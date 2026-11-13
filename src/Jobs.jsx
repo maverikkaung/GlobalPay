@@ -60,7 +60,7 @@ function Jobs() {
   useEffect(() => {
     try {
       const savedJobs = JSON.parse(
-        localStorage.getItem("globalpay_client_jobs") || "[]"
+        localStorage.getItem("TechKarvo_client_jobs") || "[]"
       );
 
       const formattedJobs = savedJobs.map(function(item) {
@@ -146,7 +146,7 @@ function Jobs() {
     <div className="jobs-page">
       <nav className="jobs-navbar">
         <Link to="/" className="logo">
-          GlobalPay
+          TechKarvo
         </Link>
 
         <div className="jobs-nav-links">
@@ -164,7 +164,7 @@ function Jobs() {
       <section className="jobs-hero">
         <div className="jobs-hero-content">
           <span className="section-label">
-            GLOBALPAY JOB MARKETPLACE
+            TechKarvo JOB MARKETPLACE
           </span>
 
           <h1>
@@ -303,7 +303,7 @@ handleApply(job);
 
       <footer className="jobs-footer">
         <p>
-          © 2026 GlobalPay. All rights reserved.
+          © 2026 TechKarvo. All rights reserved.
         </p>
       </footer>
     </div>

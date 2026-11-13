@@ -11,7 +11,7 @@ function JobDetails() {
 
   try {
     clientJobs = JSON.parse(
-      localStorage.getItem("globalpay_client_jobs") || "[]"
+      localStorage.getItem("TechKarvo_client_jobs") || "[]"
     );
   } catch (error) {
     clientJobs = [];
@@ -71,7 +71,7 @@ function JobDetails() {
 
       <header className="jobs-navbar">
         <Link to="/" className="logo">
-          GlobalPay
+          TechKarvo
         </Link>
 
         <div className="jobs-nav-links">
@@ -156,7 +156,7 @@ function JobDetails() {
       </main>
 
       <footer className="jobs-footer">
-        © 2026 GlobalPay. All rights reserved.
+        © 2026 TechKarvo. All rights reserved.
       </footer>
 
     </div>

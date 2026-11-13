@@ -17,11 +17,11 @@ function ClientDashboard() {
 
     try {
       const savedJobs = JSON.parse(
-        localStorage.getItem("globalpay_client_jobs") || "[]"
+        localStorage.getItem("TechKarvo_client_jobs") || "[]"
       );
 
       const savedApplications = JSON.parse(
-        localStorage.getItem("globalpay_applications") || "[]"
+        localStorage.getItem("TechKarvo_applications") || "[]"
       );
 
       const myProjects = savedJobs.filter(function(item) {
@@ -90,7 +90,7 @@ if (user.accountType !== "Client") {
 
       <header className="dashboard-navbar">
         <Link to="/" className="dashboard-logo">
-          GlobalPay
+          TechKarvo
         </Link>
 
         <button onClick={handleLogout} className="dashboard-logout">

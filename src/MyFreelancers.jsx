@@ -14,7 +14,7 @@ function MyFreelancers() {
 
     try {
       const savedApplications = JSON.parse(
-        localStorage.getItem("globalpay_applications") || "[]"
+        localStorage.getItem("TechKarvo_applications") || "[]"
       );
 
       const acceptedFreelancers = savedApplications.filter(function(item) {
@@ -55,7 +55,7 @@ function MyFreelancers() {
 
       <header className="dashboard-navbar">
         <Link to="/" className="dashboard-logo">
-          GlobalPay
+          TechKarvo
         </Link>
 
         <Link to="/client-dashboard" className="dashboard-logout">

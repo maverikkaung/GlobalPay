@@ -12,7 +12,7 @@ function Login() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const savedEmail = localStorage.getItem("globalpay_remembered_email");
+    const savedEmail = localStorage.getItem("TechKarvo_remembered_email");
 
     if (savedEmail) {
       setEmail(savedEmail);
@@ -66,17 +66,17 @@ function Login() {
            };
 
 localStorage.setItem(
-  "globalpay_current_user",
+  "TechKarvo_current_user",
   JSON.stringify(currentUser)
 );
 
     if (rememberMe) {
       localStorage.setItem(
-        "globalpay_remembered_email",
+        "TechKarvo_remembered_email",
         cleanEmail
       );
     } else {
-      localStorage.removeItem("globalpay_remembered_email");
+      localStorage.removeItem("TechKarvo_remembered_email");
     }
 
     alert("Welcome back, " + profile.full_name + "!");
@@ -96,9 +96,9 @@ localStorage.setItem(
     <div className="login-page">
       <div className="login-card">
 
-        <h1>GlobalPay</h1>
+        <h1>TechKarvo</h1>
         <h2>Welcome Back</h2>
-        <p>Login to your GlobalPay account</p>
+        <p>Login to your TechKarvo account</p>
 
         <form onSubmit={handleLogin}>
           <label>Email Address</label>

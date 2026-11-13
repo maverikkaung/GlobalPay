@@ -12,7 +12,7 @@ function ApplyForm() {
 
   try {
     clientJobs = JSON.parse(
-      localStorage.getItem("globalpay_client_jobs") || "[]"
+      localStorage.getItem("TechKarvo_client_jobs") || "[]"
     );
   } catch (error) {
     clientJobs = [];
@@ -43,7 +43,7 @@ function ApplyForm() {
 
     try {
       const allProfiles = JSON.parse(
-        localStorage.getItem("globalpay_freelancer_profiles") || "{}"
+        localStorage.getItem("TechKarvo_freelancer_profiles") || "{}"
       );
 
       const profile = allProfiles[user.email];
@@ -80,7 +80,7 @@ function ApplyForm() {
 
     try {
       savedApplications = JSON.parse(
-        localStorage.getItem("globalpay_applications") || "[]"
+        localStorage.getItem("TechKarvo_applications") || "[]"
       );
     } catch (error) {
       savedApplications = [];
@@ -120,7 +120,7 @@ function ApplyForm() {
     savedApplications.push(application);
 
     localStorage.setItem(
-      "globalpay_applications",
+      "TechKarvo_applications",
       JSON.stringify(savedApplications)
     );
 
@@ -159,7 +159,7 @@ function ApplyForm() {
     <div className="dashboard-page">
 <header className="dashboard-navbar">
         <Link to="/jobs" className="dashboard-logo">
-          GlobalPay
+          TechKarvo
         </Link>
 
         <Link to="/jobs" className="dashboard-logout">

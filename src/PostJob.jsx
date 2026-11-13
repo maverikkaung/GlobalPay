@@ -31,7 +31,7 @@ function PostJob() {
 
     try {
       savedJobs = JSON.parse(
-        localStorage.getItem("globalpay_client_jobs") || "[]"
+        localStorage.getItem("TechKarvo_client_jobs") || "[]"
       );
     } catch {
       savedJobs = [];
@@ -55,7 +55,7 @@ function PostJob() {
     savedJobs.push(newJob);
 
     localStorage.setItem(
-      "globalpay_client_jobs",
+      "TechKarvo_client_jobs",
       JSON.stringify(savedJobs)
     );
 
@@ -86,7 +86,7 @@ function PostJob() {
     <div className="dashboard-page">
       <header className="dashboard-navbar">
         <Link to="/client-dashboard" className="dashboard-logo">
-          GlobalPay
+          TechKarvo
         </Link>
 
         <Link to="/client-dashboard" className="dashboard-logout">

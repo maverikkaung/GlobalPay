@@ -22,7 +22,7 @@ function MyProjects() {
 
     try {
       const savedJobs = JSON.parse(
-        localStorage.getItem("globalpay_client_jobs") || "[]"
+        localStorage.getItem("TechKarvo_client_jobs") || "[]"
       );
 
       const myProjects = savedJobs.filter(function(item) {
@@ -71,7 +71,7 @@ function MyProjects() {
     }
 
     const savedJobs = JSON.parse(
-      localStorage.getItem("globalpay_client_jobs") || "[]"
+      localStorage.getItem("TechKarvo_client_jobs") || "[]"
     );
 
     const updatedJobs = savedJobs.map(function(item) {
@@ -95,7 +95,7 @@ function MyProjects() {
     });
 
     localStorage.setItem(
-      "globalpay_client_jobs",
+      "TechKarvo_client_jobs",
       JSON.stringify(updatedJobs)
     );
 
@@ -119,7 +119,7 @@ function MyProjects() {
     }
 
     const savedJobs = JSON.parse(
-      localStorage.getItem("globalpay_client_jobs") || "[]"
+      localStorage.getItem("TechKarvo_client_jobs") || "[]"
     );
 
     const updatedJobs = savedJobs.filter(function(item) {
@@ -130,12 +130,12 @@ function MyProjects() {
     });
 
     localStorage.setItem(
-      "globalpay_client_jobs",
+      "TechKarvo_client_jobs",
       JSON.stringify(updatedJobs)
     );
 
     const savedApplications = JSON.parse(
-      localStorage.getItem("globalpay_applications") || "[]"
+      localStorage.getItem("TechKarvo_applications") || "[]"
     );
 
     const updatedApplications = savedApplications.filter(function(item) {
@@ -146,7 +146,7 @@ function MyProjects() {
     });
 
     localStorage.setItem(
-      "globalpay_applications",
+      "TechKarvo_applications",
       JSON.stringify(updatedApplications)
     );
 
@@ -179,7 +179,7 @@ if (user.accountType !== "Client") {
 
       <header className="dashboard-navbar">
         <Link to="/" className="dashboard-logo">
-          GlobalPay
+          TechKarvo
         </Link>
 
         <Link to="/client-dashboard" className="dashboard-logout">

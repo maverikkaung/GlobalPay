@@ -1,6 +1,6 @@
 import { supabase } from "./supabase.js";
 
-const CURRENT_USER_KEY = "globalpay_current_user";
+const CURRENT_USER_KEY = "TechKarvo_current_user";
 
 export function getUsers() {
   return [];

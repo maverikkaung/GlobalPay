@@ -63,9 +63,9 @@ function Signup() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1>GlobalPay</h1>
+        <h1>TechKarvo</h1>
         <h2>Create Account</h2>
-        <p>Join GlobalPay and start your global journey.</p>
+        <p>Join TechKarvo and start your global journey.</p>
 
         <form onSubmit={handleSignup}>
           <label>Full Name</label>

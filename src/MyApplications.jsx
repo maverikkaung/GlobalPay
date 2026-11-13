@@ -21,7 +21,7 @@ function MyApplications() {
     if (user && user.accountType === "Freelancer") {
       try {
         const savedApplications = JSON.parse(
-          localStorage.getItem("globalpay_applications") || "[]"
+          localStorage.getItem("TechKarvo_applications") || "[]"
         );
 
         const myApplications = savedApplications.filter(function(item) {
@@ -64,7 +64,7 @@ function MyApplications() {
 
       <header className="dashboard-navbar">
         <Link to="/freelancer-dashboard" className="dashboard-logo">
-          GlobalPay
+          TechKarvo
         </Link>
 
         <Link to="/freelancer-dashboard" className="dashboard-logout">

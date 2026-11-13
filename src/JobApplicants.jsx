@@ -15,7 +15,7 @@ function JobApplicants() {
 
     try {
       const savedApplications = JSON.parse(
-        localStorage.getItem("globalpay_applications") || "[]"
+        localStorage.getItem("TechKarvo_applications") || "[]"
       );
 
       const myApplications = savedApplications.filter(function(item) {
@@ -33,7 +33,7 @@ function JobApplicants() {
 
     try {
       savedApplications = JSON.parse(
-        localStorage.getItem("globalpay_applications") || "[]"
+        localStorage.getItem("TechKarvo_applications") || "[]"
       );
     } catch (error) {
       savedApplications = [];
@@ -55,7 +55,7 @@ function JobApplicants() {
     });
 
     localStorage.setItem(
-      "globalpay_applications",
+      "TechKarvo_applications",
       JSON.stringify(updatedApplications)
     );
 
@@ -93,7 +93,7 @@ function JobApplicants() {
 
       <header className="dashboard-navbar">
         <Link to="/" className="dashboard-logo">
-          GlobalPay
+          TechKarvo
         </Link>
 
         <Link to="/client-dashboard" className="dashboard-logout">

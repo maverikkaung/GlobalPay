@@ -8,7 +8,7 @@ export const supabase = createClient(
   supabaseKey
 );
 
-console.log("GlobalPay Supabase connected!");
+console.log("TechKarvo Supabase connected!");
 
 supabase
   .from("jobs")

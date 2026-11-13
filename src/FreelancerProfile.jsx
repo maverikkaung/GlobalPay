@@ -27,7 +27,7 @@ function FreelancerProfile() {
 
     try {
       const allProfiles = JSON.parse(
-        localStorage.getItem("globalpay_freelancer_profiles") || "{}"
+        localStorage.getItem("TechKarvo_freelancer_profiles") || "{}"
       );
 
       const profile = allProfiles[user.email];
@@ -58,7 +58,7 @@ function FreelancerProfile() {
 
     try {
       allProfiles = JSON.parse(
-        localStorage.getItem("globalpay_freelancer_profiles") || "{}"
+        localStorage.getItem("TechKarvo_freelancer_profiles") || "{}"
       );
     } catch {
       allProfiles = {};
@@ -75,7 +75,7 @@ function FreelancerProfile() {
     };
 
     localStorage.setItem(
-      "globalpay_freelancer_profiles",
+      "TechKarvo_freelancer_profiles",
       JSON.stringify(allProfiles)
     );
 
@@ -90,7 +90,7 @@ function FreelancerProfile() {
     <div className="dashboard-page">
       <header className="dashboard-navbar">
         <Link to="/freelancer-dashboard" className="dashboard-logo">
-          GlobalPay
+          TechKarvo
         </Link>
 
         <Link

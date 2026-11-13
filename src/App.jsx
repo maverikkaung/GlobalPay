@@ -45,7 +45,7 @@ function Home() {
       <header className="navbar">
 
         <Link to="/" className="logo">
-          Global<span>Pay</span>
+          Tech<span>Karvo</span>
         </Link>
 
         <div className={"nav-links " + (menuOpen ? "active" : "")}>
@@ -131,7 +131,7 @@ function Home() {
 
             <p>
               Discover opportunities, connect with talented people,
-              and build your career beyond borders with GlobalPay.
+              and build your career beyond borders with TechKarvo.
             </p>
 
             <div className="hero-buttons">
@@ -159,7 +159,7 @@ function Home() {
           <div className="wallet-card home-preview-card">
 
             <div className="card-top">
-              <span>GLOBALPAY OVERVIEW</span>
+              <span>TechKarvo OVERVIEW</span>
               <span className="preview-status">PREVIEW</span>
             </div>
 <div className="balance-label">
@@ -199,7 +199,7 @@ function Home() {
 
             <div className="card-bottom">
               <span>GLOBAL OPPORTUNITIES</span>
-              <span>GLOBALPAY</span>
+              <span>TechKarvo</span>
             </div>
 
           </div>
@@ -213,7 +213,7 @@ function Home() {
 
           <div className="home-section-heading">
 
-            <span>WHY GLOBALPAY</span>
+            <span>WHY TechKarvo</span>
 
             <h2>Everything You Need to Grow</h2>
 
@@ -283,7 +283,7 @@ function Home() {
 
           <p>
             Your skills deserve a global audience.
-            Start building your future with GlobalPay.
+            Start building your future with TechKarvo.
           </p>
 
           <Link to="/signup" className="primary-btn">
@@ -304,7 +304,7 @@ function Home() {
         </Link>
 
         <p>
-          © 2026 GlobalPay. All rights reserved.
+          © 2026 TechKarvo. All rights reserved.
         </p>
 
         <span>

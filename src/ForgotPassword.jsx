@@ -35,7 +35,7 @@ function ForgotPassword() {
     <div className="login-page">
       <div className="login-card">
 
-        <h1>GlobalPay</h1>
+        <h1>TechKarvo</h1>
         <h2>Forgot Password?</h2>
 
         {!sent ? (

@@ -48,7 +48,7 @@ function ResetPassword() {
     <div className="login-page">
       <div className="login-card">
 
-        <h1>GlobalPay</h1>
+        <h1>TechKarvo</h1>
         <h2>Reset Password</h2>
 
         {!updated ? (
