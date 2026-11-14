@@ -57,13 +57,14 @@ function Login() {
 
     const profile = profileResult.data;
     const currentUser = {
-           name: profile.full_name,
-          email: cleanEmail,
-          accountType:
-          profile.account_type === "freelancer"
-            ? "Freelancer"
-               : "Client"
-           };
+  id: user.id,
+  name: profile.full_name,
+  email: cleanEmail,
+  accountType:
+    profile.account_type === "freelancer"
+      ? "Freelancer"
+      : "Client"
+};
 
 localStorage.setItem(
   "TechKarvo_current_user",

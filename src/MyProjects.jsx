@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getCurrentUser } from "./auth.js";
+import { supabase } from "./supabase.js";
 
 function MyProjects() {
   const user = getCurrentUser();
 
   const [projects, setProjects] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
@@ -16,33 +19,53 @@ function MyProjects() {
   const [paymentType, setPaymentType] = useState("Fixed Price");
 
   useEffect(function() {
-    if (!user || user.accountType !== "Client") {
-      return;
+    async function loadProjects() {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      if (user.accountType !== "Client") {
+        setLoading(false);
+        return;
+      }
+
+      if (!user.id) {
+        setLoading(false);
+        alert("User ID not found. Please log in again.");
+        return;
+      }
+
+      const result = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("client_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (result.error) {
+        console.error(result.error);
+        alert("Unable to load projects: " + result.error.message);
+        setProjects([]);
+      } else {
+        setProjects(result.data);
+      }
+
+      setLoading(false);
     }
 
-    try {
-      const savedJobs = JSON.parse(
-        localStorage.getItem("TechKarvo_client_jobs") || "[]"
-      );
-
-      const myProjects = savedJobs.filter(function(item) {
-        return item.clientEmail === user.email;
-      });
-
-      setProjects(myProjects);
-    } catch (error) {
-      setProjects([]);
-    }
-  }, []);
+    loadProjects();
+  }, [user ? user.id : null]);
 
   function startEdit(project) {
     setEditingId(project.id);
-    setTitle(project.title || "");
-    setCategory(project.category || "");
-    setDescription(project.description || "");
-    setSkills(project.skills || "");
-    setBudget(project.budget || "");
-    setPaymentType(project.paymentType || "Fixed Price");
+    setTitle(project.title);
+    setCategory(project.category ? project.category : "");
+    setDescription(project.description ? project.description : "");
+    setSkills(project.skills ? project.skills : "");
+    setBudget(String(project.budget));
+    setPaymentType(
+      project.payment_type ? project.payment_type : "Fixed Price"
+    );
 
     window.scrollTo(0, 0);
   }
@@ -57,7 +80,7 @@ function MyProjects() {
     setPaymentType("Fixed Price");
   }
 
-  function saveEdit(event) {
+  async function saveEdit(event) {
     event.preventDefault();
 
     if (
@@ -70,46 +93,51 @@ function MyProjects() {
       return;
     }
 
-    const savedJobs = JSON.parse(
-      localStorage.getItem("TechKarvo_client_jobs") || "[]"
-    );
+    setSaving(true);
 
-    const updatedJobs = savedJobs.map(function(item) {
-      if (
-        String(item.id) === String(editingId) &&
-        item.clientEmail === user.email
-      ) {
+    const result = await supabase
+      .from("jobs")
+      .update({
+        title: title.trim(),
+        category: category,
+        description: description.trim(),
+        skills: skills.trim(),
+        budget: Number(budget),
+        payment_type: paymentType
+      })
+      .eq("id", editingId)
+      .eq("client_id", user.id);
+
+    setSaving(false);
+
+    if (result.error) {
+      alert("Project update failed: " + result.error.message);
+      return;
+    }
+
+    const updatedProjects = projects.map(function(item) {
+      if (String(item.id) === String(editingId)) {
         return {
           ...item,
-          title: title,
+          title: title.trim(),
           category: category,
-          description: description,
-          skills: skills,
+          description: description.trim(),
+          skills: skills.trim(),
           budget: Number(budget),
-          salary: "$" + budget + " USD",
-          paymentType: paymentType
+          payment_type: paymentType
         };
       }
 
       return item;
     });
 
-    localStorage.setItem(
-      "TechKarvo_client_jobs",
-      JSON.stringify(updatedJobs)
-    );
-
-    const myProjects = updatedJobs.filter(function(item) {
-      return item.clientEmail === user.email;
-    });
-
-    setProjects(myProjects);
+    setProjects(updatedProjects);
     cancelEdit();
 
     alert("Project updated successfully!");
   }
 
-  function deleteProject(project) {
+  async function deleteProject(project) {
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this project?"
     );
@@ -118,46 +146,24 @@ function MyProjects() {
       return;
     }
 
-    const savedJobs = JSON.parse(
-      localStorage.getItem("TechKarvo_client_jobs") || "[]"
-    );
+    const result = await supabase
+      .from("jobs")
+      .delete()
+      .eq("id", project.id)
+      .eq("client_id", user.id);
 
-    const updatedJobs = savedJobs.filter(function(item) {
-      return !(
-        String(item.id) === String(project.id) &&
-        item.clientEmail === user.email
-      );
-    });
+    if (result.error) {
+      alert("Project deletion failed: " + result.error.message);
+      return;
+    }
 
-    localStorage.setItem(
-      "TechKarvo_client_jobs",
-      JSON.stringify(updatedJobs)
-    );
-
-    const savedApplications = JSON.parse(
-      localStorage.getItem("TechKarvo_applications") || "[]"
-    );
-
-    const updatedApplications = savedApplications.filter(function(item) {
-      return !(
-        String(item.id) === String(project.id) &&
-        item.clientEmail === user.email
-      );
-    });
-
-    localStorage.setItem(
-      "TechKarvo_applications",
-      JSON.stringify(updatedApplications)
-    );
-
-    setProjects(updatedJobs.filter(function(item) {
-      return item.clientEmail === user.email;
+    setProjects(projects.filter(function(item) {
+      return String(item.id) !== String(project.id);
     }));
 
     alert("Project deleted successfully!");
   }
-
-  if (!user) {
+      if (!user) {
     return (
       <div className="dashboard-page">
         <h2>Please login first.</h2>
@@ -165,7 +171,8 @@ function MyProjects() {
       </div>
     );
   }
-if (user.accountType !== "Client") {
+
+  if (user.accountType !== "Client") {
     return (
       <div className="dashboard-page">
         <h2>Client account required.</h2>
@@ -261,8 +268,8 @@ if (user.accountType !== "Client") {
                 <option value="Hourly">Hourly</option>
               </select>
 
-              <button type="submit">
-                Save Changes
+              <button type="submit" disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
               </button>
 
               <button type="button" onClick={cancelEdit}>
@@ -276,7 +283,11 @@ if (user.accountType !== "Client") {
         <section className="dashboard-section">
           <h2>My Posted Projects ({projects.length})</h2>
 
-          {projects.length === 0 ? (
+          {loading ? (
+            <div className="dashboard-stat-card">
+              <p>Loading your projects...</p>
+            </div>
+          ) : projects.length === 0 ? (
             <div className="dashboard-stat-card">
               <h3>No Projects Yet</h3>
               <p>You have not posted any jobs yet.</p>
@@ -290,17 +301,29 @@ if (user.accountType !== "Client") {
                   <div className="job-card" key={project.id}>
 
                     <h3>{project.title}</h3>
-                    <p>{project.company}</p>
+
                     <p>Category: {project.category}</p>
-                    <p>Budget: {project.salary}</p>
-                    <p>Payment: {project.paymentType}</p>
+
+                    <p>
+                      Budget: ${project.budget} {project.currency}
+                    </p>
+                       <p>
+                      Payment: {project.payment_type}
+                    </p>
+
                     <p>Status: {project.status}</p>
-                    <p>Posted: {project.createdAt}</p>
+
+                    <p>
+                      Posted: {
+                        new Date(project.created_at).toLocaleDateString()
+                      }
+                    </p>
 
                     <Link to={"/jobs/" + project.id}>
                       View Project
                     </Link>
-                     <button
+
+                    <button
                       type="button"
                       onClick={function() {
                         startEdit(project);
