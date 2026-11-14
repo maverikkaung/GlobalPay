@@ -1,31 +1,19 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getCurrentUser } from "./auth.js";
-import { jobsData } from "./Jobs.jsx";
+import { supabase } from "./supabase.js";
 
 function ApplyForm() {
   const navigate = useNavigate();
   const params = useParams();
   const user = getCurrentUser();
 
-  let clientJobs = [];
+  const [job, setJob] = useState(null);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  try {
-    clientJobs = JSON.parse(
-      localStorage.getItem("TechKarvo_client_jobs") || "[]"
-    );
-  } catch (error) {
-    clientJobs = [];
-  }
-
-  const allJobs = jobsData.concat(clientJobs);
-
-  const job = allJobs.find(function(item) {
-    return String(item.id) === String(params.id);
-  });
-
-  const [fullName, setFullName] = useState(user ? user.name : "");
-  const [email, setEmail] = useState(user ? user.email : "");
+  const [fullName, setFullName] = useState(user ? user.name || "" : "");
+  const [email, setEmail] = useState(user ? user.email || "" : "");
   const [country, setCountry] = useState("");
   const [title, setTitle] = useState("");
   const [bio, setBio] = useState("");
@@ -37,32 +25,88 @@ function ApplyForm() {
   const [portfolio, setPortfolio] = useState("");
 
   useEffect(function() {
-    if (!user) {
-      return;
-    }
-
-    try {
-      const allProfiles = JSON.parse(
-        localStorage.getItem("TechKarvo_freelancer_profiles") || "{}"
-      );
-
-      const profile = allProfiles[user.email];
-
-      if (profile) {
-        setFullName(profile.fullName || user.name);
-        setCountry(profile.country || "");
-        setTitle(profile.title || "");
-        setBio(profile.bio || "");
-        setSkills(profile.skills || "");
-        setExperience(profile.experience || "");
-        setPortfolio(profile.portfolio || "");
+    async function loadData() {
+      if (!user || user.accountType !== "Freelancer") {
+        setPageLoading(false);
+        return;
       }
-    } catch (error) {
-      console.log("Could not load freelancer profile.");
-    }
-  }, []);
 
-  function handleSubmit(event) {
+      try {
+        const jobResult = await supabase
+          .from("jobs")
+          .select("*")
+          .eq("id", params.id)
+          .eq("status", "open")
+          .maybeSingle();
+
+        if (jobResult.error) {
+          console.log("Job loading error:", jobResult.error.message);
+          setJob(null);
+          setPageLoading(false);
+          return;
+        }
+
+        if (!jobResult.data) {
+          setJob(null);
+          setPageLoading(false);
+          return;
+        }
+
+        const item = jobResult.data;
+
+        setJob({
+          id: item.id,
+          title: item.title,
+          budget: item.budget,
+          currency: item.currency || "USD",
+          paymentType: item.payment_type || "Fixed Price",
+          clientId: item.client_id
+        });
+
+        const profileResult = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profileResult.data) {
+          const profile = profileResult.data;
+
+          setFullName(profile.full_name || user.name || "");
+          setCountry(profile.country || "");
+        }
+
+        try {
+          const savedProfiles = JSON.parse(
+            localStorage.getItem("TechKarvo_freelancer_profiles") || "{}"
+          );
+
+          const localProfile = savedProfiles[user.email];
+
+          if (localProfile) {
+            setFullName(localProfile.fullName || user.name || "");
+            setCountry(localProfile.country || "");
+            setTitle(localProfile.title || "");
+            setBio(localProfile.bio || "");
+            setSkills(localProfile.skills || "");
+            setExperience(localProfile.experience || "");
+            setPortfolio(localProfile.portfolio || "");
+          }
+        } catch (error) {
+          console.log("Could not load saved freelancer profile.");
+        }
+      } catch (error) {
+        console.log("Application page error:", error.message);
+        setJob(null);
+      }
+
+      setPageLoading(false);
+    }
+
+    loadData();
+  }, [params.id]);
+
+  async function handleSubmit(event) {
     event.preventDefault();
 
     if (!user) {
@@ -76,53 +120,56 @@ function ApplyForm() {
       return;
     }
 
-    let savedApplications = [];
-
-    try {
-      savedApplications = JSON.parse(
-        localStorage.getItem("TechKarvo_applications") || "[]"
-      );
-    } catch (error) {
-      savedApplications = [];
-    }
-
-    const alreadyApplied = savedApplications.some(function(item) {
-      return String(item.id) === String(job.id) &&
-        item.email === user.email;
-    });
-
-    if (alreadyApplied) {
-      alert("You have already applied for this job.");
-      navigate("/my-applications");
+    if (!user.id) {
+      alert("User ID not found. Please log out and log in again.");
       return;
     }
 
-    const application = {
-      id: job.id,
-      title: job.title,
-      company: job.company,
-      clientEmail: job.clientEmail || "",
-      email: user.email,
-      fullName: fullName,
-      country: country,
-      professionalTitle: title,
-      bio: bio,
-      skills: skills,
+    if (!job) {
+      alert("This job is not available.");
+      return;
+    }
+
+    if (Number(salary) <= 0) {
+      alert("Please enter a valid expected salary.");
+      return;
+    }
+
+    setSubmitting(true);
+      const application = {
+      job_id: job.id,
+      client_id: job.clientId,
+      freelancer_id: user.id,
+      full_name: fullName.trim(),
+      email: email.trim(),
+      country: country.trim(),
+      professional_title: title.trim(),
+      bio: bio.trim(),
+      skills: skills.trim(),
       experience: experience,
-      coverLetter: coverLetter,
-      expectedSalary: salary,
-      salaryType: salaryType,
-      portfolio: portfolio,
-      status: "Pending",
-      appliedAt: new Date().toLocaleDateString()
+      cover_letter: coverLetter.trim(),
+      expected_salary: Number(salary),
+      salary_type: salaryType,
+      portfolio: portfolio.trim(),
+      status: "Pending"
     };
 
-    savedApplications.push(application);
+    const result = await supabase
+      .from("job_applications")
+      .insert(application);
 
-    localStorage.setItem(
-      "TechKarvo_applications",
-      JSON.stringify(savedApplications)
-    );
+    setSubmitting(false);
+
+    if (result.error) {
+      if (result.error.code === "23505") {
+        alert("You have already applied for this job.");
+        navigate("/my-applications");
+        return;
+      }
+
+      alert("Application submission failed: " + result.error.message);
+      return;
+    }
 
     alert("Your application has been submitted successfully!");
     navigate("/my-applications");
@@ -137,15 +184,6 @@ function ApplyForm() {
     );
   }
 
-  if (!job) {
-    return (
-      <div className="dashboard-page">
-        <h2>Job not found.</h2>
-        <Link to="/jobs">Back to Jobs</Link>
-      </div>
-    );
-  }
-
   if (user.accountType !== "Freelancer") {
     return (
       <div className="dashboard-page">
@@ -155,9 +193,26 @@ function ApplyForm() {
     );
   }
 
+  if (pageLoading) {
+    return (
+      <div className="dashboard-page">
+        <h2>Loading Application Form...</h2>
+      </div>
+    );
+  }
+
+  if (!job) {
+    return (
+      <div className="dashboard-page">
+        <h2>Job not found or no longer available.</h2>
+        <Link to="/jobs">Back to Jobs</Link>
+      </div>
+    );
+  }
+
   return (
     <div className="dashboard-page">
-<header className="dashboard-navbar">
+      <header className="dashboard-navbar">
         <Link to="/jobs" className="dashboard-logo">
           TechKarvo
         </Link>
@@ -168,15 +223,15 @@ function ApplyForm() {
       </header>
 
       <main className="dashboard-container">
-
         <div className="dashboard-welcome">
           <span className="dashboard-tag">JOB APPLICATION</span>
           <h1>Apply for {job.title}</h1>
-          <p>{job.company} · {job.salary || "Negotiable"}</p>
+          <p>
+            {job.currency} {job.budget} · {job.paymentType}
+          </p>
         </div>
 
         <form className="application-form" onSubmit={handleSubmit}>
-
           <h2>Personal Information</h2>
 
           <label>Full Name</label>
@@ -241,8 +296,7 @@ function ApplyForm() {
             }}
             required
           />
-
-          <label>Years of Experience</label>
+        <label>Years of Experience</label>
           <select
             value={experience}
             onChange={function(event) {
@@ -302,10 +356,14 @@ function ApplyForm() {
               setPortfolio(event.target.value);
             }}
           />
-<button type="submit" className="primary-btn">
-            Submit Application
-          </button>
 
+          <button
+            type="submit"
+            className="primary-btn"
+            disabled={submitting}
+          >
+            {submitting ? "Submitting..." : "Submit Application"}
+          </button>
         </form>
       </main>
     </div>
