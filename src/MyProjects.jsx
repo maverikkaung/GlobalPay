@@ -20,19 +20,8 @@ function MyProjects() {
 
   useEffect(function() {
     async function loadProjects() {
-      if (!user) {
+      if (!user || user.accountType !== "Client" || !user.id) {
         setLoading(false);
-        return;
-      }
-
-      if (user.accountType !== "Client") {
-        setLoading(false);
-        return;
-      }
-
-      if (!user.id) {
-        setLoading(false);
-        alert("User ID not found. Please log in again.");
         return;
       }
 
@@ -58,14 +47,12 @@ function MyProjects() {
 
   function startEdit(project) {
     setEditingId(project.id);
-    setTitle(project.title);
-    setCategory(project.category ? project.category : "");
-    setDescription(project.description ? project.description : "");
-    setSkills(project.skills ? project.skills : "");
+    setTitle(project.title || "");
+    setCategory(project.category || "");
+    setDescription(project.description || "");
+    setSkills(project.skills || "");
     setBudget(String(project.budget));
-    setPaymentType(
-      project.payment_type ? project.payment_type : "Fixed Price"
-    );
+    setPaymentType(project.payment_type || "Fixed Price");
 
     window.scrollTo(0, 0);
   }
@@ -87,7 +74,8 @@ function MyProjects() {
       title.trim() === "" ||
       category.trim() === "" ||
       description.trim() === "" ||
-      budget === ""
+      budget === "" ||
+      Number(budget) <= 0
     ) {
       alert("Please complete all required fields.");
       return;
@@ -99,7 +87,7 @@ function MyProjects() {
       .from("jobs")
       .update({
         title: title.trim(),
-        category: category,
+        category: category.trim(),
         description: description.trim(),
         skills: skills.trim(),
         budget: Number(budget),
@@ -120,7 +108,7 @@ function MyProjects() {
         return {
           ...item,
           title: title.trim(),
-          category: category,
+          category: category.trim(),
           description: description.trim(),
           skills: skills.trim(),
           budget: Number(budget),
@@ -133,7 +121,6 @@ function MyProjects() {
 
     setProjects(updatedProjects);
     cancelEdit();
-
     alert("Project updated successfully!");
   }
 
@@ -163,7 +150,8 @@ function MyProjects() {
 
     alert("Project deleted successfully!");
   }
-      if (!user) {
+
+  if (!user) {
     return (
       <div className="dashboard-page">
         <h2>Please login first.</h2>
@@ -171,8 +159,7 @@ function MyProjects() {
       </div>
     );
   }
-
-  if (user.accountType !== "Client") {
+        if (user.accountType !== "Client") {
     return (
       <div className="dashboard-page">
         <h2>Client account required.</h2>
@@ -182,7 +169,7 @@ function MyProjects() {
   }
 
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page my-projects-page">
 
       <header className="dashboard-navbar">
         <Link to="/" className="dashboard-logo">
@@ -194,17 +181,59 @@ function MyProjects() {
         </Link>
       </header>
 
-      <main className="dashboard-container">
+      <main className="dashboard-container my-projects-container">
 
-        <div className="dashboard-welcome">
-          <span className="dashboard-tag">CLIENT PROJECTS</span>
-          <h1>My Projects</h1>
-          <p>View and manage the jobs you have posted.</p>
-        </div>
+        <section className="my-projects-hero">
+          <div>
+            <span className="dashboard-tag">CLIENT WORKSPACE</span>
+            <h1>My Projects</h1>
+            <p>
+              Manage your posted jobs, update project details,
+              and keep track of your opportunities.
+            </p>
+          </div>
+
+          <Link to="/post-job" className="my-projects-post-button">
+            + Post New Project
+          </Link>
+        </section>
+
+        <section className="my-projects-overview">
+          <div className="my-projects-overview-card">
+            <span>Total Projects</span>
+            <strong>{projects.length}</strong>
+            <p>Projects you have posted</p>
+          </div>
+
+          <div className="my-projects-overview-card">
+            <span>Open Projects</span>
+            <strong>
+              {projects.filter(function(project) {
+                return project.status === "open";
+              }).length}
+            </strong>
+            <p>Currently accepting applications</p>
+          </div>
+
+          <div className="my-projects-overview-card">
+            <span>Other Status</span>
+            <strong>
+              {projects.filter(function(project) {
+                return project.status !== "open";
+              }).length}
+            </strong>
+            <p>Closed or inactive projects</p>
+          </div>
+        </section>
 
         {editingId !== null && (
-          <section className="dashboard-section">
-            <h2>Edit Project</h2>
+          <section className="my-projects-edit-section">
+            <div className="my-projects-section-heading">
+              <div>
+                <span>PROJECT SETTINGS</span>
+                <h2>Edit Project</h2>
+              </div>
+            </div>
 
             <form onSubmit={saveEdit} className="auth-form">
 
@@ -267,8 +296,7 @@ function MyProjects() {
                 <option value="Fixed Price">Fixed Price</option>
                 <option value="Hourly">Hourly</option>
               </select>
-
-              <button type="submit" disabled={saving}>
+                 <button type="submit" disabled={saving}>
                 {saving ? "Saving..." : "Save Changes"}
               </button>
 
@@ -280,73 +308,129 @@ function MyProjects() {
           </section>
         )}
 
-        <section className="dashboard-section">
-          <h2>My Posted Projects ({projects.length})</h2>
+        <section className="my-projects-list-section">
+
+          <div className="my-projects-section-heading">
+            <div>
+              <span>YOUR WORK</span>
+              <h2>Posted Projects</h2>
+            </div>
+
+            <span className="my-projects-count">
+              {projects.length} Projects
+            </span>
+          </div>
 
           {loading ? (
-            <div className="dashboard-stat-card">
-              <p>Loading your projects...</p>
+            <div className="my-projects-empty">
+              <h3>Loading your projects...</h3>
+              <p>Please wait while we retrieve your projects.</p>
             </div>
           ) : projects.length === 0 ? (
-            <div className="dashboard-stat-card">
+            <div className="my-projects-empty">
+              <div className="my-projects-empty-icon">＋</div>
               <h3>No Projects Yet</h3>
-              <p>You have not posted any jobs yet.</p>
-              <Link to="/post-job">Post Your First Job</Link>
+              <p>
+                You have not posted any projects.
+                Create your first project to start finding freelancers.
+              </p>
+              <Link to="/post-job" className="my-projects-post-button">
+                Post Your First Project
+              </Link>
             </div>
           ) : (
-            <div className="jobs-grid">
+            <div className="my-projects-grid">
 
               {projects.map(function(project) {
+                const status = project.status || "unknown";
+
                 return (
-                  <div className="job-card" key={project.id}>
+                  <article className="my-project-card" key={project.id}>
+
+                    <div className="my-project-card-top">
+                      <span className="my-project-category">
+                        {project.category || "General"}
+                      </span>
+
+                      <span className={"my-project-status " + status}>
+                        {status}
+                      </span>
+                    </div>
 
                     <h3>{project.title}</h3>
 
-                    <p>Category: {project.category}</p>
-
-                    <p>
-                      Budget: ${project.budget} {project.currency}
-                    </p>
-                       <p>
-                      Payment: {project.payment_type}
+                    <p className="my-project-description">
+                      {project.description || "No description provided."}
                     </p>
 
-                    <p>Status: {project.status}</p>
+                    <div className="my-project-details">
 
-                    <p>
+                      <div>
+                        <span>Budget</span>
+                        <strong>
+                          {project.currency || "USD"} {project.budget}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>Payment Type</span>
+                        <strong>
+                          {project.payment_type || "Fixed Price"}
+                        </strong>
+                      </div>
+
+                    </div>
+
+                    {project.skills && (
+                      <div className="my-project-skills">
+                        <span>Required Skills</span>
+                        <p>{project.skills}</p>
+                      </div>
+                    )}
+
+                    <div className="my-project-date">
                       Posted: {
-                        new Date(project.created_at).toLocaleDateString()
+                        project.created_at
+                          ? new Date(project.created_at).toLocaleDateString()
+                          : "Date unavailable"
                       }
-                    </p>
+                    </div>
 
-                    <Link to={"/jobs/" + project.id}>
-                      View Project
-                    </Link>
+                    <div className="my-project-actions">
+                      <Link
+                        to={"/jobs/" + project.id}
+                        className="my-project-view-button"
+                      >
+                        View Project
+                      </Link>
 
-                    <button
-                      type="button"
-                      onClick={function() {
-                        startEdit(project);
-                      }}
-                    >
-                      Edit
-                    </button>
+                      <button
+                        type="button"
+                        className="my-project-edit-button"
+                        onClick={function() {
+                          startEdit(project);
+                        }}
+                      >
+                        Edit
+                      </button>
+                        <button
+                        type="button"
+                        className="my-project-delete-button"
+                        onClick={function() {
+                          deleteProject(project);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={function() {
-                        deleteProject(project);
-                      }}
-                    >
-                      Delete
-                    </button>
-
-                  </div>
+                  </article>
                 );
               })}
 
             </div>
           )}
+
         </section>
 
       </main>
