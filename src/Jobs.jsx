@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import { getCurrentUser } from "./auth.js";
+import { supabase } from "./supabase.js";
 import "./App.css";
 
 export const jobsData = [
@@ -56,20 +57,53 @@ function Jobs() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [clientJobs, setClientJobs] = useState([]);
+  const [supabaseJobs, setSupabaseJobs] = useState([]);
 
   useEffect(() => {
-    try {
-      const savedJobs = JSON.parse(
-        localStorage.getItem("TechKarvo_client_jobs") || "[]"
-      );
+    async function loadJobs() {
+      const result = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("status", "open")
+        .order("created_at", { ascending: false });
 
-      const formattedJobs = savedJobs.map(function(item) {
+      if (result.error) {
+        console.log("Jobs Loading Error:", result.error.message);
+        setSupabaseJobs([]);
+        return;
+      }
+
+      const formattedJobs = result.data.map(function(item) {
+        return {
+          id: item.id,
+          title: item.title,
+          company: "TechKarvo Client",
+          location: "Remote",
+          type: "Freelance",
+          category: "Other",
+          salary: String(item.currency ? item.currency : "USD") + " " + String(item.budget),
+          description: item.description,
+          skills: []
+        };
+      });
+
+      setSupabaseJobs(formattedJobs);
+      console.log("Supabase Jobs Loaded:", formattedJobs);
+    }
+
+    loadJobs();
+
+    try {
+      const savedData = localStorage.getItem("TechKarvo_client_jobs");
+      const savedJobs = savedData ? JSON.parse(savedData) : [];
+
+      const formattedLocalJobs = savedJobs.map(function(item) {
         let jobSkills = [];
 
         if (Array.isArray(item.skills)) {
           jobSkills = item.skills;
         } else {
-          jobSkills = (item.skills || "").split(",");
+          jobSkills = String(item.skills ? item.skills : "").split(",");
         }
 
         return {
@@ -80,7 +114,7 @@ function Jobs() {
         };
       });
 
-      setClientJobs(formattedJobs);
+      setClientJobs(formattedLocalJobs);
     } catch (error) {
       setClientJobs([]);
     }
@@ -97,7 +131,7 @@ function Jobs() {
     "Other"
   ];
 
-  const allJobs = jobsData.concat(clientJobs);
+  const allJobs = jobsData.concat(clientJobs).concat(supabaseJobs);
 
   function handleApply(job) {
     const user = getCurrentUser();
@@ -115,29 +149,27 @@ function Jobs() {
 
     navigate("/apply/" + job.id);
   }
-
-  const filteredJobs = allJobs.filter(function(job) {
+    const filteredJobs = allJobs.filter(function(job) {
     const search = searchTerm.toLowerCase();
 
-    const title = (job.title || "").toLowerCase();
-    const company = (job.company || "").toLowerCase();
-    const description = (job.description || "").toLowerCase();
+    const title = String(job.title ? job.title : "").toLowerCase();
+    const company = String(job.company ? job.company : "").toLowerCase();
+    const description = String(job.description ? job.description : "").toLowerCase();
 
-    let skillsText = "";
+    const searchItems = [title, company, description];
 
     if (Array.isArray(job.skills)) {
-      skillsText = job.skills.join(" ").toLowerCase();
+      job.skills.forEach(function(skill) {
+        searchItems.push(String(skill).toLowerCase());
+      });
     }
 
-    const matchesSearch =
-      title.includes(search) ||
-      company.includes(search) ||
-      description.includes(search) ||
-      skillsText.includes(search);
+    const matchesSearch = searchItems.some(function(value) {
+      return value.includes(search);
+    });
 
     const matchesCategory =
-      selectedCategory === "All" ||
-      job.category === selectedCategory;
+      selectedCategory === "All" ? true : job.category === selectedCategory;
 
     return matchesSearch && matchesCategory;
   });
@@ -155,7 +187,8 @@ function Jobs() {
           <Link to="/#about">About</Link>
           <NavLink to="/jobs">Find Jobs</NavLink>
         </div>
-<div className="nav-buttons">
+
+        <div className="nav-buttons">
           <Link to="/login" className="login-btn">Login</Link>
           <Link to="/signup" className="signup-btn">Sign Up</Link>
         </div>
@@ -235,11 +268,11 @@ function Jobs() {
                   <div className="job-card" key={job.id}>
                     <div className="job-card-top">
                       <div className="company-icon">
-                        {(job.company || "C").charAt(0)}
+                        {(job.company ? job.company : "C").charAt(0)}
                       </div>
 
                       <span className="job-type">
-                        {job.type || job.paymentType || "Freelance"}
+                        {job.type ? job.type : "Freelance"}
                       </span>
                     </div>
 
@@ -248,9 +281,8 @@ function Jobs() {
                     <p className="job-company">
                       {job.company}
                     </p>
-
-                    <div className="job-info">
-                      <span>{job.location || "Remote"}</span>
+                       <div className="job-info">
+                      <span>{job.location ? job.location : "Remote"}</span>
                       <span>{job.salary}</span>
                     </div>
 
@@ -280,7 +312,7 @@ function Jobs() {
                         type="button"
                         className="apply-btn"
                         onClick={function() {
-handleApply(job);
+                          handleApply(job);
                         }}
                       >
                         Apply Now
