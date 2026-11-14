@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getCurrentUser } from "./auth.js";
+import { supabase } from "./supabase.js";
 
 function PostJob() {
   const navigate = useNavigate();
@@ -12,8 +13,9 @@ function PostJob() {
   const [skills, setSkills] = useState("");
   const [budget, setBudget] = useState("");
   const [paymentType, setPaymentType] = useState("Fixed Price");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
     if (!user) {
@@ -27,40 +29,35 @@ function PostJob() {
       return;
     }
 
-    let savedJobs = [];
-
-    try {
-      savedJobs = JSON.parse(
-        localStorage.getItem("TechKarvo_client_jobs") || "[]"
-      );
-    } catch {
-      savedJobs = [];
+    if (!user.id) {
+      alert("User ID not found. Please log out and log in again.");
+      return;
     }
 
-    const newJob = {
-      id: Date.now(),
-      title: title,
-      company: user.name,
-      category: category,
-      description: description,
-      skills: skills,
-      salary: "$" + budget + " USD",
-      budget: budget,
-      paymentType: paymentType,
-      clientEmail: user.email,
-      status: "Open",
-      createdAt: new Date().toLocaleDateString()
-    };
+    setLoading(true);
 
-    savedJobs.push(newJob);
+    const result = await supabase
+      .from("jobs")
+      .insert({
+        client_id: user.id,
+        title: title.trim(),
+        category: category,
+        description: description.trim(),
+        skills: skills.trim(),
+        budget: Number(budget),
+        currency: "USD",
+        payment_type: paymentType,
+        status: "open"
+      });
 
-    localStorage.setItem(
-      "TechKarvo_client_jobs",
-      JSON.stringify(savedJobs)
-    );
+    setLoading(false);
+
+    if (result.error) {
+      alert("Job posting failed: " + result.error.message);
+      return;
+    }
 
     alert("Your job has been posted successfully!");
-
     navigate("/client-dashboard");
   }
 
@@ -135,8 +132,7 @@ function PostJob() {
             onChange={(event) => setDescription(event.target.value)}
             required
           />
-
-          <label>Required Skills</label>
+<label>Required Skills</label>
           <input
             type="text"
             placeholder="React, JavaScript, CSS..."
@@ -144,7 +140,8 @@ function PostJob() {
             onChange={(event) => setSkills(event.target.value)}
             required
           />
-[11/6/2026 9:39 AM] James Lee: <h2>Budget Information</h2>
+
+          <h2>Budget Information</h2>
 
           <label>Budget (USD)</label>
           <input
@@ -165,8 +162,12 @@ function PostJob() {
             <option value="Hourly">Hourly</option>
           </select>
 
-          <button type="submit" className="primary-btn">
-            Publish Job
+          <button
+            type="submit"
+            className="primary-btn"
+            disabled={loading}
+          >
+            {loading ? "Publishing..." : "Publish Job"}
           </button>
         </form>
       </main>
