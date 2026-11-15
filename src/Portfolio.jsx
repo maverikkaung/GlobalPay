@@ -12,6 +12,8 @@ function Portfolio() {
   const [imageUrl, setImageUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
+  const [editingId, setEditingId] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -32,27 +34,73 @@ function Portfolio() {
     return () => { active = false; };
   }, [user.id]);
 
-  async function addItem(event) {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    const result = await supabase.from("portfolio_items").insert({
-      freelancer_id: user.id,
-      title: title.trim(),
-      description: description.trim(),
-      project_url: projectUrl.trim(),
-      image_url: imageUrl.trim() || null
-    }).select("*").single();
-    setSaving(false);
-    if (result.error) {
-      setError("Unable to add portfolio item. " + result.error.message);
-      return;
-    }
-    setItems((current) => [result.data, ...current]);
+  function clearForm() {
+    setEditingId("");
     setTitle("");
     setDescription("");
     setProjectUrl("");
     setImageUrl("");
+  }
+
+  function editItem(item) {
+    setEditingId(item.id);
+    setTitle(item.title);
+    setDescription(item.description || "");
+    setProjectUrl(item.project_url);
+    setImageUrl(item.image_url || "");
+    setError("");
+    document.getElementById("portfolio-title")?.focus();
+  }
+
+  async function saveItem(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    const itemDetails = {
+      title: title.trim(),
+      description: description.trim(),
+      project_url: projectUrl.trim(),
+      image_url: imageUrl.trim() || null,
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      const result = editingId
+        ? await supabase.from("portfolio_items").update(itemDetails)
+          .eq("id", editingId).eq("freelancer_id", user.id).select("*").single()
+        : await supabase.from("portfolio_items").insert({ ...itemDetails, freelancer_id: user.id })
+          .select("*").single();
+      if (result.error) throw result.error;
+      if (editingId) {
+        setItems((current) => current.map((item) => item.id === editingId ? result.data : item));
+      } else {
+        setItems((current) => [result.data, ...current]);
+      }
+      clearForm();
+    } catch (saveError) {
+      setError(`Unable to ${editingId ? "save" : "add"} portfolio item. ` + saveError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteItem(item) {
+    if (!window.confirm(`Delete “${item.title}” from your portfolio?`)) return;
+
+    setDeletingId(item.id);
+    setError("");
+    try {
+      const result = await supabase.from("portfolio_items").delete()
+        .eq("id", item.id).eq("freelancer_id", user.id).select("id").maybeSingle();
+      if (result.error) throw result.error;
+      if (!result.data) throw new Error("This portfolio item could not be found.");
+      setItems((current) => current.filter((currentItem) => currentItem.id !== item.id));
+      if (editingId === item.id) clearForm();
+    } catch (deleteError) {
+      setError("Unable to delete portfolio item. " + deleteError.message);
+    } finally {
+      setDeletingId("");
+    }
   }
 
   const dashboard = "/freelancer-dashboard";
@@ -70,8 +118,8 @@ function Portfolio() {
           <p>Add selected projects so clients can see what you do best.</p>
         </div>
         <section className="dashboard-section portfolio-editor">
-          <h2>Add a project</h2>
-          <form className="application-form" onSubmit={addItem}>
+          <h2>{editingId ? "Edit project" : "Add a project"}</h2>
+          <form className="application-form" onSubmit={saveItem}>
             {error && <p role="alert">{error}</p>}
             <label htmlFor="portfolio-title">Project title</label>
             <input id="portfolio-title" maxLength={120} required value={title} onChange={(event) => setTitle(event.target.value)} />
@@ -81,14 +129,23 @@ function Portfolio() {
             <input id="portfolio-url" type="url" pattern="https?://.+" placeholder="https://example.com/project" required value={projectUrl} onChange={(event) => setProjectUrl(event.target.value)} />
             <label htmlFor="portfolio-image">Preview image URL (optional)</label>
             <input id="portfolio-image" type="url" pattern="https?://.+" placeholder="https://example.com/image.jpg" value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} />
-            <button type="submit" className="primary-btn" disabled={saving}>{saving ? "Adding…" : "Add to Portfolio"}</button>
+            <div className="portfolio-form-actions">
+              <button type="submit" className="primary-btn" disabled={saving}>{saving ? "Saving…" : editingId ? "Save changes" : "Add to Portfolio"}</button>
+              {editingId && <button type="button" className="portfolio-cancel-button" disabled={saving} onClick={clearForm}>Cancel</button>}
+            </div>
           </form>
         </section>
         <section className="portfolio-grid" aria-label="Portfolio projects">
           {loading ? <p>Loading portfolio…</p> : items.length === 0 ? <div className="no-jobs"><h3>Your portfolio is ready to grow</h3><p>Add your first project above.</p></div> : items.map((item) => (
             <article className="portfolio-card" key={item.id}>
               {item.image_url && <img src={item.image_url} alt="" loading="lazy" />}
-              <div><h2>{item.title}</h2><p>{item.description}</p><a href={item.project_url} target="_blank" rel="noreferrer">View project ↗</a></div>
+              <div>
+                <h2>{item.title}</h2><p>{item.description}</p><a href={item.project_url} target="_blank" rel="noreferrer">View project ↗</a>
+                <div className="portfolio-card-actions">
+                  <button type="button" className="portfolio-edit-button" disabled={saving || Boolean(deletingId)} onClick={() => editItem(item)}>Edit</button>
+                  <button type="button" className="portfolio-delete-button" disabled={saving || Boolean(deletingId)} onClick={() => deleteItem(item)}>{deletingId === item.id ? "Deleting…" : "Delete"}</button>
+                </div>
+              </div>
             </article>
           ))}
         </section>

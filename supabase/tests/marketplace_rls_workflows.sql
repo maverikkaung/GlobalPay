@@ -261,20 +261,34 @@ values ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-3333333
 insert into public.portfolio_items (freelancer_id, title, project_url)
 values ('22222222-2222-4222-8222-222222222222', 'CI portfolio', 'https://example.invalid/project');
 
+update public.portfolio_items set title = 'Updated CI portfolio'
+where freelancer_id = (select auth.uid());
+
 do $$
 begin
   if (select count(application_id) from public.reviews) <> 1
     or (select count(*) from public.reviews_public) <> 2 then
     raise exception 'Both project participants should submit reviews while public content stays visible';
   end if;
-  if (select count(*) from public.portfolio_items) <> 1 then
-    raise exception 'Freelancers should be able to manage their own portfolios';
+  if (select count(*) from public.portfolio_items) <> 1
+    or not exists (select 1 from public.portfolio_items where title = 'Updated CI portfolio') then
+    raise exception 'Freelancers should be able to update their own portfolios';
   end if;
   if not exists (
     select 1 from public.notifications where user_id = '22222222-2222-4222-8222-222222222222'
       and kind = 'new_message' and read_at is not null
   ) then
     raise exception 'Message notifications and read receipts should work';
+  end if;
+end;
+$$;
+
+delete from public.portfolio_items where freelancer_id = (select auth.uid());
+
+do $$
+begin
+  if exists (select 1 from public.portfolio_items where freelancer_id = (select auth.uid())) then
+    raise exception 'Freelancers should be able to delete their own portfolio items';
   end if;
 end;
 $$;
