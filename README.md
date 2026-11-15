@@ -25,11 +25,11 @@ The browser client must use only the Supabase anon/publishable key. Never put a 
 - `npm test`
 - `npm run build`
 
-GitHub Actions runs these checks for pushes and pull requests. A separate job applies both SQL migrations to a disposable PostgreSQL fixture, verifies RLS and column-level privileges, and exercises client/freelancer marketplace workflows. This CI database is isolated from the connected Supabase project.
+GitHub Actions runs these checks for pushes and pull requests. A separate job applies the SQL migrations to a disposable PostgreSQL fixture, verifies RLS and table/column privileges, and exercises client/freelancer marketplace workflows. This CI database is isolated from the connected Supabase project.
 
 ## Supabase schema
 
-Database changes are versioned in `supabase/migrations/`. The app requires the existing `profiles`, `jobs`, and `job_applications` tables plus both marketplace migrations. The migrations add profile fields and RLS boundaries, then messaging, notifications, portfolios, and reviews. Applying them changes the connected database; verify the target schema and obtain approval before applying them to any shared environment. They have not been applied to the connected TechKarvo project.
+Database changes are versioned in `supabase/migrations/`. The app requires the existing `profiles`, `jobs`, and `job_applications` tables plus the marketplace migrations. The migrations add profile fields and RLS boundaries, messaging, notifications, portfolios, reviews, and least-privilege grants that replace inherited table access. Applying them changes the connected database; verify the target schema and obtain approval before applying them to any shared environment. They have not been applied to the connected TechKarvo project.
 
 The application relies on RLS for authorization. Client-side route checks are for navigation only and are not a security boundary.
 

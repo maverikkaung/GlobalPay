@@ -21,6 +21,18 @@ $$;
 
 do $$
 begin
+  if has_table_privilege('anon', 'public.profiles', 'SELECT') then
+    raise exception 'Anonymous users must not read private profiles directly';
+  end if;
+  if has_table_privilege('anon', 'public.jobs', 'INSERT')
+    or has_table_privilege('anon', 'public.jobs', 'UPDATE')
+    or has_table_privilege('anon', 'public.jobs', 'DELETE') then
+    raise exception 'Anonymous users must not write jobs';
+  end if;
+  if has_table_privilege('anon', 'public.job_applications', 'SELECT')
+    or has_table_privilege('anon', 'public.job_applications', 'INSERT') then
+    raise exception 'Anonymous users must not access applications';
+  end if;
   if has_table_privilege('authenticated', 'public.job_applications', 'UPDATE') then
     raise exception 'Authenticated users must not have table-wide application UPDATE';
   end if;
