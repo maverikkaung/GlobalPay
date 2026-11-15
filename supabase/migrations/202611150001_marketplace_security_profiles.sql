@@ -109,7 +109,8 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  if auth.uid() is distinct from old.client_id then
+  if coalesce(auth.role(), '') <> 'service_role'
+    and auth.uid() is distinct from old.client_id then
     raise exception 'Only the job owner may update an application';
   end if;
 
@@ -152,7 +153,9 @@ alter table public.job_applications enable row level security;
 grant select, update on public.profiles to authenticated;
 grant select on public.jobs to anon, authenticated;
 grant insert, update, delete on public.jobs to authenticated;
-grant select, insert, update, delete on public.job_applications to authenticated;
+grant select, insert, delete on public.job_applications to authenticated;
+revoke update on public.job_applications from public, anon, authenticated;
+grant update (status) on public.job_applications to authenticated;
 
 drop policy if exists "TechKarvo profile owner can read" on public.profiles;
 create policy "TechKarvo profile owner can read"

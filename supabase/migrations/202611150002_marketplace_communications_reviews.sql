@@ -289,7 +289,7 @@ create policy "Freelancers delete their own portfolio"
   on public.portfolio_items for delete to authenticated
   using (freelancer_id = (select auth.uid()));
 
-create or replace function public.techkarvo_is_application_participant(p_application_id text, p_user_id uuid)
+create or replace function public.techkarvo_is_application_participant(p_application_id text)
 returns boolean
 language sql
 stable
@@ -302,12 +302,12 @@ as $$
     where a.id::text = p_application_id
       and a.status = 'Accepted'
       and j.status = 'completed'
-      and (a.client_id = p_user_id or a.freelancer_id = p_user_id)
+      and (a.client_id = auth.uid() or a.freelancer_id = auth.uid())
   );
 $$;
 
-revoke all on function public.techkarvo_is_application_participant(text, uuid) from public;
-grant execute on function public.techkarvo_is_application_participant(text, uuid) to authenticated;
+revoke all on function public.techkarvo_is_application_participant(text) from public;
+grant execute on function public.techkarvo_is_application_participant(text) to authenticated;
 
 drop policy if exists "Completed job participants can read reviews" on public.reviews;
 create policy "Completed job participants can read reviews"
@@ -319,7 +319,7 @@ create policy "Participants can create one review after completion"
   on public.reviews for insert to authenticated
   with check (
     reviewer_id = (select auth.uid())
-    and public.techkarvo_is_application_participant(application_id, (select auth.uid()))
+    and public.techkarvo_is_application_participant(application_id)
     and exists (
       select 1 from public.job_applications a
       where a.id::text = reviews.application_id
@@ -330,6 +330,33 @@ create policy "Participants can create one review after completion"
         )
     )
   );
+
+create or replace function public.techkarvo_validate_job_completion()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.status = 'completed'
+    and old.status is distinct from new.status
+    and coalesce(auth.role(), '') <> 'service_role'
+    and not exists (
+      select 1 from public.job_applications a
+      where a.job_id::text = new.id::text
+        and a.client_id = auth.uid()
+        and a.status = 'Accepted'
+    ) then
+    raise exception 'A project needs an accepted freelancer before completion';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists techkarvo_validate_job_completion_before_update on public.jobs;
+create trigger techkarvo_validate_job_completion_before_update
+  before update of status on public.jobs
+  for each row execute function public.techkarvo_validate_job_completion();
 
 create or replace function public.techkarvo_notify_marketplace_activity()
 returns trigger
