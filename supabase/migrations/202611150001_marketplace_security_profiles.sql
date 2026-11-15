@@ -146,6 +146,34 @@ create trigger techkarvo_protect_application_update_before_update
   before update on public.job_applications
   for each row execute function public.techkarvo_protect_application_update();
 
+create or replace function public.techkarvo_prevent_duplicate_application()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  perform pg_advisory_xact_lock(
+    hashtextextended(new.job_id::text || ':' || new.freelancer_id::text, 0)
+  );
+
+  if exists (
+    select 1 from public.job_applications a
+    where a.job_id::text = new.job_id::text
+      and a.freelancer_id = new.freelancer_id
+  ) then
+    raise exception 'A freelancer can apply to a job only once'
+      using errcode = '23505', constraint = 'job_applications_job_freelancer_key';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists techkarvo_prevent_duplicate_application_before_insert on public.job_applications;
+create trigger techkarvo_prevent_duplicate_application_before_insert
+  before insert on public.job_applications
+  for each row execute function public.techkarvo_prevent_duplicate_application();
+
 alter table public.profiles enable row level security;
 alter table public.jobs enable row level security;
 alter table public.job_applications enable row level security;
