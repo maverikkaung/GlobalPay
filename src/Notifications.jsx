@@ -6,7 +6,9 @@ import { supabase } from "./supabase.js";
 function getNotificationLink(item) {
   if (item.data?.conversation_id) return `/messages?conversation=${encodeURIComponent(item.data.conversation_id)}`;
   if (item.data?.application_id) {
-    return item.kind === "application_received" ? "/job-applicants" : "/my-applications";
+    return ["application_received", "application_withdrawn"].includes(item.kind)
+      ? "/job-applicants"
+      : "/my-applications";
   }
   return "/";
 }

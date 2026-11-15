@@ -233,7 +233,7 @@ function JobApplicants() {
                       <p>{application.appliedAt}</p>
                     </div>
 
-                    {application.status !== "Rejected" && (
+                    {["Pending", "Accepted"].includes(application.status) && (
                       <Link className="application-view-button" to={`/messages?application=${encodeURIComponent(application.applicationId)}`}>
                         Message Freelancer
                       </Link>

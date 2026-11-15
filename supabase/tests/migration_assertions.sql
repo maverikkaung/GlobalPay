@@ -61,6 +61,9 @@ begin
   if has_table_privilege('authenticated', 'public.job_applications', 'UPDATE') then
     raise exception 'Authenticated users must not have table-wide application UPDATE';
   end if;
+  if has_table_privilege('authenticated', 'public.job_applications', 'DELETE') then
+    raise exception 'Application withdrawals must preserve history instead of deleting rows';
+  end if;
   if not has_column_privilege('authenticated', 'public.job_applications', 'status', 'UPDATE') then
     raise exception 'Authenticated users need application status UPDATE';
   end if;

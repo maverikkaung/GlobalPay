@@ -118,20 +118,23 @@ function MyApplications() {
     setWithdrawingId(application.applicationId);
     setError("");
     try {
-      const result = await supabase.from("job_applications").delete()
+      const result = await supabase.from("job_applications").update({ status: "Withdrawn" })
         .eq("id", application.applicationId)
         .eq("freelancer_id", userId)
         .eq("status", "Pending")
-        .select("id")
+        .select("id, status")
         .maybeSingle();
       if (result.error) throw result.error;
       if (!result.data) {
         setError("This application is no longer pending and could not be withdrawn.");
         return;
       }
-      setApplications((current) => current.filter((item) => item.applicationId !== application.applicationId));
+      setApplications((current) => current.map((item) => item.applicationId === application.applicationId
+        ? { ...item, status: result.data.status }
+        : item));
     } catch (withdrawError) {
-      setError("Unable to withdraw this application. " + withdrawError.message);
+      console.error("Application withdrawal failed:", withdrawError);
+      setError("Unable to withdraw this application. Please try again.");
     } finally {
       setWithdrawingId("");
     }
@@ -159,6 +162,10 @@ function MyApplications() {
 
   const rejectedCount = applications.filter(function(item) {
     return item.status === "Rejected";
+  }).length;
+
+  const withdrawnCount = applications.filter(function(item) {
+    return item.status === "Withdrawn";
   }).length;
 
   return (
@@ -264,6 +271,16 @@ function MyApplications() {
               Rejected <span>{rejectedCount}</span>
             </button>
 
+            <button
+              type="button"
+              className={selectedFilter === "Withdrawn" ? "active" : ""}
+              onClick={function() {
+                setSelectedFilter("Withdrawn");
+              }}
+            >
+              Withdrawn <span>{withdrawnCount}</span>
+            </button>
+
           </div>
 
           {loading ? (
@@ -367,7 +384,7 @@ function MyApplications() {
                       >
                         View Job Details
                       </Link>
-                      {item.status !== "Rejected" && (
+                      {(item.status === "Pending" || item.status === "Accepted") && (
                         <Link to={`/messages?application=${encodeURIComponent(item.applicationId)}`} className="application-view-button">
                           Message Client
                         </Link>

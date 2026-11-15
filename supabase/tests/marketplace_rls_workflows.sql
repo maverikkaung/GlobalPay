@@ -30,7 +30,8 @@ insert into auth.users (id, raw_user_meta_data) values
 
 insert into public.jobs (id, client_id, title, description, budget) values
   ('33333333-3333-4333-8333-333333333333', '11111111-1111-4111-8111-111111111111', 'Accepted project', 'Workflow fixture', 100),
-  ('33333333-3333-4333-8333-333333333334', '11111111-1111-4111-8111-111111111111', 'Pending project', 'Workflow fixture', 50);
+  ('33333333-3333-4333-8333-333333333334', '11111111-1111-4111-8111-111111111111', 'Pending project', 'Workflow fixture', 50),
+  ('33333333-3333-4333-8333-333333333335', '11111111-1111-4111-8111-111111111111', 'Empty project', 'Workflow fixture', 25);
 
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
@@ -44,7 +45,7 @@ values ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-3333333
 do $$
 declare
   duplicate_blocked boolean := false;
-  changed_rows integer;
+  self_decision_blocked boolean := false;
 begin
   begin
     insert into public.job_applications (id, job_id, client_id, freelancer_id, full_name, email)
@@ -58,10 +59,16 @@ begin
     raise exception 'Duplicate freelancer application was accepted';
   end if;
 
-  update public.job_applications set status = 'Accepted'
-  where id = '44444444-4444-4444-8444-444444444444';
-  get diagnostics changed_rows = row_count;
-  if changed_rows <> 0 then
+  begin
+    update public.job_applications set status = 'Accepted'
+    where id = '44444444-4444-4444-8444-444444444444';
+  exception when insufficient_privilege then
+    self_decision_blocked := true;
+  end;
+  if not self_decision_blocked and exists (
+    select 1 from public.job_applications
+    where id = '44444444-4444-4444-8444-444444444444' and status = 'Accepted'
+  ) then
     raise exception 'Freelancers must not decide their own applications';
   end if;
 
@@ -86,12 +93,31 @@ values ('44444444-4444-4444-8444-444444444447', '33333333-3333-4333-8333-3333333
   '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222223',
   'CI Second Freelancer', 'ci-second-freelancer@example.invalid');
 
-delete from public.job_applications where id = '44444444-4444-4444-8444-444444444447';
+update public.job_applications set status = 'Withdrawn'
+where id = '44444444-4444-4444-8444-444444444447'
+  and freelancer_id = (select auth.uid()) and status = 'Pending';
 
 do $$
+declare
+  duplicate_blocked boolean := false;
 begin
-  if exists (select 1 from public.job_applications where id = '44444444-4444-4444-8444-444444444447') then
-    raise exception 'Freelancers should be able to withdraw their pending applications';
+  if not exists (
+    select 1 from public.job_applications
+    where id = '44444444-4444-4444-8444-444444444447' and status = 'Withdrawn'
+  ) then
+    raise exception 'Withdrawals must preserve the application as history';
+  end if;
+
+  begin
+    insert into public.job_applications (id, job_id, client_id, freelancer_id, full_name, email)
+    values ('44444444-4444-4444-8444-444444444448', '33333333-3333-4333-8333-333333333334',
+      '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222223',
+      'CI Second Freelancer', 'ci-second-freelancer@example.invalid');
+  exception when unique_violation then
+    duplicate_blocked := true;
+  end;
+  if not duplicate_blocked then
+    raise exception 'A withdrawn application must still prevent duplicate applications';
   end if;
 end;
 $$;
@@ -108,6 +134,15 @@ do $$
 declare
   role_change_blocked boolean := false;
 begin
+  if not exists (
+    select 1 from public.notifications
+    where user_id = (select auth.uid())
+      and kind = 'application_withdrawn'
+      and data->>'application_id' = '44444444-4444-4444-8444-444444444447'
+  ) then
+    raise exception 'The client should be notified when a freelancer withdraws';
+  end if;
+
   begin
     update public.profiles set account_type = 'freelancer'
     where id = (select auth.uid());
@@ -204,7 +239,7 @@ begin
     raise exception 'Jobs with application history must not be deleted';
   end if;
 
-  delete from public.jobs where id = '33333333-3333-4333-8333-333333333334';
+  delete from public.jobs where id = '33333333-3333-4333-8333-333333333335';
   get diagnostics deleted_rows = row_count;
   if deleted_rows <> 1 then
     raise exception 'Clients should be able to delete jobs without applications';
