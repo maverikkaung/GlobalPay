@@ -153,6 +153,29 @@ function MyProjects() {
     alert("Project deleted successfully!");
   }
 
+  async function completeProject(project) {
+    const acceptedResult = await supabase.from("job_applications").select("id")
+      .eq("client_id", user.id).eq("job_id", project.id).eq("status", "Accepted").limit(1);
+    if (acceptedResult.error) {
+      alert("Unable to verify accepted applicants: " + acceptedResult.error.message);
+      return;
+    }
+    if (!acceptedResult.data?.length) {
+      alert("Accept a freelancer before marking this project complete.");
+      return;
+    }
+
+    const result = await supabase.from("jobs").update({ status: "completed" })
+      .eq("id", project.id).eq("client_id", user.id).select("id, status").single();
+    if (result.error) {
+      alert("Unable to complete this project: " + result.error.message);
+      return;
+    }
+    setProjects((current) => current.map((item) => String(item.id) === String(project.id)
+      ? { ...item, status: result.data.status }
+      : item));
+  }
+
   if (!user) {
     return (
       <div className="dashboard-page">
@@ -415,6 +438,11 @@ function MyProjects() {
                       >
                         Edit
                       </button>
+                      {status === "open" && (
+                        <button type="button" className="my-project-edit-button" onClick={() => completeProject(project)}>
+                          Mark complete
+                        </button>
+                      )}
                         <button
                         type="button"
                         className="my-project-delete-button"

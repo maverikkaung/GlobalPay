@@ -27,3 +27,13 @@ export function parseSkills(value) {
   const values = Array.isArray(value) ? value : String(value || "").split(",");
   return values.map((skill) => String(skill).trim()).filter(Boolean);
 }
+
+export function summarizeRatings(reviews = []) {
+  const valid = reviews.filter((item) => Number.isFinite(Number(item.rating))
+    && Number(item.rating) >= 1 && Number(item.rating) <= 5);
+  const total = valid.reduce((sum, item) => sum + Number(item.rating), 0);
+  return {
+    count: valid.length,
+    average: valid.length ? total / valid.length : null
+  };
+}

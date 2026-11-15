@@ -88,6 +88,7 @@ function MyApplications() {
 
         return {
           id: item.job_id,
+          clientId: item.client_id,
           applicationId: item.id,
           title: job ? job.title : "Job #" + item.job_id,
           company: job && job.category ? job.category : "Client",
@@ -337,6 +338,12 @@ function MyApplications() {
                       >
                         View Job Details
                       </Link>
+                      {item.status !== "Rejected" && (
+                        <Link to={`/messages?application=${encodeURIComponent(item.applicationId)}`} className="application-view-button">
+                          Message Client
+                        </Link>
+                      )}
+                      {item.clientId && <Link to={`/profiles/${item.clientId}`} className="application-view-button">View Client Reviews</Link>}
                     </div>
 
                   </div>

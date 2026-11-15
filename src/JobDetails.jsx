@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { jobsData } from "./jobsData.js";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import { parseSkills } from "./marketplace.js";
 import "./App.css";
 
 function JobDetails() {
@@ -23,10 +23,6 @@ function JobDetails() {
 
       if (result.data) {
         const item = result.data;
-        const jobSkills = Array.isArray(item.skills)
-          ? item.skills
-          : String(item.skills || "").split(",");
-
         setJob({
           id: item.id,
           title: item.title,
@@ -37,43 +33,16 @@ function JobDetails() {
           salary: String(item.currency || "USD") + " " + String(item.budget),
           description: item.description,
           details: item.description,
-          skills: jobSkills.map(function(skill) {
-            return skill.trim();
-          }).filter(Boolean)
+          status: item.status,
+          skills: parseSkills(item.skills)
         });
 
         setLoading(false);
         return;
       }
 
-      let clientJobs;
-      try {
-        const savedData = localStorage.getItem("TechKarvo_client_jobs");
-        clientJobs = savedData ? JSON.parse(savedData) : [];
-      } catch {
-        clientJobs = [];
-      }
-
-      const formattedJobs = clientJobs.map(function(item) {
-        const jobSkills = Array.isArray(item.skills)
-          ? item.skills
-          : String(item.skills || "").split(",");
-
-        return {
-          ...item,
-          skills: jobSkills.map(function(skill) {
-            return skill.trim();
-          }).filter(Boolean)
-        };
-      });
-
-      const fallbackJobs = jobsData.concat(formattedJobs);
-
-      const foundJob = fallbackJobs.find(function(item) {
-        return String(item.id) === String(id);
-      });
-
-      setJob(foundJob || null);
+      if (result.error) console.error("Job loading error:", result.error.message);
+      setJob(null);
       setLoading(false);
     }
 
@@ -207,7 +176,7 @@ function JobDetails() {
             </div>
           </div>
 
-          {(!user || user.accountType === "Freelancer") && (
+          {job.status === "open" && (!user || user.accountType === "Freelancer") && (
             <div className="details-actions">
               <button
                 type="button"

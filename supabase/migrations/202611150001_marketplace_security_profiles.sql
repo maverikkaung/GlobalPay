@@ -149,6 +149,11 @@ alter table public.profiles enable row level security;
 alter table public.jobs enable row level security;
 alter table public.job_applications enable row level security;
 
+grant select, update on public.profiles to authenticated;
+grant select on public.jobs to anon, authenticated;
+grant insert, update, delete on public.jobs to authenticated;
+grant select, insert, update, delete on public.job_applications to authenticated;
+
 drop policy if exists "TechKarvo profile owner can read" on public.profiles;
 create policy "TechKarvo profile owner can read"
   on public.profiles for select to authenticated

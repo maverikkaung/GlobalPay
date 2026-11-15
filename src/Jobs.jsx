@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
-import { jobsData } from "./jobsData.js";
+import { parseSkills } from "./marketplace.js";
 import "./App.css";
 
 function Jobs() {
@@ -11,18 +11,6 @@ function Jobs() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [clientJobs] = useState(() => {
-    try {
-      const savedJobs = JSON.parse(localStorage.getItem("TechKarvo_client_jobs") || "[]");
-      return savedJobs.map((item) => ({
-        ...item,
-        skills: (Array.isArray(item.skills) ? item.skills : String(item.skills || "").split(","))
-          .map((skill) => skill.trim()).filter(Boolean)
-      }));
-    } catch {
-      return [];
-    }
-  });
   const [supabaseJobs, setSupabaseJobs] = useState([]);
 
   useEffect(() => {
@@ -45,11 +33,11 @@ function Jobs() {
           title: item.title,
           company: "TechKarvo Client",
           location: "Remote",
-          type: "Freelance",
-          category: "Other",
+          type: item.payment_type || "Freelance",
+          category: item.category || "Other",
           salary: String(item.currency ? item.currency : "USD") + " " + String(item.budget),
           description: item.description,
-          skills: []
+          skills: parseSkills(item.skills)
         };
       });
 
@@ -72,7 +60,7 @@ function Jobs() {
     "Other"
   ];
 
-  const allJobs = jobsData.concat(clientJobs).concat(supabaseJobs);
+  const allJobs = supabaseJobs;
 
   function handleApply(job) {
     if (!user) {

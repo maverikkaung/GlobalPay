@@ -165,6 +165,10 @@ function JobApplicants() {
 
                     <h3>{application.fullName}</h3>
 
+                    <Link to={`/profiles/${application.freelancer_id}`} className="application-view-button">
+                      View Freelancer Profile
+                    </Link>
+
                     <p className="job-company">
                       {application.professionalTitle}
                     </p>
@@ -214,6 +218,12 @@ function JobApplicants() {
                       <h3>Applied Date</h3>
                       <p>{application.appliedAt}</p>
                     </div>
+
+                    {application.status !== "Rejected" && (
+                      <Link className="application-view-button" to={`/messages?application=${encodeURIComponent(application.applicationId)}`}>
+                        Message Freelancer
+                      </Link>
+                    )}
 
                     {application.status === "Pending" ? (
                       <div className="job-card-actions">

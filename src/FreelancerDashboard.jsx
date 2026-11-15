@@ -130,11 +130,35 @@ function FreelancerDashboard() {
               <p>Manage your professional profile and skills.</p>
             </Link>
 
+            <Link to="/portfolio" className="dashboard-action-card">
+              <span>🗂️</span>
+              <h3>My Portfolio</h3>
+              <p>Show clients examples of your best work.</p>
+            </Link>
+
             <div className="dashboard-action-card">
               <span>💳</span>
               <h3>My Wallet</h3>
               <p>Manage your freelance earnings.</p>
             </div>
+
+            <Link to="/messages" className="dashboard-action-card">
+              <span>✉️</span>
+              <h3>Messages</h3>
+              <p>Talk with clients about applications and work.</p>
+            </Link>
+
+            <Link to="/notifications" className="dashboard-action-card">
+              <span>🔔</span>
+              <h3>Notifications</h3>
+              <p>See application and message updates.</p>
+            </Link>
+
+            <Link to="/reviews" className="dashboard-action-card">
+              <span>⭐</span>
+              <h3>Reviews</h3>
+              <p>Review clients when completed work is ready.</p>
+            </Link>
 
           </div>
         </section>

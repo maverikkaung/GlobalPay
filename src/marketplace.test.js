@@ -4,7 +4,8 @@ import {
   calculateClientHiringMetrics,
   countApplicationStatuses,
   normalizeAccountType,
-  parseSkills
+  parseSkills,
+  summarizeRatings
 } from "./marketplace.js";
 
 test("account roles accept only supported database values", () => {
@@ -34,4 +35,12 @@ test("skill values work as either database arrays or comma-separated strings", (
   assert.deepEqual(parseSkills("React, CSS, , JavaScript "), ["React", "CSS", "JavaScript"]);
   assert.deepEqual(parseSkills(["Design", " Research "]), ["Design", "Research"]);
   assert.deepEqual(parseSkills(null), []);
+});
+
+test("rating summaries ignore invalid values and return no average when empty", () => {
+  assert.deepEqual(summarizeRatings([{ rating: 5 }, { rating: 3 }, { rating: 8 }, { rating: "bad" }]), {
+    count: 2,
+    average: 4
+  });
+  assert.deepEqual(summarizeRatings([]), { count: 0, average: null });
 });

@@ -18,6 +18,11 @@ const PostJob = lazy(() => import("./PostJob.jsx"));
 const JobApplicants = lazy(() => import("./JobApplicants.jsx"));
 const MyFreelancers = lazy(() => import("./MyFreelancers.jsx"));
 const MyProjects = lazy(() => import("./MyProjects.jsx"));
+const Messages = lazy(() => import("./Messages.jsx"));
+const Notifications = lazy(() => import("./Notifications.jsx"));
+const Reviews = lazy(() => import("./Reviews.jsx"));
+const Portfolio = lazy(() => import("./Portfolio.jsx"));
+const PublicProfile = lazy(() => import("./PublicProfile.jsx"));
 
 
 function Home() {
@@ -373,6 +378,12 @@ function App() {
         path="/my-projects"
         element={<RequireAuth roles={["Client"]}><MyProjects /></RequireAuth>}
       />
+
+      <Route path="/messages" element={<RequireAuth roles={["Client", "Freelancer"]}><Messages /></RequireAuth>} />
+      <Route path="/notifications" element={<RequireAuth roles={["Client", "Freelancer"]}><Notifications /></RequireAuth>} />
+      <Route path="/reviews" element={<RequireAuth roles={["Client", "Freelancer"]}><Reviews /></RequireAuth>} />
+      <Route path="/portfolio" element={<RequireAuth roles={["Freelancer"]}><Portfolio /></RequireAuth>} />
+      <Route path="/profiles/:id" element={<RequireAuth roles={["Client", "Freelancer"]}><PublicProfile /></RequireAuth>} />
 
         </Routes>
       </Suspense>

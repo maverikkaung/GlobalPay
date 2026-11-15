@@ -196,6 +196,24 @@ function ClientDashboard() {
               </p>
             </Link>
 
+            <Link to="/messages" className="dashboard-action-card">
+              <span>✉️</span>
+              <h3>Messages</h3>
+              <p>Talk with freelancers about your projects.</p>
+            </Link>
+
+            <Link to="/notifications" className="dashboard-action-card">
+              <span>🔔</span>
+              <h3>Notifications</h3>
+              <p>See new applications, decisions, and messages.</p>
+            </Link>
+
+            <Link to="/reviews" className="dashboard-action-card">
+              <span>⭐</span>
+              <h3>Reviews</h3>
+              <p>Leave feedback after completed work.</p>
+            </Link>
+
           </div>
         </section>
 

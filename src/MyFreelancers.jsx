@@ -51,6 +51,7 @@ function MyFreelancers() {
 
       setFreelancers(rows.map((item) => ({
         ...item,
+        applicationId: item.id,
         id: item.job_id,
         title: jobsById[String(item.job_id)] || "Job #" + item.job_id,
         fullName: item.full_name,
@@ -156,6 +157,10 @@ function MyFreelancers() {
 
                     <h3>{item.fullName}</h3>
 
+                    <Link to={`/profiles/${item.freelancer_id}`} className="application-view-button">
+                      View Profile and Reviews
+                    </Link>
+
                     <p className="job-company">
                       {item.professionalTitle}
                     </p>
@@ -188,6 +193,10 @@ function MyFreelancers() {
                       <h3>Portfolio</h3>
                       <p>{item.portfolio || "Not provided"}</p>
                     </div>
+
+                    <Link className="application-view-button" to={`/messages?application=${encodeURIComponent(item.applicationId)}`}>
+                      Open Conversation
+                    </Link>
 
                   </div>
                 );
