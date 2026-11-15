@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { supabase } from "./supabase.js";
 import { AuthContext } from "./auth-context.js";
@@ -19,11 +19,19 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [loadedProfile, setLoadedProfile] = useState({ userId: null, profile: null });
+  const sessionUserId = useRef(null);
 
   useEffect(() => {
     let active = true;
+    let authEventReceived = false;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!active) return;
+      authEventReceived = true;
+      const nextUserId = nextSession?.user?.id || null;
+      if (sessionUserId.current !== nextUserId) {
+        sessionUserId.current = nextUserId;
+        setLoadedProfile({ userId: null, profile: null });
+      }
       setSession(nextSession);
       setAuthReady(true);
     });
@@ -31,12 +39,24 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(({ data, error }) => {
       if (!active) return;
       if (error) console.error("Unable to restore authentication session:", error.message);
-      setSession((current) => current?.user?.id === data.session?.user?.id ? current : data.session);
+      if (!authEventReceived) {
+        const restoredSession = data?.session || null;
+        const restoredUserId = restoredSession?.user?.id || null;
+        if (sessionUserId.current !== restoredUserId) {
+          sessionUserId.current = restoredUserId;
+          setLoadedProfile({ userId: null, profile: null });
+        }
+        setSession(restoredSession);
+      }
       setAuthReady(true);
     }).catch((error) => {
       if (!active) return;
       console.error("Unable to restore authentication session:", error.message);
-      setSession(null);
+      if (!authEventReceived) {
+        sessionUserId.current = null;
+        setLoadedProfile({ userId: null, profile: null });
+        setSession(null);
+      }
       setAuthReady(true);
     });
 
