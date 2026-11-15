@@ -13,6 +13,15 @@ export function countApplicationStatuses(applications = []) {
   }, { accepted: 0, pending: 0, rejected: 0 });
 }
 
+export function countOpenAcceptedJobs(applications = [], jobs = []) {
+  const openJobIds = new Set(jobs
+    .filter((job) => job.status === "open")
+    .map((job) => String(job.id)));
+  return new Set(applications
+    .filter((application) => application.status === "Accepted" && openJobIds.has(String(application.job_id)))
+    .map((application) => String(application.job_id))).size;
+}
+
 export function calculateClientHiringMetrics(applications = [], jobs = []) {
   const accepted = applications.filter((item) => item.status === "Accepted");
   const acceptedJobIds = new Set(accepted.map((item) => String(item.job_id)));

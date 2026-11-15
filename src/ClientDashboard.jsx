@@ -15,9 +15,13 @@ function ClientDashboard() {
   const [totalHires, setTotalHires] = useState(0);
   const [totalSpending, setTotalSpending] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(function() {
+    let active = true;
     async function loadDashboard() {
+      setLoading(true);
+      setError("");
       if (!userId) {
         setLoading(false);
         return;
@@ -38,7 +42,7 @@ function ClientDashboard() {
           throw jobsResult.error;
         }
 
-        const myJobs = jobsResult.data;
+        const myJobs = jobsResult.data || [];
 
         const openProjects = myJobs.filter(function(item) {
           return item.status === "open";
@@ -55,18 +59,21 @@ function ClientDashboard() {
         if (applicationResult.error) throw applicationResult.error;
 
         const metrics = calculateClientHiringMetrics(applicationResult.data || [], myJobs);
+        if (!active) return;
         setTotalHires(metrics.totalHires);
         setTotalSpending(metrics.totalSpending);
 
       } catch (error) {
+        if (!active) return;
         console.error("Dashboard loading error:", error);
-        alert("Unable to load dashboard data: " + error.message);
+        setError("Unable to load dashboard data. " + error.message);
+      } finally {
+        if (active) setLoading(false);
       }
-
-      setLoading(false);
     }
 
     loadDashboard();
+    return () => { active = false; };
   }, [userId, accountType]);
 
   async function handleLogout() {
@@ -118,6 +125,8 @@ function ClientDashboard() {
             Find talented freelancers and manage your projects.
           </p>
         </div>
+
+        {error && <p role="alert">{error}</p>}
 
         <div className="dashboard-stats">
 

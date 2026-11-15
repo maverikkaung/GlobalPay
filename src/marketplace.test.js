@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   calculateClientHiringMetrics,
   countApplicationStatuses,
+  countOpenAcceptedJobs,
   normalizeAccountType,
   parseSkills,
   summarizeRatings
@@ -19,6 +20,19 @@ test("application summaries count only known workflow statuses", () => {
   assert.deepEqual(countApplicationStatuses([
     { status: "Accepted" }, { status: "Pending" }, { status: "Rejected" }, { status: "withdrawn" }
   ]), { accepted: 1, pending: 1, rejected: 1 });
+});
+
+test("freelancer active jobs exclude completed projects and duplicate applications", () => {
+  assert.equal(countOpenAcceptedJobs([
+    { job_id: 7, status: "Accepted" },
+    { job_id: "7", status: "Accepted" },
+    { job_id: 8, status: "Accepted" },
+    { job_id: 9, status: "Pending" }
+  ], [
+    { id: 7, status: "open" },
+    { id: 8, status: "completed" },
+    { id: 9, status: "open" }
+  ]), 1);
 });
 
 test("client hiring totals count each hire and each accepted job budget once", () => {

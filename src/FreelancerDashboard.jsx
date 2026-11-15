@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { logoutUser } from "./auth.js";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
-import { countApplicationStatuses } from "./marketplace.js";
+import { countApplicationStatuses, countOpenAcceptedJobs } from "./marketplace.js";
 
 function FreelancerDashboard() {
   const navigate = useNavigate();
@@ -14,28 +14,49 @@ function FreelancerDashboard() {
   const [activeJobs, setActiveJobs] = useState(0);
   const [pendingApplications, setPendingApplications] = useState(0);
   const [rejectedApplications, setRejectedApplications] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(function() {
     let active = true;
 
     async function loadApplications() {
-      if (accountType !== "Freelancer" || !userId) return;
-
-      const result = await supabase
-        .from("job_applications")
-        .select("status")
-        .eq("freelancer_id", userId);
-
-      if (!active) return;
-      if (result.error) {
-        console.error("Unable to load application summary:", result.error);
+      setLoading(true);
+      setError("");
+      if (accountType !== "Freelancer" || !userId) {
+        setLoading(false);
         return;
       }
 
-      const counts = countApplicationStatuses(result.data || []);
-      setActiveJobs(counts.accepted);
-      setPendingApplications(counts.pending);
-      setRejectedApplications(counts.rejected);
+      try {
+        const result = await supabase
+          .from("job_applications")
+          .select("status, job_id")
+          .eq("freelancer_id", userId);
+        if (result.error) throw result.error;
+
+        const applications = result.data || [];
+        const counts = countApplicationStatuses(applications);
+        const acceptedJobIds = [...new Set(applications
+          .filter((application) => application.status === "Accepted")
+          .map((application) => String(application.job_id)))];
+        let jobs = [];
+        if (acceptedJobIds.length) {
+          const jobsResult = await supabase.from("jobs").select("id, status").in("id", acceptedJobIds);
+          if (jobsResult.error) throw jobsResult.error;
+          jobs = jobsResult.data || [];
+        }
+
+        if (!active) return;
+        setActiveJobs(countOpenAcceptedJobs(applications, jobs));
+        setPendingApplications(counts.pending);
+        setRejectedApplications(counts.rejected);
+      } catch (loadError) {
+        if (!active) return;
+        setError("Unable to load your dashboard summary. " + loadError.message);
+      } finally {
+        if (active) setLoading(false);
+      }
     }
 
     loadApplications();
@@ -88,23 +109,25 @@ function FreelancerDashboard() {
 
           <div className="dashboard-stat-card">
             <span>Active Jobs</span>
-            <h2>{activeJobs}</h2>
+            <h2>{loading ? "…" : activeJobs}</h2>
             <p>Accepted applications</p>
           </div>
 
           <div className="dashboard-stat-card">
             <span>Pending Applications</span>
-            <h2>{pendingApplications}</h2>
+            <h2>{loading ? "…" : pendingApplications}</h2>
             <p>Waiting for client response</p>
           </div>
 
           <div className="dashboard-stat-card">
             <span>Rejected Applications</span>
-            <h2>{rejectedApplications}</h2>
+            <h2>{loading ? "…" : rejectedApplications}</h2>
             <p>Applications not accepted</p>
           </div>
 
         </div>
+
+        {error && <p role="alert">{error}</p>}
 
         <section className="dashboard-section">
 
