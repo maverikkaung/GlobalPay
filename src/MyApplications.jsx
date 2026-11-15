@@ -13,6 +13,7 @@ function MyApplications() {
   const [selectedFilter, setSelectedFilter] = useState("All");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [withdrawingId, setWithdrawingId] = useState("");
 
   useEffect(function() {
     let active = true;
@@ -110,6 +111,32 @@ function MyApplications() {
     };
   }, [userId, accountType, navigate]);
 
+  async function withdrawApplication(application) {
+    const confirmed = window.confirm("Withdraw this pending application? You will no longer be considered for the project.");
+    if (!confirmed) return;
+
+    setWithdrawingId(application.applicationId);
+    setError("");
+    try {
+      const result = await supabase.from("job_applications").delete()
+        .eq("id", application.applicationId)
+        .eq("freelancer_id", userId)
+        .eq("status", "Pending")
+        .select("id")
+        .maybeSingle();
+      if (result.error) throw result.error;
+      if (!result.data) {
+        setError("This application is no longer pending and could not be withdrawn.");
+        return;
+      }
+      setApplications((current) => current.filter((item) => item.applicationId !== application.applicationId));
+    } catch (withdrawError) {
+      setError("Unable to withdraw this application. " + withdrawError.message);
+    } finally {
+      setWithdrawingId("");
+    }
+  }
+
   if (!user || user.accountType !== "Freelancer") {
     return null;
   }
@@ -192,6 +219,8 @@ function MyApplications() {
               <p>Review the jobs you have applied for.</p>
             </div>
           </div>
+
+          {error && <p role="alert">{error}</p>}
 
           <div className="application-filters">
 
@@ -344,6 +373,16 @@ function MyApplications() {
                         </Link>
                       )}
                       {item.clientId && <Link to={`/profiles/${item.clientId}`} className="application-view-button">View Client Reviews</Link>}
+                      {item.status === "Pending" && (
+                        <button
+                          type="button"
+                          className="application-withdraw-button"
+                          disabled={withdrawingId === item.applicationId}
+                          onClick={() => withdrawApplication(item)}
+                        >
+                          {withdrawingId === item.applicationId ? "Withdrawing…" : "Withdraw application"}
+                        </button>
+                      )}
                     </div>
 
                   </div>

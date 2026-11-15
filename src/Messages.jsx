@@ -76,7 +76,7 @@ function Messages() {
       let applicationsById = {};
       if (applicationIds.length) {
         const applicationsResult = await supabase.from("job_applications")
-          .select("id, full_name, professional_title")
+          .select("id, full_name, professional_title, status")
           .in("id", applicationIds);
         if (applicationsResult.error) throw applicationsResult.error;
         applicationsById = Object.fromEntries((applicationsResult.data || []).map((item) => [String(item.id), item]));
@@ -111,7 +111,8 @@ function Messages() {
           ...item,
           otherName,
           otherTitle: application?.professional_title || "Marketplace member",
-          jobTitle: jobsById[String(item.job_id)] || "Project conversation"
+          jobTitle: jobsById[String(item.job_id)] || "Project conversation",
+          messagingOpen: ["Pending", "Accepted"].includes(application?.status)
         };
       });
       setConversations(formatted);
@@ -238,11 +239,15 @@ function Messages() {
                   </article>
                 ))}
               </div>
-              <form className="message-composer" onSubmit={sendMessage}>
-                <label className="visually-hidden" htmlFor="message-body">Write a message</label>
-                <textarea id="message-body" maxLength={10000} rows={2} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write a message…" required />
-                <button type="submit" className="primary-btn" disabled={sending || !draft.trim()}>{sending ? "Sending…" : "Send"}</button>
-              </form>
+              {selectedConversation.messagingOpen ? (
+                <form className="message-composer" onSubmit={sendMessage}>
+                  <label className="visually-hidden" htmlFor="message-body">Write a message</label>
+                  <textarea id="message-body" maxLength={10000} rows={2} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write a message…" required />
+                  <button type="submit" className="primary-btn" disabled={sending || !draft.trim()}>{sending ? "Sending…" : "Send"}</button>
+                </form>
+              ) : (
+                <p className="messages-closed-note" role="status">This application is closed. You can read the conversation, but new messages are disabled.</p>
+              )}
             </>
           ) : (
             <div className="messages-thread-empty"><span>✉</span><h2>Select a conversation</h2><p>Choose a thread to read and reply to messages.</p></div>

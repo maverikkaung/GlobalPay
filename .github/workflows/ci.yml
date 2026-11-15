@@ -43,6 +43,7 @@ jobs:
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150001_marketplace_security_profiles.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150002_marketplace_communications_reviews.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150003_marketplace_legacy_grant_hardening.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150004_close_messaging_after_application.sql
         env:
           PGPASSWORD: postgres
       - name: Assert marketplace RLS and write boundaries

@@ -79,6 +79,21 @@ values ('44444444-4444-4444-8444-444444444446', '33333333-3333-4333-8333-3333333
   '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222223',
   'CI Second Freelancer', 'ci-second-freelancer@example.invalid');
 
+insert into public.job_applications (id, job_id, client_id, freelancer_id, full_name, email)
+values ('44444444-4444-4444-8444-444444444447', '33333333-3333-4333-8333-333333333334',
+  '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222223',
+  'CI Second Freelancer', 'ci-second-freelancer@example.invalid');
+
+delete from public.job_applications where id = '44444444-4444-4444-8444-444444444447';
+
+do $$
+begin
+  if exists (select 1 from public.job_applications where id = '44444444-4444-4444-8444-444444444447') then
+    raise exception 'Freelancers should be able to withdraw their pending applications';
+  end if;
+end;
+$$;
+
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
@@ -102,6 +117,16 @@ $$;
 
 update public.job_applications set status = 'Accepted'
 where id = '44444444-4444-4444-8444-444444444444';
+
+insert into public.conversations (application_id, job_id, client_id, freelancer_id, created_by)
+values ('44444444-4444-4444-8444-444444444446', '33333333-3333-4333-8333-333333333333',
+  '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222223',
+  '11111111-1111-4111-8111-111111111111');
+
+insert into public.messages (conversation_id, sender_id, body)
+select id, '11111111-1111-4111-8111-111111111111', 'Let me know if you have any questions.'
+from public.conversations where application_id = '44444444-4444-4444-8444-444444444446';
+
 update public.jobs set status = 'completed'
 where id = '33333333-3333-4333-8333-333333333333';
 
@@ -145,6 +170,8 @@ select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222223
 do $$
 declare
   outsider_review_blocked boolean := false;
+  closed_conversation_id uuid;
+  closed_message_blocked boolean := false;
 begin
   if (select count(*) from public.profiles) <> 1 then
     raise exception 'A legacy profile policy exposed another user profile';
@@ -158,8 +185,9 @@ begin
   if exists (select 1 from public.jobs where status = 'completed') then
     raise exception 'A legacy jobs policy exposed a completed project to an outsider';
   end if;
-  if (select count(*) from public.conversations) <> 0
-    or (select count(*) from public.messages) <> 0
+  if (select count(*) from public.conversations) <> 1
+    or exists (select 1 from public.conversations where application_id <> '44444444-4444-4444-8444-444444444446')
+    or (select count(*) from public.messages) <> 1
     or (select count(*) from public.portfolio_items) <> 0 then
     raise exception 'A legacy policy exposed another user’s private marketplace data';
   end if;
@@ -180,6 +208,19 @@ begin
   end;
   if not outsider_review_blocked then
     raise exception 'A non-participant review was not blocked';
+  end if;
+
+  select id into closed_conversation_id from public.conversations
+  where application_id = '44444444-4444-4444-8444-444444444446';
+  begin
+    insert into public.messages (conversation_id, sender_id, body)
+    values (closed_conversation_id, (select auth.uid()), 'Can you still read this?');
+    raise exception 'Messaging was allowed after the application closed';
+  exception when insufficient_privilege then
+    closed_message_blocked := true;
+  end;
+  if not closed_message_blocked then
+    raise exception 'Closed application messaging was not blocked';
   end if;
 end;
 $$;

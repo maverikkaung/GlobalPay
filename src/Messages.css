@@ -181,6 +181,15 @@
   padding: 18px 24px;
 }
 
+.messages-closed-note {
+  margin: 0;
+  border-top: 1px solid #e8edf4;
+  padding: 16px 24px;
+  color: #72809a;
+  background: #fbfcfe;
+  font-size: 14px;
+}
+
 .message-composer textarea {
   flex: 1;
   resize: vertical;
@@ -272,5 +281,9 @@
   .message-composer {
     padding: 12px;
     gap: 8px;
+  }
+
+  .messages-closed-note {
+    padding: 14px 16px;
   }
 }

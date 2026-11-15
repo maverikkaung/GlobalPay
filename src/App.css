@@ -2065,6 +2065,32 @@ footer p {
   background: #3987ff;
 }
 
+.application-withdraw-button {
+  display: inline-block;
+  padding: 9px 13px;
+  color: #ffd6d6;
+  background: transparent;
+  border: 1px solid #93414d;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.application-withdraw-button:hover:not(:disabled) {
+  background: #5a202a;
+}
+
+.application-withdraw-button:focus-visible {
+  outline: 3px solid #ffb7c0;
+  outline-offset: 2px;
+}
+
+.application-withdraw-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 /* EMPTY STATE */
 
 .applications-empty {
@@ -2158,6 +2184,11 @@ footer p {
   }
 
   .application-view-button {
+    width: 100%;
+    text-align: center;
+  }
+
+  .application-withdraw-button {
     width: 100%;
     text-align: center;
   }
