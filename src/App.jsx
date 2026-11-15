@@ -328,6 +328,20 @@ function Home() {
   );
 }
 
+function NotFound() {
+  return (
+    <main className="not-found-page">
+      <span>404 · PAGE NOT FOUND</span>
+      <h1>That page isn’t here.</h1>
+      <p>The link may be outdated, or the address may be incorrect.</p>
+      <div>
+        <Link to="/" className="primary-btn">Go to TechKarvo</Link>
+        <Link to="/jobs" className="secondary-btn">Browse jobs</Link>
+      </div>
+    </main>
+  );
+}
+
 
 function App() {
   if (!isSupabaseConfigured) {
@@ -400,6 +414,7 @@ function App() {
       <Route path="/reviews" element={<RequireAuth roles={["Client", "Freelancer"]}><Reviews /></RequireAuth>} />
       <Route path="/portfolio" element={<RequireAuth roles={["Freelancer"]}><Portfolio /></RequireAuth>} />
       <Route path="/profiles/:id" element={<RequireAuth roles={["Client", "Freelancer"]}><PublicProfile /></RequireAuth>} />
+      <Route path="*" element={<NotFound />} />
 
         </Routes>
       </Suspense>
