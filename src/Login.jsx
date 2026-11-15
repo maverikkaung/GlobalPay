@@ -56,7 +56,16 @@ function Login() {
         localStorage.removeItem("TechKarvo_remembered_email");
       }
 
-      navigate(accountType === "freelancer" ? "/freelancer-dashboard" : "/client-dashboard");
+      const returnLocation = location.state?.from;
+      const returnPath = typeof returnLocation === "string"
+        ? returnLocation
+        : returnLocation && typeof returnLocation.pathname === "string"
+          ? returnLocation.pathname + (returnLocation.search || "") + (returnLocation.hash || "")
+          : null;
+      const safeReturnPath = returnPath?.startsWith("/") && !returnPath.startsWith("//")
+        ? returnPath
+        : null;
+      navigate(safeReturnPath || (accountType === "freelancer" ? "/freelancer-dashboard" : "/client-dashboard"));
     } catch (error) {
       setError("Login failed: " + error.message);
     } finally {

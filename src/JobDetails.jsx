@@ -51,13 +51,12 @@ function JobDetails() {
 
   function handleApply() {
     if (!user) {
-      alert("Please log in to apply for this job.");
-      navigate("/login");
+      navigate("/login", { state: { from: "/apply/" + job.id } });
       return;
     }
 
     if (user.accountType !== "Freelancer") {
-      alert("Only Freelancers can apply for jobs.");
+      navigate("/client-dashboard");
       return;
     }
 

@@ -15,6 +15,8 @@ function ApplyForm() {
   const [job, setJob] = useState(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState(false);
 
   const [fullName, setFullName] = useState(userName);
   const [email] = useState(userEmail);
@@ -44,7 +46,7 @@ function ApplyForm() {
           .maybeSingle();
 
         if (jobResult.error) {
-          console.log("Job loading error:", jobResult.error.message);
+          console.error("Job loading error:", jobResult.error.message);
           setJob(null);
           setPageLoading(false);
           return;
@@ -85,7 +87,7 @@ function ApplyForm() {
           setPortfolio(profile.portfolio_url || "");
         }
       } catch (error) {
-        console.log("Application page error:", error.message);
+        console.error("Application page error:", error.message);
         setJob(null);
       }
 
@@ -99,33 +101,33 @@ function ApplyForm() {
     event.preventDefault();
 
     if (!user) {
-      alert("Please log in first.");
-      navigate("/login");
+      navigate("/login", { state: { from: "/apply/" + params.id } });
       return;
     }
 
     if (user.accountType !== "Freelancer") {
-      alert("Only Freelancers can apply for jobs.");
+      setFormError("Only freelancers can apply for jobs.");
       return;
     }
 
     if (!user.id) {
-      alert("User ID not found. Please log out and log in again.");
+      setFormError("We couldn't verify your account. Please sign out and sign in again.");
       return;
     }
 
     if (!job) {
-      alert("This job is not available.");
+      setFormError("This job is no longer available.");
       return;
     }
 
-    if (Number(salary) <= 0) {
-      alert("Please enter a valid expected salary.");
+    if (!Number.isFinite(Number(salary)) || Number(salary) <= 0) {
+      setFormError("Enter an expected salary greater than zero.");
       return;
     }
 
     setSubmitting(true);
-      const application = {
+    setFormError("");
+    const application = {
       job_id: job.id,
       client_id: job.clientId,
       freelancer_id: user.id,
@@ -143,25 +145,24 @@ function ApplyForm() {
       status: "Pending"
     };
 
-    const result = await supabase
-      .from("job_applications")
-      .insert(application);
-
-    setSubmitting(false);
-
-    if (result.error) {
-      if (result.error.code === "23505") {
-        alert("You have already applied for this job.");
-        navigate("/my-applications");
+    try {
+      const result = await supabase.from("job_applications").insert(application);
+      if (result.error) {
+        if (result.error.code === "23505") {
+          setFormError("You've already applied for this job. View your application in My Applications.");
+          return;
+        }
+        setFormError("We couldn't submit your application. Please try again.");
+        console.error("Application submission failed:", result.error.message);
         return;
       }
-
-      alert("Application submission failed: " + result.error.message);
-      return;
+      setFormSuccess(true);
+    } catch (error) {
+      console.error("Application submission failed:", error);
+      setFormError("A network error interrupted submission. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    alert("Your application has been submitted successfully!");
-    navigate("/my-applications");
   }
 
   if (!user) {
@@ -221,6 +222,8 @@ function ApplyForm() {
         </div>
 
         <form className="application-form" onSubmit={handleSubmit}>
+          {formError && <p className="auth-notice auth-notice--error" role="alert">{formError} {formError.startsWith("You've already applied") && <Link to="/my-applications">Go to My Applications</Link>}</p>}
+          {formSuccess && <p className="auth-notice auth-notice--success" role="status">Application submitted. <Link to="/my-applications">View your applications</Link>.</p>}
           <h2>Personal Information</h2>
 
           <label>Full Name</label>
@@ -349,7 +352,7 @@ function ApplyForm() {
           <button
             type="submit"
             className="primary-btn"
-            disabled={submitting}
+            disabled={submitting || formSuccess}
           >
             {submitting ? "Submitting..." : "Submit Application"}
           </button>

@@ -14,31 +14,32 @@ function PostJob() {
   const [budget, setBudget] = useState("");
   const [paymentType, setPaymentType] = useState("Fixed Price");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [published, setPublished] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
 
     if (!user) {
-      alert("Please log in first.");
       navigate("/login");
       return;
     }
 
     if (user.accountType !== "Client") {
-      alert("Only Clients can post jobs.");
+      setError("Only clients can post jobs.");
       return;
     }
 
     if (!user.id) {
-      alert("User ID not found. Please log out and log in again.");
+      setError("We couldn't verify your account. Please sign out and sign in again.");
       return;
     }
 
     setLoading(true);
+    setError("");
 
-    const result = await supabase
-      .from("jobs")
-      .insert({
+    try {
+      const result = await supabase.from("jobs").insert({
         client_id: user.id,
         title: title.trim(),
         category: category,
@@ -49,16 +50,18 @@ function PostJob() {
         payment_type: paymentType,
         status: "open"
       });
-
-    setLoading(false);
-
-    if (result.error) {
-      alert("Job posting failed: " + result.error.message);
-      return;
+      if (result.error) {
+        console.error("Job posting failed:", result.error.message);
+        setError("We couldn't publish your project. Please check your connection and try again.");
+        return;
+      }
+      setPublished(true);
+    } catch (requestError) {
+      console.error("Job posting failed:", requestError);
+      setError("A network error interrupted publishing. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    alert("Your job has been posted successfully!");
-    navigate("/client-dashboard");
   }
 
   if (!user) {
@@ -99,6 +102,8 @@ function PostJob() {
         </div>
 
         <form className="application-form" onSubmit={handleSubmit}>
+          {error && <p className="auth-notice auth-notice--error" role="alert">{error}</p>}
+          {published && <p className="auth-notice auth-notice--success" role="status">Your project is live. <Link to="/my-projects">Manage your projects</Link>.</p>}
           <h2>Job Information</h2>
 
           <label>Job Title</label>
@@ -165,10 +170,11 @@ function PostJob() {
           <button
             type="submit"
             className="primary-btn"
-            disabled={loading}
+            disabled={loading || published}
           >
             {loading ? "Publishing..." : "Publish Job"}
           </button>
+          {published && <Link to="/my-projects" className="primary-btn">Go to My Projects</Link>}
         </form>
       </main>
     </div>
