@@ -347,7 +347,8 @@ begin
         and a.client_id = auth.uid()
         and a.status = 'Accepted'
     ) then
-    raise exception 'A project needs an accepted freelancer before completion';
+    raise exception 'A project needs an accepted freelancer before completion'
+      using errcode = '23514';
   end if;
   return new;
 end;

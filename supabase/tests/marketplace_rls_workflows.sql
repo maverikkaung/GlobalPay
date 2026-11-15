@@ -1,0 +1,125 @@
+begin;
+
+insert into auth.users (id, raw_user_meta_data) values
+  ('11111111-1111-4111-8111-111111111111', '{"full_name":"CI Client","account_type":"client"}'),
+  ('22222222-2222-4222-8222-222222222222', '{"full_name":"CI Freelancer","account_type":"freelancer"}');
+
+insert into public.jobs (id, client_id, title, description, budget) values
+  ('33333333-3333-4333-8333-333333333333', '11111111-1111-4111-8111-111111111111', 'Accepted project', 'Workflow fixture', 100),
+  ('33333333-3333-4333-8333-333333333334', '11111111-1111-4111-8111-111111111111', 'Pending project', 'Workflow fixture', 50);
+
+set local role authenticated;
+select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', true);
+
+insert into public.job_applications (id, job_id, client_id, freelancer_id, full_name, email)
+values ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-333333333333',
+  '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222',
+  'CI Freelancer', 'ci-freelancer@example.invalid');
+
+do $$
+declare
+  duplicate_blocked boolean := false;
+  changed_rows integer;
+begin
+  begin
+    insert into public.job_applications (id, job_id, client_id, freelancer_id, full_name, email)
+    values ('44444444-4444-4444-8444-444444444445', '33333333-3333-4333-8333-333333333333',
+      '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222',
+      'CI Freelancer', 'ci-freelancer@example.invalid');
+  exception when unique_violation then
+    duplicate_blocked := true;
+  end;
+  if not duplicate_blocked then
+    raise exception 'Duplicate freelancer application was accepted';
+  end if;
+
+  update public.job_applications set status = 'Accepted'
+  where id = '44444444-4444-4444-8444-444444444444';
+  get diagnostics changed_rows = row_count;
+  if changed_rows <> 0 then
+    raise exception 'Freelancers must not decide their own applications';
+  end if;
+
+  if (select count(*) from public.profiles) <> 1 then
+    raise exception 'A freelancer must only read their own profile';
+  end if;
+end;
+$$;
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+
+do $$
+declare
+  completion_blocked boolean := false;
+begin
+  begin
+    update public.jobs set status = 'completed'
+    where id = '33333333-3333-4333-8333-333333333334';
+  exception when check_violation then
+    completion_blocked := true;
+  end;
+  if not completion_blocked then
+    raise exception 'A client completed a project with no accepted freelancer';
+  end if;
+end;
+$$;
+
+update public.job_applications set status = 'Accepted'
+where id = '44444444-4444-4444-8444-444444444444';
+update public.jobs set status = 'completed'
+where id = '33333333-3333-4333-8333-333333333333';
+
+insert into public.reviews (application_id, job_id, reviewer_id, reviewee_id, rating, body)
+values ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-333333333333',
+  '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', 5, 'Great work');
+
+insert into public.conversations (application_id, job_id, client_id, freelancer_id, created_by)
+values ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-333333333333',
+  '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222',
+  '11111111-1111-4111-8111-111111111111');
+
+insert into public.messages (conversation_id, sender_id, body)
+select id, '11111111-1111-4111-8111-111111111111', 'The completed work looks great.'
+from public.conversations where application_id = '44444444-4444-4444-8444-444444444444';
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', true);
+
+update public.messages set read_at = now()
+where conversation_id = (select id from public.conversations
+  where application_id = '44444444-4444-4444-8444-444444444444');
+
+update public.notifications set read_at = now()
+where user_id = '22222222-2222-4222-8222-222222222222' and kind = 'new_message';
+
+insert into public.reviews (application_id, job_id, reviewer_id, reviewee_id, rating, body)
+values ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-333333333333',
+  '22222222-2222-4222-8222-222222222222', '11111111-1111-4111-8111-111111111111', 5, 'Clear communication');
+
+insert into public.portfolio_items (freelancer_id, title, project_url)
+values ('22222222-2222-4222-8222-222222222222', 'CI portfolio', 'https://example.invalid/project');
+
+do $$
+begin
+  if (select count(*) from public.reviews) <> 2 then
+    raise exception 'Both project participants should be able to review each other';
+  end if;
+  if (select count(*) from public.portfolio_items) <> 1 then
+    raise exception 'Freelancers should be able to manage their own portfolios';
+  end if;
+  if not exists (
+    select 1 from public.notifications where user_id = '22222222-2222-4222-8222-222222222222'
+      and kind = 'new_message' and read_at is not null
+  ) then
+    raise exception 'Message notifications and read receipts should work';
+  end if;
+end;
+$$;
+
+rollback;
