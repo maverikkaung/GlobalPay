@@ -15,6 +15,7 @@ const ClientDashboard = lazy(() => import("./ClientDashboard.jsx"));
 const MyApplications = lazy(() => import("./MyApplications.jsx"));
 const ApplyForm = lazy(() => import("./ApplyForm.jsx"));
 const FreelancerProfile = lazy(() => import("./FreelancerProfile.jsx"));
+const ClientProfile = lazy(() => import("./ClientProfile.jsx"));
 const PostJob = lazy(() => import("./PostJob.jsx"));
 const JobApplicants = lazy(() => import("./JobApplicants.jsx"));
 const MyFreelancers = lazy(() => import("./MyFreelancers.jsx"));
@@ -356,6 +357,7 @@ function App() {
       <Route path="/freelancer-dashboard" element={<RequireAuth roles={["Freelancer"]}><FreelancerDashboard /></RequireAuth>} />
 
       <Route path="/client-dashboard" element={<RequireAuth roles={["Client"]}><ClientDashboard /></RequireAuth>} />
+      <Route path="/client-profile" element={<RequireAuth roles={["Client"]}><ClientProfile /></RequireAuth>} />
 
       <Route path="/my-applications" element={<RequireAuth roles={["Freelancer"]}><MyApplications /></RequireAuth>} />
 

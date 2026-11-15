@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { supabase } from "./supabase.js";
 import { AuthContext } from "./auth-context.js";
@@ -19,7 +19,9 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [loadedProfile, setLoadedProfile] = useState({ userId: null, profile: null });
+  const [profileRefresh, setProfileRefresh] = useState(0);
   const sessionUserId = useRef(null);
+  const refreshProfile = useCallback(() => setProfileRefresh((current) => current + 1), []);
 
   useEffect(() => {
     let active = true;
@@ -86,16 +88,17 @@ export function AuthProvider({ children }) {
       });
 
     return () => { active = false; };
-  }, [userId]);
+  }, [userId, profileRefresh]);
 
   const value = useMemo(() => {
     const profile = loadedProfile.userId === userId ? loadedProfile.profile : null;
     return {
       user: toAppUser(authUser, profile),
       session,
+      refreshProfile,
       loading: !authReady || Boolean(userId && loadedProfile.userId !== userId)
     };
-  }, [authReady, authUser, loadedProfile, session, userId]);
+  }, [authReady, authUser, loadedProfile, refreshProfile, session, userId]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -101,6 +101,32 @@ set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
 
+update public.profiles set full_name = 'CI Client Updated', country = 'Test City'
+where id = (select auth.uid());
+
+do $$
+declare
+  role_change_blocked boolean := false;
+begin
+  begin
+    update public.profiles set account_type = 'freelancer'
+    where id = (select auth.uid());
+  exception when raise_exception then
+    role_change_blocked := true;
+  end;
+  if not role_change_blocked then
+    raise exception 'Users must not change their own account role';
+  end if;
+  if not exists (
+    select 1 from public.profiles
+    where id = (select auth.uid()) and full_name = 'CI Client Updated'
+      and country = 'Test City' and account_type = 'client'
+  ) then
+    raise exception 'Clients should be able to update their own public profile';
+  end if;
+end;
+$$;
+
 do $$
 declare
   completion_blocked boolean := false;

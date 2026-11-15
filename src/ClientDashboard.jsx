@@ -205,6 +205,12 @@ function ClientDashboard() {
               </p>
             </Link>
 
+            <Link to="/client-profile" className="dashboard-action-card">
+              <span>🏢</span>
+              <h3>My Profile</h3>
+              <p>Update the public details freelancers see about you.</p>
+            </Link>
+
             <Link to="/messages" className="dashboard-action-card">
               <span>✉️</span>
               <h3>Messages</h3>

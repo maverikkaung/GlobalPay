@@ -5,7 +5,10 @@ import { supabase } from "./supabase.js";
 
 function FreelancerProfile() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
+  const userId = user?.id;
+  const userName = user?.name;
+  const accountType = user?.accountType;
   const [fullName, setFullName] = useState(user ? user.name : "");
   const [country, setCountry] = useState("");
   const [title, setTitle] = useState("");
@@ -16,14 +19,15 @@ function FreelancerProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
       navigate("/login");
       return;
     }
 
-    if (user.accountType !== "Freelancer") {
+    if (accountType !== "Freelancer") {
       navigate("/client-dashboard");
       return;
     }
@@ -31,13 +35,13 @@ function FreelancerProfile() {
     let active = true;
     supabase.from("profiles")
       .select("full_name, country, professional_title, bio, skills, experience, portfolio_url")
-      .eq("id", user.id).maybeSingle()
+      .eq("id", userId).maybeSingle()
       .then(({ data, error: loadError }) => {
         if (!active) return;
         if (loadError) {
           setError("Unable to load your profile. " + loadError.message);
         } else if (data) {
-          setFullName(data.full_name || user.name || "");
+          setFullName(data.full_name || userName || "");
           setCountry(data.country || "");
           setTitle(data.professional_title || "");
           setBio(data.bio || "");
@@ -52,12 +56,12 @@ function FreelancerProfile() {
         setLoading(false);
       });
     return () => { active = false; };
-  }, [navigate, user]);
+  }, [accountType, navigate, userId, userName]);
 
   async function handleSave(event) {
     event.preventDefault();
 
-    if (!user) {
+    if (!userId) {
       navigate("/login");
       return;
     }
@@ -65,6 +69,7 @@ function FreelancerProfile() {
     try {
       setSaving(true);
       setError("");
+      setNotice("");
       const result = await supabase.from("profiles").update({
         full_name: fullName.trim(),
         country: country.trim(),
@@ -73,11 +78,12 @@ function FreelancerProfile() {
         skills: skills.trim(),
         experience,
         portfolio_url: portfolio.trim() || null
-      }).eq("id", user.id).select("id").maybeSingle();
+      }).eq("id", userId).select("id").maybeSingle();
 
       if (result.error) throw result.error;
       if (!result.data) throw new Error("Your profile record was not found. Please sign out and back in.");
-      alert("Your profile has been saved successfully!");
+      setNotice("Your profile has been saved.");
+      refreshProfile();
     } catch (saveError) {
       setError("Unable to save your profile. " + saveError.message);
     } finally {
@@ -113,6 +119,7 @@ function FreelancerProfile() {
 
         <form className="application-form" onSubmit={handleSave}>
           {error && <p role="alert">{error}</p>}
+          {notice && <p className="auth-notice auth-notice--success" role="status">{notice}</p>}
           <h2>Personal Information</h2>
 
           <label>Full Name</label>
