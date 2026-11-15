@@ -193,10 +193,14 @@ from public.conversations where application_id = '44444444-4444-4444-8444-444444
 do $$
 declare
   deleted_rows integer;
+  history_delete_blocked boolean := false;
 begin
-  delete from public.jobs where id = '33333333-3333-4333-8333-333333333333';
-  get diagnostics deleted_rows = row_count;
-  if deleted_rows <> 0 then
+  begin
+    delete from public.jobs where id = '33333333-3333-4333-8333-333333333333';
+  exception when raise_exception then
+    history_delete_blocked := true;
+  end;
+  if not history_delete_blocked then
     raise exception 'Jobs with application history must not be deleted';
   end if;
 

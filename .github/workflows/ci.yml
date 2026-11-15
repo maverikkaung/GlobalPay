@@ -46,6 +46,7 @@ jobs:
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150004_close_messaging_after_application.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150005_restrict_review_record_access.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150006_preserve_jobs_with_applications.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150007_preserve_job_history_trigger.sql
         env:
           PGPASSWORD: postgres
       - name: Assert marketplace RLS and write boundaries

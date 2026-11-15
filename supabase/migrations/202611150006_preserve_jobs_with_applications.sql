@@ -9,8 +9,4 @@ create policy "TechKarvo job delete boundary"
       select 1 from public.profiles p
       where p.id = (select auth.uid()) and p.account_type = 'client'
     )
-    and not exists (
-      select 1 from public.job_applications a
-      where a.job_id = jobs.id
-    )
   );
