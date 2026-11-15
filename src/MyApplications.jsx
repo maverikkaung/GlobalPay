@@ -1,11 +1,11 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { getCurrentUser } from "./auth.js";
+import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 
 function MyApplications() {
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const userId = user ? user.id : null;
   const accountType = user ? user.accountType : null;
 

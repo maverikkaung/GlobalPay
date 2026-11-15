@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getCurrentUser } from "./auth.js";
+import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 
 function ApplyForm() {
   const navigate = useNavigate();
   const params = useParams();
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const userId = user ? user.id : null;
   const accountType = user ? user.accountType : null;
   const userName = user ? user.name || "" : "";
@@ -69,7 +69,7 @@ function ApplyForm() {
 
         const profileResult = await supabase
           .from("profiles")
-          .select("*")
+          .select("full_name, country, professional_title, bio, skills, experience, portfolio_url")
           .eq("id", userId)
           .maybeSingle();
 
@@ -78,26 +78,11 @@ function ApplyForm() {
 
           setFullName(profile.full_name || userName);
           setCountry(profile.country || "");
-        }
-
-        try {
-          const savedProfiles = JSON.parse(
-            localStorage.getItem("TechKarvo_freelancer_profiles") || "{}"
-          );
-
-          const localProfile = savedProfiles[userEmail];
-
-          if (localProfile) {
-            setFullName(localProfile.fullName || userName);
-            setCountry(localProfile.country || "");
-            setTitle(localProfile.title || "");
-            setBio(localProfile.bio || "");
-            setSkills(localProfile.skills || "");
-            setExperience(localProfile.experience || "");
-            setPortfolio(localProfile.portfolio || "");
-          }
-        } catch {
-          console.log("Could not load saved freelancer profile.");
+          setTitle(profile.professional_title || "");
+          setBio(profile.bio || "");
+          setSkills(profile.skills || "");
+          setExperience(profile.experience || "");
+          setPortfolio(profile.portfolio_url || "");
         }
       } catch (error) {
         console.log("Application page error:", error.message);

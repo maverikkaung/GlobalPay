@@ -1,11 +1,13 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { getCurrentUser, logoutUser } from "./auth.js";
+import { logoutUser } from "./auth.js";
+import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import { calculateClientHiringMetrics } from "./marketplace.js";
 
 function ClientDashboard() {
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const userId = user ? user.id : null;
   const accountType = user ? user.accountType : null;
 
@@ -52,13 +54,9 @@ function ClientDashboard() {
 
         if (applicationResult.error) throw applicationResult.error;
 
-        const accepted = applicationResult.data || [];
-        const hiredProjectIds = [...new Set(accepted.map((item) => String(item.job_id)))];
-        const spending = myJobs.reduce((total, project) =>
-          hiredProjectIds.includes(String(project.id)) ? total + Number(project.budget || 0) : total, 0);
-
-        setTotalHires(accepted.length);
-        setTotalSpending(spending);
+        const metrics = calculateClientHiringMetrics(applicationResult.data || [], myJobs);
+        setTotalHires(metrics.totalHires);
+        setTotalSpending(metrics.totalSpending);
 
       } catch (error) {
         console.error("Dashboard loading error:", error);

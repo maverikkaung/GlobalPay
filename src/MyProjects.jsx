@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { getCurrentUser } from "./auth.js";
+import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 
 function MyProjects() {
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const userId = user ? user.id : null;
   const accountType = user ? user.accountType : null;
 

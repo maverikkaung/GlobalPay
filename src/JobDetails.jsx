@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { jobsData } from "./jobsData.js";
-import { getCurrentUser } from "./auth.js";
+import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import "./App.css";
 
 function JobDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const { user } = useAuth();
 
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);

@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getCurrentUser } from "./auth.js";
+import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 
 function PostJob() {
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const { user } = useAuth();
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");

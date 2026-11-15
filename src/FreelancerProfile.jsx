@@ -1,28 +1,21 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getCurrentUser } from "./auth.js";
-
-function readSavedProfile(email) {
-  try {
-    const profiles = JSON.parse(localStorage.getItem("TechKarvo_freelancer_profiles") || "{}");
-    return profiles[email] || {};
-  } catch {
-    return {};
-  }
-}
+import { useAuth } from "./useAuth.js";
+import { supabase } from "./supabase.js";
 
 function FreelancerProfile() {
   const navigate = useNavigate();
-  const user = getCurrentUser();
-  const profile = readSavedProfile(user ? user.email : "");
-
-  const [fullName, setFullName] = useState(profile.fullName || (user ? user.name : ""));
-  const [country, setCountry] = useState(profile.country || "");
-  const [title, setTitle] = useState(profile.title || "");
-  const [bio, setBio] = useState(profile.bio || "");
-  const [skills, setSkills] = useState(profile.skills || "");
-  const [experience, setExperience] = useState(profile.experience || "");
-  const [portfolio, setPortfolio] = useState(profile.portfolio || "");
+  const { user } = useAuth();
+  const [fullName, setFullName] = useState(user ? user.name : "");
+  const [country, setCountry] = useState("");
+  const [title, setTitle] = useState("");
+  const [bio, setBio] = useState("");
+  const [skills, setSkills] = useState("");
+  const [experience, setExperience] = useState("");
+  const [portfolio, setPortfolio] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user) {
@@ -35,9 +28,33 @@ function FreelancerProfile() {
       return;
     }
 
+    let active = true;
+    supabase.from("profiles")
+      .select("full_name, country, professional_title, bio, skills, experience, portfolio_url")
+      .eq("id", user.id).maybeSingle()
+      .then(({ data, error: loadError }) => {
+        if (!active) return;
+        if (loadError) {
+          setError("Unable to load your profile. " + loadError.message);
+        } else if (data) {
+          setFullName(data.full_name || user.name || "");
+          setCountry(data.country || "");
+          setTitle(data.professional_title || "");
+          setBio(data.bio || "");
+          setSkills(data.skills || "");
+          setExperience(data.experience || "");
+          setPortfolio(data.portfolio_url || "");
+        }
+        setLoading(false);
+      }).catch((loadError) => {
+        if (!active) return;
+        setError("Unable to load your profile. " + loadError.message);
+        setLoading(false);
+      });
+    return () => { active = false; };
   }, [navigate, user]);
 
-  function handleSave(event) {
+  async function handleSave(event) {
     event.preventDefault();
 
     if (!user) {
@@ -45,30 +62,27 @@ function FreelancerProfile() {
       return;
     }
 
-    let allProfiles;
     try {
-      allProfiles = JSON.parse(localStorage.getItem("TechKarvo_freelancer_profiles") || "{}");
-      if (!allProfiles || typeof allProfiles !== "object" || Array.isArray(allProfiles)) allProfiles = {};
-    } catch {
-      allProfiles = {};
+      setSaving(true);
+      setError("");
+      const result = await supabase.from("profiles").update({
+        full_name: fullName.trim(),
+        country: country.trim(),
+        professional_title: title.trim(),
+        bio: bio.trim(),
+        skills: skills.trim(),
+        experience,
+        portfolio_url: portfolio.trim() || null
+      }).eq("id", user.id).select("id").maybeSingle();
+
+      if (result.error) throw result.error;
+      if (!result.data) throw new Error("Your profile record was not found. Please sign out and back in.");
+      alert("Your profile has been saved successfully!");
+    } catch (saveError) {
+      setError("Unable to save your profile. " + saveError.message);
+    } finally {
+      setSaving(false);
     }
-
-    allProfiles[user.email] = {
-      fullName: fullName,
-      country: country,
-      title: title,
-      bio: bio,
-      skills: skills,
-      experience: experience,
-      portfolio: portfolio
-    };
-
-    localStorage.setItem(
-      "TechKarvo_freelancer_profiles",
-      JSON.stringify(allProfiles)
-    );
-
-    alert("Your profile has been saved successfully!");
   }
 
   if (!user || user.accountType !== "Freelancer") {
@@ -98,6 +112,7 @@ function FreelancerProfile() {
         </div>
 
         <form className="application-form" onSubmit={handleSave}>
+          {error && <p role="alert">{error}</p>}
           <h2>Personal Information</h2>
 
           <label>Full Name</label>
@@ -166,8 +181,8 @@ function FreelancerProfile() {
             onChange={(event) => setPortfolio(event.target.value)}
           />
 
-          <button type="submit" className="primary-btn">
-            Save Profile
+          <button type="submit" className="primary-btn" disabled={saving || loading}>
+            {loading ? "Loading Profile…" : saving ? "Saving…" : "Save Profile"}
           </button>
         </form>
       </main>

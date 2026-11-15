@@ -1,11 +1,13 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { getCurrentUser, logoutUser } from "./auth.js";
+import { logoutUser } from "./auth.js";
+import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import { countApplicationStatuses } from "./marketplace.js";
 
 function FreelancerDashboard() {
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const userId = user ? user.id : null;
   const accountType = user ? user.accountType : null;
 
@@ -30,10 +32,10 @@ function FreelancerDashboard() {
         return;
       }
 
-      const applications = result.data || [];
-      setActiveJobs(applications.filter((item) => item.status === "Accepted").length);
-      setPendingApplications(applications.filter((item) => item.status === "Pending").length);
-      setRejectedApplications(applications.filter((item) => item.status === "Rejected").length);
+      const counts = countApplicationStatuses(result.data || []);
+      setActiveJobs(counts.accepted);
+      setPendingApplications(counts.pending);
+      setRejectedApplications(counts.rejected);
     }
 
     loadApplications();

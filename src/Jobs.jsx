@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
-import { getCurrentUser } from "./auth.js";
+import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { jobsData } from "./jobsData.js";
 import "./App.css";
 
 function Jobs() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -74,8 +75,6 @@ function Jobs() {
   const allJobs = jobsData.concat(clientJobs).concat(supabaseJobs);
 
   function handleApply(job) {
-    const user = getCurrentUser();
-
     if (!user) {
       alert("Please log in to apply for this job.");
       navigate("/login");

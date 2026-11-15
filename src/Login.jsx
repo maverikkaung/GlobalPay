@@ -19,69 +19,45 @@ function Login() {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    const result = await supabase.auth.signInWithPassword({
-      email: cleanEmail,
-      password: password
-    });
+    try {
+      const result = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password
+      });
 
-    if (result.error) {
-      alert(result.error.message);
+      if (result.error) {
+        alert(result.error.message);
+        return;
+      }
+
+      const authUser = result.data.user;
+      const profileResult = await supabase.from("profiles")
+        .select("full_name, account_type").eq("id", authUser.id).maybeSingle();
+      const profile = profileResult.data;
+
+      if (profileResult.error) {
+        console.error("Profile lookup failed after login:", profileResult.error.message);
+      }
+
+      const accountType = profile?.account_type;
+
+      if (accountType !== "freelancer" && accountType !== "client") {
+        await supabase.auth.signOut();
+        alert("Your account profile could not be verified. Please try again or contact support.");
+        return;
+      }
+
+      if (rememberMe) {
+        localStorage.setItem("TechKarvo_remembered_email", cleanEmail);
+      } else {
+        localStorage.removeItem("TechKarvo_remembered_email");
+      }
+
+      navigate(accountType === "freelancer" ? "/freelancer-dashboard" : "/client-dashboard");
+    } catch (error) {
+      alert("Login failed: " + error.message);
+    } finally {
       setLoading(false);
-      return;
-    }
-
-    const user = result.data.user;
-
-    const profileResult = await supabase
-      .from("profiles")
-      .select("full_name, account_type")
-      .eq("id", user.id)
-      .single();
-
-    if (profileResult.error) {
-      alert(
-        "Login successful, but profile could not be loaded: " +
-        profileResult.error.message
-      );
-      setLoading(false);
-      return;
-    }
-
-    const profile = profileResult.data;
-    const currentUser = {
-  id: user.id,
-  name: profile.full_name,
-  email: cleanEmail,
-  accountType:
-    profile.account_type === "freelancer"
-      ? "Freelancer"
-      : "Client"
-};
-
-localStorage.setItem(
-  "TechKarvo_current_user",
-  JSON.stringify(currentUser)
-);
-
-    if (rememberMe) {
-      localStorage.setItem(
-        "TechKarvo_remembered_email",
-        cleanEmail
-      );
-    } else {
-      localStorage.removeItem("TechKarvo_remembered_email");
-    }
-
-    alert("Welcome back, " + profile.full_name + "!");
-
-    setLoading(false);
-
-    if (profile.account_type === "freelancer") {
-      navigate("/freelancer-dashboard");
-    } else if (profile.account_type === "client") {
-      navigate("/client-dashboard");
-    } else {
-      navigate("/");
     }
   }
 

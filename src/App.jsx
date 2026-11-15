@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, useEffect } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 import "./App.css";
+import { AuthProvider, RequireAuth } from "./AuthContext.jsx";
 
 const Login = lazy(() => import("./Login.jsx"));
 const Signup = lazy(() => import("./Signup.jsx"));
@@ -320,8 +321,9 @@ function Home() {
 
 function App() {
   return (
-    <Suspense fallback={<main className="route-loading" aria-live="polite">Loading TechKarvo…</main>}>
-      <Routes>
+    <AuthProvider>
+      <Suspense fallback={<main className="route-loading" aria-live="polite">Loading TechKarvo…</main>}>
+        <Routes>
 
       <Route path="/" element={<Home />} />
 
@@ -343,46 +345,38 @@ function App() {
 
       <Route path="/jobs/:id" element={<JobDetails />} />
 
-      <Route
-        path="/freelancer-dashboard"
-        element={<FreelancerDashboard />}
-      />
+      <Route path="/freelancer-dashboard" element={<RequireAuth roles={["Freelancer"]}><FreelancerDashboard /></RequireAuth>} />
 
-      <Route
-        path="/client-dashboard"
-        element={<ClientDashboard />}
-      />
+      <Route path="/client-dashboard" element={<RequireAuth roles={["Client"]}><ClientDashboard /></RequireAuth>} />
 
-      <Route
-        path="/my-applications"
-        element={<MyApplications />}
-      />
+      <Route path="/my-applications" element={<RequireAuth roles={["Freelancer"]}><MyApplications /></RequireAuth>} />
 
-      <Route path="/apply/:id" element={<ApplyForm />} />
+      <Route path="/apply/:id" element={<RequireAuth roles={["Freelancer"]}><ApplyForm /></RequireAuth>} />
 <Route
         path="/freelancer-profile"
-        element={<FreelancerProfile />}
+        element={<RequireAuth roles={["Freelancer"]}><FreelancerProfile /></RequireAuth>}
       />
 
-      <Route path="/post-job" element={<PostJob />} />
+      <Route path="/post-job" element={<RequireAuth roles={["Client"]}><PostJob /></RequireAuth>} />
 
       <Route
         path="/job-applicants"
-        element={<JobApplicants />}
+        element={<RequireAuth roles={["Client"]}><JobApplicants /></RequireAuth>}
       />
 
       <Route
         path="/my-freelancers"
-        element={<MyFreelancers />}
+        element={<RequireAuth roles={["Client"]}><MyFreelancers /></RequireAuth>}
       />
 
       <Route
         path="/my-projects"
-        element={<MyProjects />}
+        element={<RequireAuth roles={["Client"]}><MyProjects /></RequireAuth>}
       />
 
-      </Routes>
-    </Suspense>
+        </Routes>
+      </Suspense>
+    </AuthProvider>
   );
 }
 
