@@ -3,6 +3,7 @@ import { Routes, Route, Link, useLocation } from "react-router-dom";
 import "./App.css";
 import { AuthProvider, RequireAuth } from "./AuthContext.jsx";
 import { useAuth } from "./useAuth.js";
+import { isSupabaseConfigured } from "./supabase.js";
 
 const Login = lazy(() => import("./Login.jsx"));
 const Signup = lazy(() => import("./Signup.jsx"));
@@ -329,6 +330,16 @@ function Home() {
 
 
 function App() {
+  if (!isSupabaseConfigured) {
+    return (
+      <main className="configuration-error" role="alert">
+        <span className="configuration-error-brand">TechKarvo</span>
+        <h1>We’ll be back shortly.</h1>
+        <p>The marketplace is temporarily unavailable. Please try again later.</p>
+      </main>
+    );
+  }
+
   return (
     <AuthProvider>
       <Suspense fallback={<main className="route-loading" aria-live="polite">Loading TechKarvo…</main>}>

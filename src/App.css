@@ -14,6 +14,35 @@ body {
   color: #ffffff;
 }
 
+.configuration-error {
+  min-height: 100vh;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: 32px 24px;
+  background: #071426;
+  color: #fff;
+  text-align: center;
+}
+
+.configuration-error-brand {
+  color: #62a2ff;
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: .04em;
+}
+
+.configuration-error h1 {
+  margin: 28px 0 10px;
+  font-size: clamp(32px, 6vw, 48px);
+}
+
+.configuration-error p {
+  max-width: 420px;
+  color: #aabbd1;
+  line-height: 1.7;
+}
+
 button {
   cursor: pointer;
   font: inherit;
