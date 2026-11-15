@@ -106,8 +106,9 @@ function PostJob() {
           {published && <p className="auth-notice auth-notice--success" role="status">Your project is live. <Link to="/my-projects">Manage your projects</Link>.</p>}
           <h2>Job Information</h2>
 
-          <label>Job Title</label>
+          <label htmlFor="post-job-title">Job Title</label>
           <input
+            id="post-job-title"
             type="text"
             placeholder="Example: React Developer Needed"
             value={title}
@@ -115,8 +116,9 @@ function PostJob() {
             required
           />
 
-          <label>Job Category</label>
+          <label htmlFor="post-job-category">Job Category</label>
           <select
+            id="post-job-category"
             value={category}
             onChange={(event) => setCategory(event.target.value)}
             required
@@ -130,15 +132,17 @@ function PostJob() {
             <option value="Other">Other</option>
           </select>
 
-          <label>Job Description</label>
+          <label htmlFor="post-job-description">Job Description</label>
           <textarea
+            id="post-job-description"
             placeholder="Describe the work and project requirements..."
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             required
           />
-<label>Required Skills</label>
+          <label htmlFor="post-job-skills">Required Skills</label>
           <input
+            id="post-job-skills"
             type="text"
             placeholder="React, JavaScript, CSS..."
             value={skills}
@@ -148,8 +152,9 @@ function PostJob() {
 
           <h2>Budget Information</h2>
 
-          <label>Budget (USD)</label>
+          <label htmlFor="post-job-budget">Budget (USD)</label>
           <input
+            id="post-job-budget"
             type="number"
             min="1"
             placeholder="Example: 500"
@@ -158,8 +163,9 @@ function PostJob() {
             required
           />
 
-          <label>Payment Type</label>
+          <label htmlFor="post-job-payment-type">Payment Type</label>
           <select
+            id="post-job-payment-type"
             value={paymentType}
             onChange={(event) => setPaymentType(event.target.value)}
           >

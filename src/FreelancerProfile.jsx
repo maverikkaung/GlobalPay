@@ -122,16 +122,18 @@ function FreelancerProfile() {
           {notice && <p className="auth-notice auth-notice--success" role="status">{notice}</p>}
           <h2>Personal Information</h2>
 
-          <label>Full Name</label>
+          <label htmlFor="freelancer-profile-name">Full Name</label>
           <input
+            id="freelancer-profile-name"
             type="text"
             value={fullName}
             onChange={(event) => setFullName(event.target.value)}
             required
           />
 
-          <label>Country / City</label>
+          <label htmlFor="freelancer-profile-country">Country / City</label>
           <input
+            id="freelancer-profile-country"
             type="text"
             placeholder="Example: Yangon, Myanmar"
             value={country}
@@ -141,8 +143,9 @@ function FreelancerProfile() {
 
           <h2>Professional Information</h2>
 
-          <label>Professional Title</label>
+          <label htmlFor="freelancer-profile-title">Professional Title</label>
           <input
+            id="freelancer-profile-title"
             type="text"
             placeholder="Example: Frontend Developer"
             value={title}
@@ -150,15 +153,17 @@ function FreelancerProfile() {
             required
           />
 
-          <label>About Me</label>
+          <label htmlFor="freelancer-profile-bio">About Me</label>
           <textarea
+            id="freelancer-profile-bio"
             placeholder="Tell clients about yourself..."
             value={bio}
             onChange={(event) => setBio(event.target.value)}
             required
           />
-<label>Skills</label>
+          <label htmlFor="freelancer-profile-skills">Skills</label>
           <input
+            id="freelancer-profile-skills"
             type="text"
             placeholder="React, JavaScript, CSS..."
             value={skills}
@@ -166,8 +171,9 @@ function FreelancerProfile() {
             required
           />
 
-          <label>Years of Experience</label>
+          <label htmlFor="freelancer-profile-experience">Years of Experience</label>
           <select
+            id="freelancer-profile-experience"
             value={experience}
             onChange={(event) => setExperience(event.target.value)}
             required
@@ -180,8 +186,9 @@ function FreelancerProfile() {
             <option value="5+ years">5+ years</option>
           </select>
 
-          <label>Portfolio / LinkedIn URL</label>
+          <label htmlFor="freelancer-profile-portfolio">Portfolio / LinkedIn URL</label>
           <input
+            id="freelancer-profile-portfolio"
             type="url"
             placeholder="https://example.com"
             value={portfolio}

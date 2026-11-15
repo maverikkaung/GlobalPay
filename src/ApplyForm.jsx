@@ -226,8 +226,9 @@ function ApplyForm() {
           {formSuccess && <p className="auth-notice auth-notice--success" role="status">Application submitted. <Link to="/my-applications">View your applications</Link>.</p>}
           <h2>Personal Information</h2>
 
-          <label>Full Name</label>
+          <label htmlFor="application-full-name">Full Name</label>
           <input
+            id="application-full-name"
             type="text"
             value={fullName}
             onChange={function(event) {
@@ -236,16 +237,18 @@ function ApplyForm() {
             required
           />
 
-          <label>Email Address</label>
+          <label htmlFor="application-email">Email Address</label>
           <input
+            id="application-email"
             type="email"
             value={email}
             disabled
             required
           />
 
-          <label>Country / City</label>
+          <label htmlFor="application-country">Country / City</label>
           <input
+            id="application-country"
             type="text"
             placeholder="Example: Yangon, Myanmar"
             value={country}
@@ -257,8 +260,9 @@ function ApplyForm() {
 
           <h2>Professional Profile</h2>
 
-          <label>Professional Title</label>
+          <label htmlFor="application-title">Professional Title</label>
           <input
+            id="application-title"
             type="text"
             placeholder="Example: Frontend Developer"
             value={title}
@@ -268,8 +272,9 @@ function ApplyForm() {
             required
           />
 
-          <label>About Me</label>
+          <label htmlFor="application-bio">About Me</label>
           <textarea
+            id="application-bio"
             placeholder="Tell the client about yourself..."
             value={bio}
             onChange={function(event) {
@@ -278,8 +283,9 @@ function ApplyForm() {
             required
           />
 
-          <label>Skills</label>
+          <label htmlFor="application-skills">Skills</label>
           <input
+            id="application-skills"
             type="text"
             placeholder="React, JavaScript, CSS..."
             value={skills}
@@ -288,8 +294,9 @@ function ApplyForm() {
             }}
             required
           />
-        <label>Years of Experience</label>
+          <label htmlFor="application-experience">Years of Experience</label>
           <select
+            id="application-experience"
             value={experience}
             onChange={function(event) {
               setExperience(event.target.value);
@@ -306,8 +313,9 @@ function ApplyForm() {
 
           <h2>Job Application</h2>
 
-          <label>Cover Letter</label>
+          <label htmlFor="application-cover-letter">Cover Letter</label>
           <textarea
+            id="application-cover-letter"
             placeholder="Why are you suitable for this job?"
             value={coverLetter}
             onChange={function(event) {
@@ -316,8 +324,9 @@ function ApplyForm() {
             required
           />
 
-          <label>Expected Salary (USD)</label>
+          <label htmlFor="application-salary">Expected Salary (USD)</label>
           <input
+            id="application-salary"
             type="number"
             min="1"
             placeholder="Example: 800"
@@ -328,8 +337,9 @@ function ApplyForm() {
             required
           />
 
-          <label>Salary Type</label>
+          <label htmlFor="application-salary-type">Salary Type</label>
           <select
+            id="application-salary-type"
             value={salaryType}
             onChange={function(event) {
               setSalaryType(event.target.value);
@@ -339,8 +349,9 @@ function ApplyForm() {
             <option value="Hourly">Hourly</option>
           </select>
 
-          <label>Portfolio / LinkedIn URL</label>
+          <label htmlFor="application-portfolio">Portfolio / LinkedIn URL</label>
           <input
+            id="application-portfolio"
             type="url"
             placeholder="https://example.com"
             value={portfolio}

@@ -293,8 +293,9 @@ function MyProjects() {
 
             <form onSubmit={saveEdit} className="auth-form">
 
-              <label>Job Title</label>
+              <label htmlFor="edit-project-title">Job Title</label>
               <input
+                id="edit-project-title"
                 type="text"
                 value={title}
                 onChange={function(event) {
@@ -303,8 +304,9 @@ function MyProjects() {
                 required
               />
 
-              <label>Category</label>
+              <label htmlFor="edit-project-category">Category</label>
               <input
+                id="edit-project-category"
                 type="text"
                 value={category}
                 onChange={function(event) {
@@ -313,8 +315,9 @@ function MyProjects() {
                 required
               />
 
-              <label>Description</label>
+              <label htmlFor="edit-project-description">Description</label>
               <textarea
+                id="edit-project-description"
                 value={description}
                 onChange={function(event) {
                   setDescription(event.target.value);
@@ -322,8 +325,9 @@ function MyProjects() {
                 required
               />
 
-              <label>Required Skills</label>
+              <label htmlFor="edit-project-skills">Required Skills</label>
               <input
+                id="edit-project-skills"
                 type="text"
                 value={skills}
                 onChange={function(event) {
@@ -331,8 +335,9 @@ function MyProjects() {
                 }}
               />
 
-              <label>Budget (USD)</label>
+              <label htmlFor="edit-project-budget">Budget (USD)</label>
               <input
+                id="edit-project-budget"
                 type="number"
                 min="1"
                 value={budget}
@@ -342,8 +347,9 @@ function MyProjects() {
                 required
               />
 
-              <label>Payment Type</label>
+              <label htmlFor="edit-project-payment-type">Payment Type</label>
               <select
+                id="edit-project-payment-type"
                 value={paymentType}
                 onChange={function(event) {
                   setPaymentType(event.target.value);
