@@ -17,3 +17,34 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  database-migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create isolated Supabase schema fixture
+        run: psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/migration_fixture.sql
+        env:
+          PGPASSWORD: postgres
+      - name: Apply marketplace migrations to isolated fixture
+        run: |
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150001_marketplace_security_profiles.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150002_marketplace_communications_reviews.sql
+        env:
+          PGPASSWORD: postgres
+      - name: Assert marketplace RLS and write boundaries
+        run: psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/migration_assertions.sql
+        env:
+          PGPASSWORD: postgres
