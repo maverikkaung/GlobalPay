@@ -14,94 +14,78 @@ function MyApplications() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [withdrawingId, setWithdrawingId] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(function() {
     let active = true;
 
     async function loadApplications() {
+      setLoading(true);
+      setError("");
       if (!userId) {
         navigate("/login");
+        setLoading(false);
         return;
       }
 
       if (accountType !== "Freelancer") {
         navigate("/client-dashboard");
-        return;
-      }
-
-      if (!userId) {
-        setError("Account information is missing. Please login again.");
         setLoading(false);
         return;
       }
 
-      const applicationResult = await supabase
-        .from("job_applications")
-        .select("*")
-        .eq("freelancer_id", userId)
-        .order("applied_at", { ascending: false });
+      try {
+        const applicationResult = await supabase
+          .from("job_applications")
+          .select("*")
+          .eq("freelancer_id", userId)
+          .order("applied_at", { ascending: false });
+        if (applicationResult.error) throw applicationResult.error;
+        if (!active) return;
 
-      if (!active) {
-        return;
-      }
+        const applicationRows = applicationResult.data || [];
+        const jobMap = {};
 
-      if (applicationResult.error) {
-        setError(applicationResult.error.message);
-        setLoading(false);
-        return;
-      }
+        if (applicationRows.length > 0) {
+          const jobIds = applicationRows.map((item) => item.job_id);
+          const jobsResult = await supabase
+            .from("jobs")
+            .select("id, title, category, budget, currency")
+            .in("id", jobIds);
+          if (!active) return;
 
-      const applicationRows = applicationResult.data;
+          if (!jobsResult.error) {
+            (jobsResult.data || []).forEach((job) => {
+              jobMap[String(job.id)] = job;
+            });
+          } else {
+            console.error("Application job details failed to load:", jobsResult.error.message);
+            setError("Your applications loaded, but some job details are unavailable.");
+          }
+        }
 
-      if (applicationRows.length === 0) {
+        setApplications(applicationRows.map((item) => {
+          const job = jobMap[String(item.job_id)];
+          return {
+            id: item.job_id,
+            clientId: item.client_id,
+            applicationId: item.id,
+            title: job ? job.title : "Job #" + item.job_id,
+            company: job?.category || "Client",
+            status: item.status,
+            expectedSalary: item.expected_salary,
+            salaryType: item.salary_type,
+            appliedAt: item.applied_at
+          };
+        }));
+      } catch (loadError) {
+        if (!active) return;
+        console.error("Applications failed to load:", loadError);
         setApplications([]);
-        setLoading(false);
-        return;
+        setError("Unable to load your applications. Please try again.");
+      } finally {
+        if (active) setLoading(false);
       }
-
-      const jobIds = applicationRows.map(function(item) {
-        return item.job_id;
-      });
-
-      const jobsResult = await supabase
-        .from("jobs")
-        .select("id, title, category, budget, currency")
-        .in("id", jobIds);
-
-      if (!active) {
-        return;
-      }
-
-      const jobMap = {};
-
-      if (!jobsResult.error) {
-        jobsResult.data.forEach(function(job) {
-          jobMap[String(job.id)] = job;
-        });
-      } else {
-        setError(
-          "Applications loaded, but some job details could not be loaded."
-        );
-      }
-
-      const formattedApplications = applicationRows.map(function(item) {
-        const job = jobMap[String(item.job_id)];
-
-        return {
-          id: item.job_id,
-          clientId: item.client_id,
-          applicationId: item.id,
-          title: job ? job.title : "Job #" + item.job_id,
-          company: job && job.category ? job.category : "Client",
-          status: item.status,
-          expectedSalary: item.expected_salary,
-          salaryType: item.salary_type,
-          appliedAt: item.applied_at
-        };
-      });
-
-      setApplications(formattedApplications);
-      setLoading(false);
     }
 
     loadApplications();
@@ -109,7 +93,7 @@ function MyApplications() {
     return function() {
       active = false;
     };
-  }, [userId, accountType, navigate]);
+  }, [userId, accountType, navigate, loadAttempt]);
 
   async function withdrawApplication(application) {
     const confirmed = window.confirm("Withdraw this pending application? You will no longer be considered for the project.");
@@ -232,7 +216,7 @@ function MyApplications() {
             </div>
           </div>
 
-          {error && <p role="alert">{error}</p>}
+          {error && <div role="alert"><p>{error}</p><button type="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button></div>}
 
           <div className="application-filters">
 
