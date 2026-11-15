@@ -13,6 +13,10 @@ function MyProjects() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [pendingAction, setPendingAction] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
@@ -22,31 +26,39 @@ function MyProjects() {
   const [paymentType, setPaymentType] = useState("Fixed Price");
 
   useEffect(function() {
+    let active = true;
     async function loadProjects() {
+      setLoading(true);
+      setLoadError("");
       if (accountType !== "Client" || !userId) {
         setLoading(false);
         return;
       }
 
-      const result = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("client_id", userId)
-        .order("created_at", { ascending: false });
-
-      if (result.error) {
-        console.error(result.error);
-        alert("Unable to load projects: " + result.error.message);
+      try {
+        const result = await supabase.from("jobs").select("*")
+          .eq("client_id", userId).order("created_at", { ascending: false });
+        if (!active) return;
+        if (result.error) throw result.error;
+        setProjects(result.data || []);
+      } catch (error) {
+        if (!active) return;
+        console.error("Unable to load projects:", error);
+        setLoadError("Unable to load projects. Please refresh and try again.");
         setProjects([]);
-      } else {
-        setProjects(result.data);
+      } finally {
+        if (active) setLoading(false);
       }
-
-      setLoading(false);
     }
 
-    loadProjects();
-  }, [userId, accountType]);
+    loadProjects().catch((error) => {
+      if (!active) return;
+      console.error("Unable to load projects:", error);
+      setLoadError("Unable to load projects. Please refresh and try again.");
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, [userId, accountType, loadAttempt]);
 
   function startEdit(project) {
     setEditingId(project.id);
@@ -80,15 +92,15 @@ function MyProjects() {
       budget === "" ||
       Number(budget) <= 0
     ) {
-      alert("Please complete all required fields.");
+      setActionError("Complete every required field and enter a budget above zero.");
       return;
     }
 
     setSaving(true);
-
-    const result = await supabase
-      .from("jobs")
-      .update({
+    setActionError("");
+    setActionNotice("");
+    try {
+      const result = await supabase.from("jobs").update({
         title: title.trim(),
         category: category.trim(),
         description: description.trim(),
@@ -97,34 +109,26 @@ function MyProjects() {
         payment_type: paymentType
       })
       .eq("id", editingId)
-      .eq("client_id", user.id);
+      .eq("client_id", user.id)
+      .select("id, title, category, description, skills, budget, payment_type, status")
+      .maybeSingle();
 
-    setSaving(false);
-
-    if (result.error) {
-      alert("Project update failed: " + result.error.message);
-      return;
-    }
-
-    const updatedProjects = projects.map(function(item) {
-      if (String(item.id) === String(editingId)) {
-        return {
-          ...item,
-          title: title.trim(),
-          category: category.trim(),
-          description: description.trim(),
-          skills: skills.trim(),
-          budget: Number(budget),
-          payment_type: paymentType
-        };
+      if (result.error) throw result.error;
+      if (!result.data) {
+        setActionError("This project could not be updated. Refresh and try again.");
+        return;
       }
 
-      return item;
-    });
-
-    setProjects(updatedProjects);
-    cancelEdit();
-    alert("Project updated successfully!");
+      setProjects((current) => current.map((item) =>
+        String(item.id) === String(editingId) ? { ...item, ...result.data } : item));
+      cancelEdit();
+      setActionNotice("Project details saved.");
+    } catch (error) {
+      console.error("Project update failed:", error);
+      setActionError("Project update failed. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function deleteProject(project) {
@@ -137,61 +141,66 @@ function MyProjects() {
     }
 
     setActionError("");
-    const applicationsResult = await supabase.from("job_applications").select("id")
-      .eq("job_id", project.id).limit(1);
-    if (applicationsResult.error) {
-      setActionError("Unable to check project history. " + applicationsResult.error.message);
-      return;
-    }
-    if (applicationsResult.data?.length) {
-      setActionError("This project has application history and cannot be deleted. Mark it complete to keep its history available.");
-      return;
-    }
+    setActionNotice("");
+    setPendingAction("delete:" + String(project.id));
+    try {
+      const applicationsResult = await supabase.from("job_applications").select("id")
+        .eq("job_id", project.id).limit(1);
+      if (applicationsResult.error) throw applicationsResult.error;
+      if (applicationsResult.data?.length) {
+        setActionError("This project has application history and cannot be deleted. Mark it complete to keep its history available.");
+        return;
+      }
 
-    const result = await supabase
-      .from("jobs")
-      .delete()
-      .eq("id", project.id)
-      .eq("client_id", user.id)
-      .select("id")
-      .maybeSingle();
+      const result = await supabase.from("jobs").delete()
+        .eq("id", project.id).eq("client_id", user.id).select("id").maybeSingle();
+      if (result.error) throw result.error;
+      if (!result.data) {
+        setActionError("This project could not be deleted. It may have application history.");
+        return;
+      }
 
-    if (result.error) {
-      setActionError("Project deletion failed: " + result.error.message);
-      return;
+      setProjects((current) => current.filter((item) => String(item.id) !== String(project.id)));
+      if (String(editingId) === String(project.id)) cancelEdit();
+      setActionNotice("Project deleted.");
+    } catch (error) {
+      console.error("Project deletion failed:", error);
+      setActionError("Project deletion failed. Please try again.");
+    } finally {
+      setPendingAction("");
     }
-    if (!result.data) {
-      setActionError("This project could not be deleted. It may have application history.");
-      return;
-    }
-
-    setProjects((current) => current.filter(function(item) {
-      return String(item.id) !== String(project.id);
-    }));
-    if (String(editingId) === String(project.id)) cancelEdit();
   }
 
   async function completeProject(project) {
-    const acceptedResult = await supabase.from("job_applications").select("id")
-      .eq("client_id", user.id).eq("job_id", project.id).eq("status", "Accepted").limit(1);
-    if (acceptedResult.error) {
-      alert("Unable to verify accepted applicants: " + acceptedResult.error.message);
-      return;
-    }
-    if (!acceptedResult.data?.length) {
-      alert("Accept a freelancer before marking this project complete.");
-      return;
-    }
+    setActionError("");
+    setActionNotice("");
+    setPendingAction("complete:" + String(project.id));
+    try {
+      const acceptedResult = await supabase.from("job_applications").select("id")
+        .eq("client_id", user.id).eq("job_id", project.id).eq("status", "Accepted").limit(1);
+      if (acceptedResult.error) throw acceptedResult.error;
+      if (!acceptedResult.data?.length) {
+        setActionError("Accept a freelancer before marking this project complete.");
+        return;
+      }
 
-    const result = await supabase.from("jobs").update({ status: "completed" })
-      .eq("id", project.id).eq("client_id", user.id).select("id, status").single();
-    if (result.error) {
-      alert("Unable to complete this project: " + result.error.message);
-      return;
+      const result = await supabase.from("jobs").update({ status: "completed" })
+        .eq("id", project.id).eq("client_id", user.id).select("id, status").maybeSingle();
+      if (result.error) throw result.error;
+      if (!result.data) {
+        setActionError("This project could not be completed. Refresh and try again.");
+        return;
+      }
+      setProjects((current) => current.map((item) => String(item.id) === String(project.id)
+        ? { ...item, status: result.data.status }
+        : item));
+      setActionNotice("Project marked complete.");
+    } catch (error) {
+      console.error("Project completion failed:", error);
+      setActionError("Unable to complete this project. Please try again.");
+    } finally {
+      setPendingAction("");
     }
-    setProjects((current) => current.map((item) => String(item.id) === String(project.id)
-      ? { ...item, status: result.data.status }
-      : item));
   }
 
   if (!user) {
@@ -269,7 +278,9 @@ function MyProjects() {
           </div>
         </section>
 
+        {loadError && <div role="alert"><p>{loadError}</p><button type="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button></div>}
         {actionError && <p role="alert">{actionError}</p>}
+        {actionNotice && <p role="status">{actionNotice}</p>}
 
         {editingId !== null && (
           <section className="my-projects-edit-section">
@@ -459,18 +470,19 @@ function MyProjects() {
                         Edit
                       </button>
                       {status === "open" && (
-                        <button type="button" className="my-project-edit-button" onClick={() => completeProject(project)}>
-                          Mark complete
+                        <button type="button" className="my-project-edit-button" disabled={Boolean(pendingAction)} onClick={() => completeProject(project)}>
+                          {pendingAction === "complete:" + String(project.id) ? "Completing…" : "Mark complete"}
                         </button>
                       )}
                         <button
                         type="button"
                         className="my-project-delete-button"
+                        disabled={Boolean(pendingAction)}
                         onClick={function() {
                           deleteProject(project);
                         }}
                       >
-                        Delete
+                        {pendingAction === "delete:" + String(project.id) ? "Deleting…" : "Delete"}
                       </button>
                     </div>
 
