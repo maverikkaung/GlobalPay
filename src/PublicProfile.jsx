@@ -27,7 +27,7 @@ function PublicProfile() {
       }
 
       const [reviewsResult, portfolioResult] = await Promise.all([
-        supabase.from("reviews").select("id, rating, body, created_at")
+        supabase.from("reviews_public").select("id, rating, body, created_at")
           .eq("reviewee_id", id).order("created_at", { ascending: false }),
         isFreelancer
           ? supabase.from("portfolio_items").select("id, title, description, project_url, image_url")

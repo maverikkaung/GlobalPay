@@ -18,6 +18,8 @@ create policy "CI legacy portfolio access" on public.portfolio_items
   for all to authenticated using (true) with check (true);
 create policy "CI legacy review insert" on public.reviews
   for insert to authenticated with check (true);
+create policy "CI legacy review read" on public.reviews
+  for select to authenticated using (true);
 
 begin;
 
@@ -197,6 +199,10 @@ begin
   ) then
     raise exception 'A legacy notification policy exposed another user’s notifications';
   end if;
+  if (select count(application_id) from public.reviews) <> 0
+    or (select count(*) from public.reviews_public) <> 1 then
+    raise exception 'Review authorship must stay private while public review content remains visible';
+  end if;
 
   begin
     insert into public.reviews (application_id, job_id, reviewer_id, reviewee_id, rating, body)
@@ -257,8 +263,9 @@ values ('22222222-2222-4222-8222-222222222222', 'CI portfolio', 'https://example
 
 do $$
 begin
-  if (select count(*) from public.reviews) <> 2 then
-    raise exception 'Both project participants should be able to review each other';
+  if (select count(application_id) from public.reviews) <> 1
+    or (select count(*) from public.reviews_public) <> 2 then
+    raise exception 'Both project participants should submit reviews while public content stays visible';
   end if;
   if (select count(*) from public.portfolio_items) <> 1 then
     raise exception 'Freelancers should be able to manage their own portfolios';

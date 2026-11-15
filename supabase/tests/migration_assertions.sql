@@ -33,6 +33,31 @@ begin
     or has_table_privilege('anon', 'public.job_applications', 'INSERT') then
     raise exception 'Anonymous users must not access applications';
   end if;
+  if has_table_privilege('anon', 'public.reviews', 'SELECT')
+    or has_table_privilege('authenticated', 'public.reviews', 'SELECT') then
+    raise exception 'Reviews must not expose unrestricted base-table reads';
+  end if;
+  if has_column_privilege('authenticated', 'public.reviews', 'body', 'SELECT')
+    or has_column_privilege('authenticated', 'public.reviews', 'job_id', 'SELECT')
+    or has_column_privilege('authenticated', 'public.reviews', 'reviewee_id', 'SELECT') then
+    raise exception 'Review content and relationship fields require the safe public view';
+  end if;
+  if not has_column_privilege('authenticated', 'public.reviews', 'application_id', 'SELECT')
+    or not has_column_privilege('authenticated', 'public.reviews', 'reviewer_id', 'SELECT') then
+    raise exception 'Review authors need their own review identifiers';
+  end if;
+  if not has_table_privilege('authenticated', 'public.reviews_public', 'SELECT')
+    or has_table_privilege('anon', 'public.reviews_public', 'SELECT') then
+    raise exception 'Only authenticated users should read the public review projection';
+  end if;
+  if exists (
+    select 1 from pg_attribute
+    where attrelid = 'public.reviews_public'::regclass
+      and attname in ('application_id', 'reviewer_id', 'job_id')
+      and attnum > 0 and not attisdropped
+  ) then
+    raise exception 'The public review projection must omit application and author identifiers';
+  end if;
   if has_table_privilege('authenticated', 'public.job_applications', 'UPDATE') then
     raise exception 'Authenticated users must not have table-wide application UPDATE';
   end if;
