@@ -16,20 +16,28 @@ function PublicProfile() {
   useEffect(() => {
     let active = true;
     async function loadProfile() {
-      const isFreelancer = user.accountType === "Client";
-      const view = isFreelancer ? "freelancer_public_profiles" : "client_public_profiles";
-      const profileResult = await supabase.from(view).select("*").eq("id", id).maybeSingle();
-      if (profileResult.error) throw profileResult.error;
-      const currentProfile = profileResult.data;
+      setLoading(true);
+      setError("");
+      setProfile(null);
+      setPortfolio([]);
+      setReviews([]);
+      const [freelancerResult, clientResult] = await Promise.all([
+        supabase.from("freelancer_public_profiles").select("*").eq("id", id).maybeSingle(),
+        supabase.from("client_public_profiles").select("*").eq("id", id).maybeSingle()
+      ]);
+      if (freelancerResult.error) throw freelancerResult.error;
+      if (clientResult.error) throw clientResult.error;
+      const currentProfile = freelancerResult.data || clientResult.data;
       if (!currentProfile) {
         if (active) setLoading(false);
         return;
       }
+      const isFreelancerProfile = currentProfile.account_type === "freelancer";
 
       const [reviewsResult, portfolioResult] = await Promise.all([
         supabase.from("reviews_public").select("id, rating, body, created_at")
           .eq("reviewee_id", id).order("created_at", { ascending: false }),
-        isFreelancer
+        isFreelancerProfile
           ? supabase.from("portfolio_items").select("id, title, description, project_url, image_url")
             .eq("freelancer_id", id).order("created_at", { ascending: false })
           : Promise.resolve({ data: [], error: null })
@@ -48,7 +56,7 @@ function PublicProfile() {
       setLoading(false);
     });
     return () => { active = false; };
-  }, [id, user.accountType]);
+  }, [id]);
 
   const backLink = user.accountType === "Client" ? "/my-freelancers" : "/my-applications";
   const ratingSummary = summarizeRatings(reviews);

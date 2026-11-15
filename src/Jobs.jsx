@@ -8,6 +8,8 @@ import "./App.css";
 function Jobs() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isAuthenticated = Boolean(user);
+  const currentUserId = user?.id;
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -46,11 +48,31 @@ function Jobs() {
         return;
       }
 
+      const clientNames = new Map();
+      const clientIds = [...new Set(result.data.map((item) => item.client_id).filter(Boolean))];
+      if (isAuthenticated && clientIds.length > 0) {
+        try {
+          const clientsResult = await supabase.from("client_public_profiles")
+            .select("id, full_name").in("id", clientIds);
+          if (clientsResult.error) {
+            console.error("Client profile lookup failed:", clientsResult.error.message);
+          } else {
+            (clientsResult.data || []).forEach((profile) => {
+              if (profile.full_name) clientNames.set(profile.id, profile.full_name);
+            });
+          }
+        } catch (error) {
+          console.error("Client profile lookup failed:", error);
+        }
+      }
+      if (!active) return;
+
       const formattedJobs = result.data.map(function(item) {
         return {
           id: item.id,
+          clientId: item.client_id,
           title: item.title,
-          company: "TechKarvo Client",
+          company: clientNames.get(item.client_id) || "TechKarvo Client",
           location: "Remote",
           type: item.payment_type || "Freelance",
           category: item.category || "Other",
@@ -66,7 +88,7 @@ function Jobs() {
 
     loadJobs();
     return () => { active = false; };
-  }, [loadAttempt]);
+  }, [loadAttempt, isAuthenticated, currentUserId]);
 
   const categories = [
     "All",
@@ -231,7 +253,9 @@ function Jobs() {
                     <h3>{job.title}</h3>
 
                     <p className="job-company">
-                      {job.company}
+                      {user && job.clientId
+                        ? <Link to={"/profiles/" + job.clientId}>{job.company}</Link>
+                        : job.company}
                     </p>
                        <div className="job-info">
                       <span>{job.location ? job.location : "Remote"}</span>

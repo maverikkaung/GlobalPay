@@ -9,24 +9,42 @@ function JobDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isAuthenticated = Boolean(user);
+  const currentUserId = user?.id;
 
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(function() {
+    let active = true;
     async function loadJob() {
-      const result = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
+      if (active) setLoading(true);
+      try {
+        const result = await supabase.from("jobs").select("*").eq("id", id).maybeSingle();
+        if (result.error) throw result.error;
+        if (!result.data) {
+          if (active) setJob(null);
+          return;
+        }
 
-      if (result.data) {
         const item = result.data;
+        let company = "TechKarvo Client";
+        if (isAuthenticated && item.client_id) {
+          const clientResult = await supabase.from("client_public_profiles")
+            .select("full_name").eq("id", item.client_id).maybeSingle();
+          if (clientResult.error) {
+            console.error("Client profile lookup failed:", clientResult.error.message);
+          } else if (clientResult.data?.full_name) {
+            company = clientResult.data.full_name;
+          }
+        }
+
+        if (!active) return;
         setJob({
           id: item.id,
+          clientId: item.client_id,
           title: item.title,
-          company: "TechKarvo Client",
+          company,
           location: "Remote",
           type: item.payment_type || "Freelance",
           category: item.category || "Other",
@@ -36,18 +54,17 @@ function JobDetails() {
           status: item.status,
           skills: parseSkills(item.skills)
         });
-
-        setLoading(false);
-        return;
+      } catch (error) {
+        console.error("Job loading error:", error);
+        if (active) setJob(null);
+      } finally {
+        if (active) setLoading(false);
       }
-
-      if (result.error) console.error("Job loading error:", result.error.message);
-      setJob(null);
-      setLoading(false);
     }
 
     loadJob();
-  }, [id]);
+    return () => { active = false; };
+  }, [id, isAuthenticated, currentUserId]);
 
   function handleApply() {
     if (!user) {
@@ -133,7 +150,9 @@ function JobDetails() {
               <h1>{job.title}</h1>
 
               <p className="details-company">
-                {job.company}
+                {user && job.clientId
+                  ? <Link to={"/profiles/" + job.clientId}>{job.company}</Link>
+                  : job.company}
               </p>
             </div>
 
