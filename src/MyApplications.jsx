@@ -6,6 +6,8 @@ import { supabase } from "./supabase.js";
 function MyApplications() {
   const navigate = useNavigate();
   const user = getCurrentUser();
+  const userId = user ? user.id : null;
+  const accountType = user ? user.accountType : null;
 
   const [applications, setApplications] = useState([]);
   const [selectedFilter, setSelectedFilter] = useState("All");
@@ -16,17 +18,17 @@ function MyApplications() {
     let active = true;
 
     async function loadApplications() {
-      if (!user) {
+      if (!userId) {
         navigate("/login");
         return;
       }
 
-      if (user.accountType !== "Freelancer") {
+      if (accountType !== "Freelancer") {
         navigate("/client-dashboard");
         return;
       }
 
-      if (!user.id) {
+      if (!userId) {
         setError("Account information is missing. Please login again.");
         setLoading(false);
         return;
@@ -35,7 +37,7 @@ function MyApplications() {
       const applicationResult = await supabase
         .from("job_applications")
         .select("*")
-        .eq("freelancer_id", user.id)
+        .eq("freelancer_id", userId)
         .order("applied_at", { ascending: false });
 
       if (!active) {
@@ -105,7 +107,7 @@ function MyApplications() {
     return function() {
       active = false;
     };
-  }, []);
+  }, [userId, accountType, navigate]);
 
   if (!user || user.accountType !== "Freelancer") {
     return null;

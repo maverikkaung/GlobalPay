@@ -1,52 +1,44 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getCurrentUser, logoutUser } from "./auth.js";
+import { supabase } from "./supabase.js";
 
 function FreelancerDashboard() {
   const navigate = useNavigate();
   const user = getCurrentUser();
+  const userId = user ? user.id : null;
+  const accountType = user ? user.accountType : null;
 
   const [activeJobs, setActiveJobs] = useState(0);
   const [pendingApplications, setPendingApplications] = useState(0);
   const [rejectedApplications, setRejectedApplications] = useState(0);
 
   useEffect(function() {
-    if (!user || user.accountType !== "Freelancer") {
-      return;
+    let active = true;
+
+    async function loadApplications() {
+      if (accountType !== "Freelancer" || !userId) return;
+
+      const result = await supabase
+        .from("job_applications")
+        .select("status")
+        .eq("freelancer_id", userId);
+
+      if (!active) return;
+      if (result.error) {
+        console.error("Unable to load application summary:", result.error);
+        return;
+      }
+
+      const applications = result.data || [];
+      setActiveJobs(applications.filter((item) => item.status === "Accepted").length);
+      setPendingApplications(applications.filter((item) => item.status === "Pending").length);
+      setRejectedApplications(applications.filter((item) => item.status === "Rejected").length);
     }
 
-    try {
-      const savedApplications = JSON.parse(
-        localStorage.getItem("TechKarvo_applications") || "[]"
-      );
-
-      const myApplications = savedApplications.filter(function(item) {
-        return item.email === user.email;
-      });
-
-      const accepted = myApplications.filter(function(item) {
-        return item.status === "Accepted";
-      });
-
-      const pending = myApplications.filter(function(item) {
-        return item.status === "Pending";
-      });
-
-      const rejected = myApplications.filter(function(item) {
-        return item.status === "Rejected";
-      });
-
-      setActiveJobs(accepted.length);
-      setPendingApplications(pending.length);
-      setRejectedApplications(rejected.length);
-
-    } catch (error) {
-      setActiveJobs(0);
-      setPendingApplications(0);
-      setRejectedApplications(0);
-    }
-
-  }, []);
+    loadApplications();
+    return () => { active = false; };
+  }, [userId, accountType]);
 
   useEffect(() => {
     if (!user) {

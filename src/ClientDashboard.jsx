@@ -6,6 +6,8 @@ import { supabase } from "./supabase.js";
 function ClientDashboard() {
   const navigate = useNavigate();
   const user = getCurrentUser();
+  const userId = user ? user.id : null;
+  const accountType = user ? user.accountType : null;
 
   const [activeProjects, setActiveProjects] = useState(0);
   const [totalHires, setTotalHires] = useState(0);
@@ -14,12 +16,12 @@ function ClientDashboard() {
 
   useEffect(function() {
     async function loadDashboard() {
-      if (!user) {
+      if (!userId) {
         setLoading(false);
         return;
       }
 
-      if (user.accountType !== "Client") {
+      if (accountType !== "Client") {
         setLoading(false);
         return;
       }
@@ -28,7 +30,7 @@ function ClientDashboard() {
         const jobsResult = await supabase
           .from("jobs")
           .select("id, budget, status")
-          .eq("client_id", user.id);
+          .eq("client_id", userId);
 
         if (jobsResult.error) {
           throw jobsResult.error;
@@ -42,60 +44,20 @@ function ClientDashboard() {
 
         setActiveProjects(openProjects.length);
 
-        let savedApplications = [];
-        let savedJobs = [];
+        const applicationResult = await supabase
+          .from("job_applications")
+          .select("job_id")
+          .eq("client_id", userId)
+          .eq("status", "Accepted");
 
-        try {
-          const applicationsText = localStorage.getItem(
-            "TechKarvo_applications"
-          );
+        if (applicationResult.error) throw applicationResult.error;
 
-          savedApplications = JSON.parse(
-            applicationsText ? applicationsText : "[]"
-          );
+        const accepted = applicationResult.data || [];
+        const hiredProjectIds = [...new Set(accepted.map((item) => String(item.job_id)))];
+        const spending = myJobs.reduce((total, project) =>
+          hiredProjectIds.includes(String(project.id)) ? total + Number(project.budget || 0) : total, 0);
 
-          const jobsText = localStorage.getItem(
-            "TechKarvo_client_jobs"
-          );
-
-          savedJobs = JSON.parse(
-            jobsText ? jobsText : "[]"
-          );
-        } catch (error) {
-          savedApplications = [];
-          savedJobs = [];
-        }
-
-        const myApplications = savedApplications.filter(
-          function(item) {
-            return (
-              item.clientEmail === user.email &&
-              item.status === "Accepted"
-            );
-          }
-        );
-
-        const hiredProjectIds = [];
-
-        myApplications.forEach(function(item) {
-          if (
-            hiredProjectIds.indexOf(String(item.id)) === -1
-          ) {
-            hiredProjectIds.push(String(item.id));
-          }
-        });
-
-        let spending = 0;
-
-        savedJobs.forEach(function(project) {
-          if (
-            hiredProjectIds.indexOf(String(project.id)) !== -1
-          ) {
-            spending = spending + Number(project.budget);
-          }
-        });
-
-        setTotalHires(myApplications.length);
+        setTotalHires(accepted.length);
         setTotalSpending(spending);
 
       } catch (error) {
@@ -107,7 +69,7 @@ function ClientDashboard() {
     }
 
     loadDashboard();
-  }, [user ? user.id : null]);
+  }, [userId, accountType]);
 
   async function handleLogout() {
     await logoutUser();

@@ -5,6 +5,8 @@ import { supabase } from "./supabase.js";
 
 function MyProjects() {
   const user = getCurrentUser();
+  const userId = user ? user.id : null;
+  const accountType = user ? user.accountType : null;
 
   const [projects, setProjects] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -20,7 +22,7 @@ function MyProjects() {
 
   useEffect(function() {
     async function loadProjects() {
-      if (!user || user.accountType !== "Client" || !user.id) {
+      if (accountType !== "Client" || !userId) {
         setLoading(false);
         return;
       }
@@ -28,7 +30,7 @@ function MyProjects() {
       const result = await supabase
         .from("jobs")
         .select("*")
-        .eq("client_id", user.id)
+        .eq("client_id", userId)
         .order("created_at", { ascending: false });
 
       if (result.error) {
@@ -43,7 +45,7 @@ function MyProjects() {
     }
 
     loadProjects();
-  }, [user ? user.id : null]);
+  }, [userId, accountType]);
 
   function startEdit(project) {
     setEditingId(project.id);

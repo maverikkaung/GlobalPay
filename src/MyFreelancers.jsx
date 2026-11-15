@@ -1,34 +1,70 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getCurrentUser } from "./auth.js";
+import { supabase } from "./supabase.js";
 
 function MyFreelancers() {
   const user = getCurrentUser();
+  const userId = user ? user.id : null;
+  const accountType = user ? user.accountType : null;
 
   const [freelancers, setFreelancers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(function() {
-    if (!user || user.accountType !== "Client") {
-      return;
+    let active = true;
+
+    async function loadFreelancers() {
+      if (accountType !== "Client" || !userId) {
+        setLoading(false);
+        return;
+      }
+
+      const result = await supabase
+        .from("job_applications")
+        .select("*")
+        .eq("client_id", userId)
+        .eq("status", "Accepted")
+        .order("applied_at", { ascending: false });
+
+      if (!active) return;
+      if (result.error) {
+        setError("Unable to load hired freelancers. " + result.error.message);
+        setLoading(false);
+        return;
+      }
+
+      const rows = result.data || [];
+      const jobIds = [...new Set(rows.map((item) => item.job_id))];
+      let jobsById = {};
+      if (jobIds.length) {
+        const jobsResult = await supabase.from("jobs").select("id, title")
+          .in("id", jobIds).eq("client_id", userId);
+        if (!active) return;
+        if (jobsResult.error) {
+          setError("Freelancers loaded, but some job titles could not be loaded.");
+        } else {
+          jobsById = Object.fromEntries((jobsResult.data || []).map((job) => [String(job.id), job.title]));
+        }
+      }
+
+      setFreelancers(rows.map((item) => ({
+        ...item,
+        id: item.job_id,
+        title: jobsById[String(item.job_id)] || "Job #" + item.job_id,
+        fullName: item.full_name,
+        professionalTitle: item.professional_title,
+        expectedSalary: item.expected_salary,
+        salaryType: item.salary_type,
+        appliedAt: item.applied_at
+      })));
+      setLoading(false);
     }
 
-    try {
-      const savedApplications = JSON.parse(
-        localStorage.getItem("TechKarvo_applications") || "[]"
-      );
-
-      const acceptedFreelancers = savedApplications.filter(function(item) {
-        return (
-          item.clientEmail === user.email &&
-          item.status === "Accepted"
-        );
-      });
-
-      setFreelancers(acceptedFreelancers);
-    } catch (error) {
-      setFreelancers([]);
-    }
-  }, []);
+    loadFreelancers();
+    return () => { active = false; };
+  }, [userId, accountType]);
 
   if (!user) {
     return (
@@ -83,7 +119,10 @@ function MyFreelancers() {
             Accepted Freelancers ({freelancers.length})
           </h2>
 
-          {freelancers.length === 0 ? (
+          {error && <p role="alert">{error}</p>}
+          {loading ? (
+            <div className="no-jobs"><h3>Loading freelancers...</h3></div>
+          ) : freelancers.length === 0 ? (
             <div className="no-jobs">
               <h3>No Freelancers Yet</h3>
 
@@ -98,7 +137,7 @@ function MyFreelancers() {
           ) : (
             <div className="jobs-grid">
 
-              {freelancers.map(function(item, index) {
+              {freelancers.map(function(item) {
                 return (
                   <div
                     className="job-card"

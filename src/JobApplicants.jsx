@@ -1,71 +1,86 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { getCurrentUser } from "./auth.js";
+import { supabase } from "./supabase.js";
 
 function JobApplicants() {
-  const navigate = useNavigate();
   const user = getCurrentUser();
+  const userId = user ? user.id : null;
+  const accountType = user ? user.accountType : null;
 
   const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(function() {
-    if (!user || user.accountType !== "Client") {
+    let active = true;
+    async function loadApplications() {
+      if (accountType !== "Client" || !userId) return;
+
+      const result = await supabase.from("job_applications").select("*")
+        .eq("client_id", userId).order("applied_at", { ascending: false });
+      if (!active) return;
+      if (result.error) {
+        setError("Unable to load applicants. " + result.error.message);
+        setLoading(false);
+        return;
+      }
+
+      const rows = result.data || [];
+      const jobIds = [...new Set(rows.map((item) => item.job_id))];
+      let jobsById = {};
+      if (jobIds.length) {
+        const jobsResult = await supabase.from("jobs").select("id, title")
+          .in("id", jobIds).eq("client_id", userId);
+        if (!active) return;
+        if (jobsResult.error) {
+          setError("Applicants loaded, but some job titles could not be loaded.");
+        } else {
+          jobsById = Object.fromEntries((jobsResult.data || []).map((job) => [String(job.id), job.title]));
+        }
+      }
+
+      setApplications(rows.map((item) => ({
+        ...item,
+        applicationId: item.id,
+        id: item.job_id,
+        title: jobsById[String(item.job_id)] || "Job #" + item.job_id,
+        fullName: item.full_name,
+        professionalTitle: item.professional_title,
+        expectedSalary: item.expected_salary,
+        salaryType: item.salary_type,
+        coverLetter: item.cover_letter,
+        appliedAt: item.applied_at
+      })));
+      setLoading(false);
+    }
+
+    loadApplications().catch((loadError) => {
+      if (active) {
+        setError("Unable to load applicants. " + loadError.message);
+        setLoading(false);
+      }
+    });
+    return () => { active = false; };
+  }, [userId, accountType]);
+
+  async function updateStatus(application, newStatus) {
+    const result = await supabase.from("job_applications")
+      .update({ status: newStatus })
+      .eq("id", application.applicationId)
+      .eq("client_id", userId)
+      .select("id, status")
+      .single();
+
+    if (result.error) {
+      setError("Application status could not be updated. " + result.error.message);
       return;
     }
 
-    try {
-      const savedApplications = JSON.parse(
-        localStorage.getItem("TechKarvo_applications") || "[]"
-      );
-
-      const myApplications = savedApplications.filter(function(item) {
-        return item.clientEmail === user.email;
-      });
-
-      setApplications(myApplications);
-    } catch (error) {
-      setApplications([]);
-    }
-  }, []);
-
-  function updateStatus(application, newStatus) {
-    let savedApplications = [];
-
-    try {
-      savedApplications = JSON.parse(
-        localStorage.getItem("TechKarvo_applications") || "[]"
-      );
-    } catch (error) {
-      savedApplications = [];
-    }
-
-    const updatedApplications = savedApplications.map(function(item) {
-      if (
-        String(item.id) === String(application.id) &&
-        item.email === application.email &&
-        item.clientEmail === user.email
-      ) {
-        return {
-          ...item,
-          status: newStatus
-        };
-      }
-
-      return item;
-    });
-
-    localStorage.setItem(
-      "TechKarvo_applications",
-      JSON.stringify(updatedApplications)
-    );
-
-    const myApplications = updatedApplications.filter(function(item) {
-      return item.clientEmail === user.email;
-    });
-
-    setApplications(myApplications);
-
-    alert("Application status updated to " + newStatus + ".");
+    setApplications((current) => current.map((item) => item.applicationId === application.applicationId
+      ? { ...item, status: result.data.status }
+      : item));
+    setError("");
   }
 
   if (!user) {
@@ -121,7 +136,10 @@ function JobApplicants() {
             Applications ({applications.length})
           </h2>
 
-          {applications.length === 0 ? (
+          {error && <p role="alert">{error}</p>}
+          {loading ? (
+            <div className="no-jobs"><h3>Loading applicants...</h3></div>
+          ) : applications.length === 0 ? (
             <div className="no-jobs">
               <h3>No Applications Yet</h3>
               <p>
@@ -131,7 +149,7 @@ function JobApplicants() {
           ) : (
             <div className="jobs-grid">
 
-              {applications.map(function(application, index) {
+                    {applications.map(function(application) {
                 return (
                   <div className="job-card" key={application.id + "-" + application.email}>
 

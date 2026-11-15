@@ -7,13 +7,17 @@ function ApplyForm() {
   const navigate = useNavigate();
   const params = useParams();
   const user = getCurrentUser();
+  const userId = user ? user.id : null;
+  const accountType = user ? user.accountType : null;
+  const userName = user ? user.name || "" : "";
+  const userEmail = user ? user.email || "" : "";
 
   const [job, setJob] = useState(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const [fullName, setFullName] = useState(user ? user.name || "" : "");
-  const [email, setEmail] = useState(user ? user.email || "" : "");
+  const [fullName, setFullName] = useState(userName);
+  const [email] = useState(userEmail);
   const [country, setCountry] = useState("");
   const [title, setTitle] = useState("");
   const [bio, setBio] = useState("");
@@ -26,7 +30,7 @@ function ApplyForm() {
 
   useEffect(function() {
     async function loadData() {
-      if (!user || user.accountType !== "Freelancer") {
+      if (accountType !== "Freelancer" || !userId) {
         setPageLoading(false);
         return;
       }
@@ -66,13 +70,13 @@ function ApplyForm() {
         const profileResult = await supabase
           .from("profiles")
           .select("*")
-          .eq("id", user.id)
+          .eq("id", userId)
           .maybeSingle();
 
         if (profileResult.data) {
           const profile = profileResult.data;
 
-          setFullName(profile.full_name || user.name || "");
+          setFullName(profile.full_name || userName);
           setCountry(profile.country || "");
         }
 
@@ -81,10 +85,10 @@ function ApplyForm() {
             localStorage.getItem("TechKarvo_freelancer_profiles") || "{}"
           );
 
-          const localProfile = savedProfiles[user.email];
+          const localProfile = savedProfiles[userEmail];
 
           if (localProfile) {
-            setFullName(localProfile.fullName || user.name || "");
+            setFullName(localProfile.fullName || userName);
             setCountry(localProfile.country || "");
             setTitle(localProfile.title || "");
             setBio(localProfile.bio || "");
@@ -92,7 +96,7 @@ function ApplyForm() {
             setExperience(localProfile.experience || "");
             setPortfolio(localProfile.portfolio || "");
           }
-        } catch (error) {
+        } catch {
           console.log("Could not load saved freelancer profile.");
         }
       } catch (error) {
@@ -104,7 +108,7 @@ function ApplyForm() {
     }
 
     loadData();
-  }, [params.id]);
+  }, [params.id, accountType, userId, userEmail, userName]);
 
   async function handleSubmit(event) {
     event.preventDefault();

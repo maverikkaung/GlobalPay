@@ -2,17 +2,27 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getCurrentUser } from "./auth.js";
 
+function readSavedProfile(email) {
+  try {
+    const profiles = JSON.parse(localStorage.getItem("TechKarvo_freelancer_profiles") || "{}");
+    return profiles[email] || {};
+  } catch {
+    return {};
+  }
+}
+
 function FreelancerProfile() {
   const navigate = useNavigate();
   const user = getCurrentUser();
+  const profile = readSavedProfile(user ? user.email : "");
 
-  const [fullName, setFullName] = useState(user ? user.name : "");
-  const [country, setCountry] = useState("");
-  const [title, setTitle] = useState("");
-  const [bio, setBio] = useState("");
-  const [skills, setSkills] = useState("");
-  const [experience, setExperience] = useState("");
-  const [portfolio, setPortfolio] = useState("");
+  const [fullName, setFullName] = useState(profile.fullName || (user ? user.name : ""));
+  const [country, setCountry] = useState(profile.country || "");
+  const [title, setTitle] = useState(profile.title || "");
+  const [bio, setBio] = useState(profile.bio || "");
+  const [skills, setSkills] = useState(profile.skills || "");
+  const [experience, setExperience] = useState(profile.experience || "");
+  const [portfolio, setPortfolio] = useState(profile.portfolio || "");
 
   useEffect(() => {
     if (!user) {
@@ -25,26 +35,7 @@ function FreelancerProfile() {
       return;
     }
 
-    try {
-      const allProfiles = JSON.parse(
-        localStorage.getItem("TechKarvo_freelancer_profiles") || "{}"
-      );
-
-      const profile = allProfiles[user.email];
-
-      if (profile) {
-        setFullName(profile.fullName || user.name);
-        setCountry(profile.country || "");
-        setTitle(profile.title || "");
-        setBio(profile.bio || "");
-        setSkills(profile.skills || "");
-        setExperience(profile.experience || "");
-        setPortfolio(profile.portfolio || "");
-      }
-    } catch {
-      console.log("Could not load profile.");
-    }
-  }, []);
+  }, [navigate, user]);
 
   function handleSave(event) {
     event.preventDefault();
@@ -54,12 +45,10 @@ function FreelancerProfile() {
       return;
     }
 
-    let allProfiles = {};
-
+    let allProfiles;
     try {
-      allProfiles = JSON.parse(
-        localStorage.getItem("TechKarvo_freelancer_profiles") || "{}"
-      );
+      allProfiles = JSON.parse(localStorage.getItem("TechKarvo_freelancer_profiles") || "{}");
+      if (!allProfiles || typeof allProfiles !== "object" || Array.isArray(allProfiles)) allProfiles = {};
     } catch {
       allProfiles = {};
     }

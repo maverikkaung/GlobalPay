@@ -1,24 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "./supabase.js";
 
 function Login() {
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState("");
+  const [savedEmail] = useState(() => localStorage.getItem("TechKarvo_remembered_email"));
+  const [email, setEmail] = useState(savedEmail || "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(Boolean(savedEmail));
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const savedEmail = localStorage.getItem("TechKarvo_remembered_email");
-
-    if (savedEmail) {
-      setEmail(savedEmail);
-      setRememberMe(true);
-    }
-  }, []);
 
   async function handleLogin(event) {
     event.preventDefault();

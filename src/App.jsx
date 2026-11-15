@@ -1,22 +1,22 @@
-import { useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 import "./App.css";
 
-import Login from "./Login.jsx";
-import Signup from "./Signup.jsx";
-import ForgotPassword from "./ForgotPassword.jsx";
-import ResetPassword from "./ResetPassword.jsx";
-import Jobs from "./Jobs.jsx";
-import JobDetails from "./JobDetails.jsx";
-import FreelancerDashboard from "./FreelancerDashboard.jsx";
-import ClientDashboard from "./ClientDashboard.jsx";
-import MyApplications from "./MyApplications.jsx";
-import ApplyForm from "./ApplyForm.jsx";
-import FreelancerProfile from "./FreelancerProfile.jsx";
-import PostJob from "./PostJob.jsx";
-import JobApplicants from "./JobApplicants.jsx";
-import MyFreelancers from "./MyFreelancers.jsx";
-import MyProjects from "./MyProjects.jsx";
+const Login = lazy(() => import("./Login.jsx"));
+const Signup = lazy(() => import("./Signup.jsx"));
+const ForgotPassword = lazy(() => import("./ForgotPassword.jsx"));
+const ResetPassword = lazy(() => import("./ResetPassword.jsx"));
+const Jobs = lazy(() => import("./Jobs.jsx"));
+const JobDetails = lazy(() => import("./JobDetails.jsx"));
+const FreelancerDashboard = lazy(() => import("./FreelancerDashboard.jsx"));
+const ClientDashboard = lazy(() => import("./ClientDashboard.jsx"));
+const MyApplications = lazy(() => import("./MyApplications.jsx"));
+const ApplyForm = lazy(() => import("./ApplyForm.jsx"));
+const FreelancerProfile = lazy(() => import("./FreelancerProfile.jsx"));
+const PostJob = lazy(() => import("./PostJob.jsx"));
+const JobApplicants = lazy(() => import("./JobApplicants.jsx"));
+const MyFreelancers = lazy(() => import("./MyFreelancers.jsx"));
+const MyProjects = lazy(() => import("./MyProjects.jsx"));
 
 
 function Home() {
@@ -320,7 +320,8 @@ function Home() {
 
 function App() {
   return (
-    <Routes>
+    <Suspense fallback={<main className="route-loading" aria-live="polite">Loading TechKarvo…</main>}>
+      <Routes>
 
       <Route path="/" element={<Home />} />
 
@@ -380,7 +381,8 @@ function App() {
         element={<MyProjects />}
       />
 
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }
 

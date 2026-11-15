@@ -2,61 +2,26 @@ import { useState, useEffect } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import { getCurrentUser } from "./auth.js";
 import { supabase } from "./supabase.js";
+import { jobsData } from "./jobsData.js";
 import "./App.css";
-
-export const jobsData = [
-  {
-    id: 1,
-    title: "Frontend React Developer",
-    company: "Tech Solutions",
-    location: "Remote",
-    type: "Full-time",
-    category: "Web Development",
-    salary: "$800 - $1,500",
-    description: "We are looking for a React developer to build modern and responsive web applications.",
-    skills: ["React", "JavaScript", "CSS", "HTML"]
-  },
-  {
-    id: 2,
-    title: "UI/UX Designer",
-    company: "Creative Studio",
-    location: "Remote",
-    type: "Part-time",
-    category: "Design",
-    salary: "$500 - $1,000",
-    description: "Design beautiful and user-friendly interfaces for web and mobile applications.",
-    skills: ["Figma", "UI Design", "UX Design"]
-  },
-  {
-    id: 3,
-    title: "Content Writer",
-    company: "Global Media",
-    location: "Remote",
-    type: "Freelance",
-    category: "Writing",
-    salary: "$300 - $700",
-    description: "Create engaging articles, blog posts, and website content.",
-    skills: ["Writing", "Research", "SEO"]
-  },
-  {
-    id: 4,
-    title: "Digital Marketing Specialist",
-    company: "Growth Agency",
-    location: "Remote",
-    type: "Full-time",
-    category: "Marketing",
-    salary: "$600 - $1,200",
-    description: "Manage digital marketing campaigns and help businesses grow online.",
-    skills: ["SEO", "Social Media", "Marketing"]
-  }
-];
 
 function Jobs() {
   const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [clientJobs, setClientJobs] = useState([]);
+  const [clientJobs] = useState(() => {
+    try {
+      const savedJobs = JSON.parse(localStorage.getItem("TechKarvo_client_jobs") || "[]");
+      return savedJobs.map((item) => ({
+        ...item,
+        skills: (Array.isArray(item.skills) ? item.skills : String(item.skills || "").split(","))
+          .map((skill) => skill.trim()).filter(Boolean)
+      }));
+    } catch {
+      return [];
+    }
+  });
   const [supabaseJobs, setSupabaseJobs] = useState([]);
 
   useEffect(() => {
@@ -93,31 +58,6 @@ function Jobs() {
 
     loadJobs();
 
-    try {
-      const savedData = localStorage.getItem("TechKarvo_client_jobs");
-      const savedJobs = savedData ? JSON.parse(savedData) : [];
-
-      const formattedLocalJobs = savedJobs.map(function(item) {
-        let jobSkills = [];
-
-        if (Array.isArray(item.skills)) {
-          jobSkills = item.skills;
-        } else {
-          jobSkills = String(item.skills ? item.skills : "").split(",");
-        }
-
-        return {
-          ...item,
-          skills: jobSkills.map(function(skill) {
-            return skill.trim();
-          }).filter(Boolean)
-        };
-      });
-
-      setClientJobs(formattedLocalJobs);
-    } catch (error) {
-      setClientJobs([]);
-    }
   }, []);
 
   const categories = [

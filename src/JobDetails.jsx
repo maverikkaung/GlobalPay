@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { jobsData } from "./Jobs.jsx";
+import { jobsData } from "./jobsData.js";
 import { getCurrentUser } from "./auth.js";
 import { supabase } from "./supabase.js";
 import "./App.css";
@@ -23,13 +23,9 @@ function JobDetails() {
 
       if (result.data) {
         const item = result.data;
-        let jobSkills = [];
-
-        if (Array.isArray(item.skills)) {
-          jobSkills = item.skills;
-        } else {
-          jobSkills = String(item.skills || "").split(",");
-        }
+        const jobSkills = Array.isArray(item.skills)
+          ? item.skills
+          : String(item.skills || "").split(",");
 
         setJob({
           id: item.id,
@@ -50,23 +46,18 @@ function JobDetails() {
         return;
       }
 
-      let clientJobs = [];
-
+      let clientJobs;
       try {
         const savedData = localStorage.getItem("TechKarvo_client_jobs");
         clientJobs = savedData ? JSON.parse(savedData) : [];
-      } catch (error) {
+      } catch {
         clientJobs = [];
       }
 
       const formattedJobs = clientJobs.map(function(item) {
-        let jobSkills = [];
-
-        if (Array.isArray(item.skills)) {
-          jobSkills = item.skills;
-        } else {
-          jobSkills = String(item.skills || "").split(",");
-        }
+        const jobSkills = Array.isArray(item.skills)
+          ? item.skills
+          : String(item.skills || "").split(",");
 
         return {
           ...item,
