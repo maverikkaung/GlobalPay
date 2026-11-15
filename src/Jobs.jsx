@@ -12,18 +12,37 @@ function Jobs() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [supabaseJobs, setSupabaseJobs] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsError, setJobsError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
+    let active = true;
     async function loadJobs() {
-      const result = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("status", "open")
-        .order("created_at", { ascending: false });
-
-      if (result.error) {
-        console.log("Jobs Loading Error:", result.error.message);
+      setJobsLoading(true);
+      setJobsError("");
+      let result;
+      try {
+        result = await supabase
+          .from("jobs")
+          .select("*")
+          .eq("status", "open")
+          .order("created_at", { ascending: false });
+      } catch (error) {
+        if (!active) return;
+        console.error("Jobs loading failed:", error);
+        setJobsError("We couldn't load jobs right now. Please try again.");
         setSupabaseJobs([]);
+        setJobsLoading(false);
+        return;
+      }
+
+      if (!active) return;
+      if (result.error) {
+        console.error("Jobs loading failed:", result.error.message);
+        setJobsError("We couldn't load jobs right now. Please try again.");
+        setSupabaseJobs([]);
+        setJobsLoading(false);
         return;
       }
 
@@ -42,12 +61,12 @@ function Jobs() {
       });
 
       setSupabaseJobs(formattedJobs);
-      console.log("Supabase Jobs Loaded:", formattedJobs);
+      setJobsLoading(false);
     }
 
     loadJobs();
-
-  }, []);
+    return () => { active = false; };
+  }, [loadAttempt]);
 
   const categories = [
     "All",
@@ -108,16 +127,19 @@ function Jobs() {
           TechKarvo
         </Link>
 
-        <div className="jobs-nav-links">
+        <nav aria-label="Main navigation" className="jobs-nav-links">
           <NavLink to="/" end>Home</NavLink>
           <Link to="/#features">Features</Link>
           <Link to="/#about">About</Link>
           <NavLink to="/jobs">Find Jobs</NavLink>
-        </div>
+        </nav>
 
         <div className="nav-buttons">
-          <Link to="/login" className="login-btn">Login</Link>
-          <Link to="/signup" className="signup-btn">Sign Up</Link>
+          {user ? (
+            <Link to={user.accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard"} className="signup-btn">Dashboard</Link>
+          ) : (
+            <><Link to="/login" className="login-btn">Log In</Link><Link to="/signup" className="signup-btn">Sign Up</Link></>
+          )}
         </div>
       </nav>
 
@@ -165,7 +187,7 @@ function Jobs() {
             </div>
 
             <span className="jobs-count">
-              {filteredJobs.length} Jobs Found
+              {jobsLoading ? "Loading jobs…" : `${filteredJobs.length} Jobs Found`}
             </span>
           </div>
 
@@ -189,7 +211,11 @@ function Jobs() {
           </div>
 
           <div className="jobs-grid">
-            {filteredJobs.length > 0 ? (
+            {jobsLoading ? (
+              <div className="no-jobs" role="status"><h3>Loading opportunities</h3><p>Fetching the latest open jobs…</p></div>
+            ) : jobsError ? (
+              <div className="no-jobs" role="alert"><h3>Jobs unavailable</h3><p>{jobsError}</p><button type="button" className="apply-btn" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button></div>
+            ) : filteredJobs.length > 0 ? (
               filteredJobs.map(function(job) {
                 return (
                   <div className="job-card" key={job.id}>
@@ -252,7 +278,7 @@ function Jobs() {
               <div className="no-jobs">
                 <h3>No Jobs Found</h3>
                 <p>
-                  Try another search keyword or category.
+                  {supabaseJobs.length ? "Try another search keyword or category." : "New opportunities will appear here when clients post them."}
                 </p>
               </div>
             )}

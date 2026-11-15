@@ -2,6 +2,7 @@ import { lazy, Suspense, useState, useEffect } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 import "./App.css";
 import { AuthProvider, RequireAuth } from "./AuthContext.jsx";
+import { useAuth } from "./useAuth.js";
 
 const Login = lazy(() => import("./Login.jsx"));
 const Signup = lazy(() => import("./Signup.jsx"));
@@ -28,6 +29,8 @@ const PublicProfile = lazy(() => import("./PublicProfile.jsx"));
 function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  const { user, loading } = useAuth();
+  const dashboardPath = user?.accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard";
 
   useEffect(() => {
     if (location.hash) {
@@ -54,7 +57,7 @@ function Home() {
           Tech<span>Karvo</span>
         </Link>
 
-        <div className={"nav-links " + (menuOpen ? "active" : "")}>
+        <nav aria-label="Main navigation" className={"nav-links " + (menuOpen ? "active" : "")}>
 
           <Link
             to="/#home"
@@ -91,22 +94,22 @@ function Home() {
             About
           </Link>
 
-        </div>
+        </nav>
 
         <div className="nav-buttons">
 
-          <Link to="/login" className="login-btn">
-            Log In
-          </Link>
-
-          <Link to="/signup" className="signup-btn">
-            Get Started
-          </Link>
+          {!loading && user ? <Link to={dashboardPath} className="signup-btn">Dashboard</Link> : <>
+            <Link to="/login" className="login-btn">Log In</Link>
+            <Link to="/signup" className="signup-btn">Get Started</Link>
+          </>}
 
         </div>
 
         <button
           className="menu-btn"
+          type="button"
+          aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-expanded={menuOpen}
           onClick={() => setMenuOpen(!menuOpen)}
         >
           ☰
@@ -146,9 +149,9 @@ function Home() {
                 Explore Jobs →
               </Link>
 
-              <Link to="/signup" className="secondary-btn">
+          {!user && <Link to="/signup" className="secondary-btn">
                 Become a Freelancer
-              </Link>
+          </Link>}
 
             </div>
 
@@ -292,9 +295,9 @@ function Home() {
             Start building your future with TechKarvo.
           </p>
 
-          <Link to="/signup" className="primary-btn">
+        {!user && <Link to="/signup" className="primary-btn">
             Create Your Account →
-          </Link>
+          </Link>}
 
         </section>
 
@@ -306,7 +309,7 @@ function Home() {
       <footer className="home-footer">
 
         <Link to="/" className="logo">
-          Global<span>Pay</span>
+          Tech<span>Karvo</span>
         </Link>
 
         <p>
