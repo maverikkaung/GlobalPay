@@ -190,6 +190,24 @@ insert into public.messages (conversation_id, sender_id, body)
 select id, '11111111-1111-4111-8111-111111111111', 'The completed work looks great.'
 from public.conversations where application_id = '44444444-4444-4444-8444-444444444444';
 
+do $$
+declare
+  deleted_rows integer;
+begin
+  delete from public.jobs where id = '33333333-3333-4333-8333-333333333333';
+  get diagnostics deleted_rows = row_count;
+  if deleted_rows <> 0 then
+    raise exception 'Jobs with application history must not be deleted';
+  end if;
+
+  delete from public.jobs where id = '33333333-3333-4333-8333-333333333334';
+  get diagnostics deleted_rows = row_count;
+  if deleted_rows <> 1 then
+    raise exception 'Clients should be able to delete jobs without applications';
+  end if;
+end;
+$$;
+
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);

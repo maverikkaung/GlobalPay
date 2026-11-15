@@ -12,6 +12,7 @@ function MyProjects() {
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
@@ -135,22 +136,39 @@ function MyProjects() {
       return;
     }
 
+    setActionError("");
+    const applicationsResult = await supabase.from("job_applications").select("id")
+      .eq("job_id", project.id).limit(1);
+    if (applicationsResult.error) {
+      setActionError("Unable to check project history. " + applicationsResult.error.message);
+      return;
+    }
+    if (applicationsResult.data?.length) {
+      setActionError("This project has application history and cannot be deleted. Mark it complete to keep its history available.");
+      return;
+    }
+
     const result = await supabase
       .from("jobs")
       .delete()
       .eq("id", project.id)
-      .eq("client_id", user.id);
+      .eq("client_id", user.id)
+      .select("id")
+      .maybeSingle();
 
     if (result.error) {
-      alert("Project deletion failed: " + result.error.message);
+      setActionError("Project deletion failed: " + result.error.message);
+      return;
+    }
+    if (!result.data) {
+      setActionError("This project could not be deleted. It may have application history.");
       return;
     }
 
-    setProjects(projects.filter(function(item) {
+    setProjects((current) => current.filter(function(item) {
       return String(item.id) !== String(project.id);
     }));
-
-    alert("Project deleted successfully!");
+    if (String(editingId) === String(project.id)) cancelEdit();
   }
 
   async function completeProject(project) {
@@ -250,6 +268,8 @@ function MyProjects() {
             <p>Closed or inactive projects</p>
           </div>
         </section>
+
+        {actionError && <p role="alert">{actionError}</p>}
 
         {editingId !== null && (
           <section className="my-projects-edit-section">
