@@ -136,12 +136,6 @@ function FreelancerDashboard() {
               <p>Show clients examples of your best work.</p>
             </Link>
 
-            <div className="dashboard-action-card">
-              <span>💳</span>
-              <h3>My Wallet</h3>
-              <p>Manage your freelance earnings.</p>
-            </div>
-
             <Link to="/messages" className="dashboard-action-card">
               <span>✉️</span>
               <h3>Messages</h3>
