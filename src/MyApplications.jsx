@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getCurrentUser } from "./auth.js";
+import { supabase } from "./supabase.js";
 
 function MyApplications() {
   const navigate = useNavigate();
@@ -8,31 +9,102 @@ function MyApplications() {
 
   const [applications, setApplications] = useState([]);
   const [selectedFilter, setSelectedFilter] = useState("All");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(function() {
-    if (!user) {
-      navigate("/login");
-    } else if (user.accountType !== "Freelancer") {
-      navigate("/client-dashboard");
-    }
-  }, [user, navigate]);
+    let active = true;
 
-  useEffect(function() {
-    if (user && user.accountType === "Freelancer") {
-      try {
-        const savedApplications = JSON.parse(
-          localStorage.getItem("TechKarvo_applications") || "[]"
-        );
-
-        const myApplications = savedApplications.filter(function(item) {
-          return item.email === user.email;
-        });
-
-        setApplications(myApplications);
-      } catch (error) {
-        setApplications([]);
+    async function loadApplications() {
+      if (!user) {
+        navigate("/login");
+        return;
       }
+
+      if (user.accountType !== "Freelancer") {
+        navigate("/client-dashboard");
+        return;
+      }
+
+      if (!user.id) {
+        setError("Account information is missing. Please login again.");
+        setLoading(false);
+        return;
+      }
+
+      const applicationResult = await supabase
+        .from("job_applications")
+        .select("*")
+        .eq("freelancer_id", user.id)
+        .order("applied_at", { ascending: false });
+
+      if (!active) {
+        return;
+      }
+
+      if (applicationResult.error) {
+        setError(applicationResult.error.message);
+        setLoading(false);
+        return;
+      }
+
+      const applicationRows = applicationResult.data;
+
+      if (applicationRows.length === 0) {
+        setApplications([]);
+        setLoading(false);
+        return;
+      }
+
+      const jobIds = applicationRows.map(function(item) {
+        return item.job_id;
+      });
+
+      const jobsResult = await supabase
+        .from("jobs")
+        .select("id, title, category, budget, currency")
+        .in("id", jobIds);
+
+      if (!active) {
+        return;
+      }
+
+      const jobMap = {};
+
+      if (!jobsResult.error) {
+        jobsResult.data.forEach(function(job) {
+          jobMap[String(job.id)] = job;
+        });
+      } else {
+        setError(
+          "Applications loaded, but some job details could not be loaded."
+        );
+      }
+
+      const formattedApplications = applicationRows.map(function(item) {
+        const job = jobMap[String(item.job_id)];
+
+        return {
+          id: item.job_id,
+          applicationId: item.id,
+          title: job ? job.title : "Job #" + item.job_id,
+          company: job && job.category ? job.category : "Client",
+          status: item.status,
+          expectedSalary: item.expected_salary,
+          salaryType: item.salary_type,
+          appliedAt: item.applied_at
+        };
+      });
+
+      setApplications(formattedApplications);
+      setLoading(false);
     }
+
+    loadApplications();
+
+    return function() {
+      active = false;
+    };
   }, []);
 
   if (!user || user.accountType !== "Freelancer") {
@@ -80,8 +152,7 @@ function MyApplications() {
             <h1>My Applications</h1>
             <p>Keep track of your job applications and their latest status.</p>
           </div>
-
-          <Link to="/jobs" className="applications-find-button">
+              <Link to="/jobs" className="applications-find-button">
             + Find More Jobs
           </Link>
         </div>
@@ -140,7 +211,8 @@ function MyApplications() {
             >
               Pending <span>{pendingCount}</span>
             </button>
-<button
+
+            <button
               type="button"
               className={selectedFilter === "Accepted" ? "active" : ""}
               onClick={function() {
@@ -162,7 +234,21 @@ function MyApplications() {
 
           </div>
 
-          {applications.length === 0 ? (
+          {loading ? (
+
+            <div className="applications-empty">
+              <h2>Loading Applications...</h2>
+              <p>Please wait while we load your applications.</p>
+            </div>
+
+          ) : error && applications.length === 0 ? (
+
+            <div className="applications-empty">
+              <h2>Unable to Load Applications</h2>
+              <p>{error}</p>
+            </div>
+
+          ) : applications.length === 0 ? (
 
             <div className="applications-empty">
               <div className="applications-empty-icon">📄</div>
@@ -185,7 +271,7 @@ function MyApplications() {
 
             <div className="applications-list">
 
-              {filteredApplications.map(function(item, index) {
+              {filteredApplications.map(function(item) {
                 const statusClass = item.status === "Accepted"
                   ? "accepted"
                   : item.status === "Rejected"
@@ -193,23 +279,24 @@ function MyApplications() {
                   : "pending";
 
                 return (
-                  <div className="application-card" key={index}>
+                  <div className="application-card" key={item.applicationId}>
 
                     <div className="application-card-top">
-
-                      <div className="application-job-info">
+                       <div className="application-job-info">
                         <div className="application-company-icon">
-                          {item.company ? item.company.charAt(0).toUpperCase() : "G"}
+                          {item.company
+                            ? item.company.charAt(0).toUpperCase()
+                            : "G"}
                         </div>
 
                         <div>
                           <h3>{item.title}</h3>
-                          <p>{item.company || "Company not specified"}</p>
+                          <p>{item.company}</p>
                         </div>
                       </div>
 
                       <span className={"application-status " + statusClass}>
-                        {item.status || "Pending"}
+                        {item.status}
                       </span>
 
                     </div>
@@ -219,7 +306,8 @@ function MyApplications() {
                       <div>
                         <span>Expected Salary</span>
                         <strong>
-                          {item.expectedSalary
+                          {item.expectedSalary !== null &&
+                          item.expectedSalary !== undefined
                             ? "$" + item.expectedSalary
                             : "Not specified"}
                         </strong>
@@ -238,7 +326,7 @@ function MyApplications() {
 
                     <div className="application-card-bottom">
                       <span className="application-reference">
-                        Application #{index + 1}
+                        Application #{item.applicationId}
                       </span>
 
                       <Link
@@ -255,6 +343,10 @@ function MyApplications() {
 
             </div>
 
+          )}
+
+          {error && applications.length > 0 && (
+            <p className="applications-error">{error}</p>
           )}
 
         </section>
