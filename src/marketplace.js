@@ -37,6 +37,14 @@ export function parseSkills(value) {
   return values.map((skill) => String(skill).trim()).filter(Boolean);
 }
 
+export function matchesJobSearch(job = {}, query = "") {
+  const term = String(query || "").trim().toLowerCase();
+  if (!term) return true;
+
+  const searchableValues = [job.title, job.company, job.description, ...parseSkills(job.skills)];
+  return searchableValues.some((value) => String(value || "").toLowerCase().includes(term));
+}
+
 export function summarizeRatings(reviews = []) {
   const valid = reviews.filter((item) => Number.isFinite(Number(item.rating))
     && Number(item.rating) >= 1 && Number(item.rating) <= 5);

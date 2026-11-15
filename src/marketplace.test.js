@@ -4,6 +4,7 @@ import {
   calculateClientHiringMetrics,
   countApplicationStatuses,
   countOpenAcceptedJobs,
+  matchesJobSearch,
   normalizeAccountType,
   parseSkills,
   summarizeRatings
@@ -49,6 +50,21 @@ test("skill values work as either database arrays or comma-separated strings", (
   assert.deepEqual(parseSkills("React, CSS, , JavaScript "), ["React", "CSS", "JavaScript"]);
   assert.deepEqual(parseSkills(["Design", " Research "]), ["Design", "Research"]);
   assert.deepEqual(parseSkills(null), []);
+});
+
+test("job search matches title, client, description, and skills without case sensitivity", () => {
+  const job = {
+    title: "Build an Analytics Dashboard",
+    company: "Northwind Studio",
+    description: "Create a reporting experience for a SaaS product",
+    skills: ["React", "Data Visualization"]
+  };
+  assert.equal(matchesJobSearch(job, "analytics"), true);
+  assert.equal(matchesJobSearch(job, "NORTHWIND"), true);
+  assert.equal(matchesJobSearch(job, "saas product"), true);
+  assert.equal(matchesJobSearch(job, "visualization"), true);
+  assert.equal(matchesJobSearch(job, "unrelated"), false);
+  assert.equal(matchesJobSearch(job, "  "), true);
 });
 
 test("rating summaries ignore invalid values and return no average when empty", () => {

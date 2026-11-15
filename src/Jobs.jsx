@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
-import { parseSkills } from "./marketplace.js";
+import { matchesJobSearch, parseSkills } from "./marketplace.js";
 import "./App.css";
 
 function Jobs() {
@@ -12,6 +12,7 @@ function Jobs() {
   const currentUserId = user?.id;
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [supabaseJobs, setSupabaseJobs] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(true);
@@ -102,6 +103,10 @@ function Jobs() {
   ];
 
   const allJobs = supabaseJobs;
+  function applySearch(event) {
+    event.preventDefault();
+    setAppliedSearchTerm(searchTerm.trim());
+  }
 
   function handleApply(job) {
     if (!user) {
@@ -117,28 +122,10 @@ function Jobs() {
     navigate("/apply/" + job.id);
   }
     const filteredJobs = allJobs.filter(function(job) {
-    const search = searchTerm.toLowerCase();
-
-    const title = String(job.title ? job.title : "").toLowerCase();
-    const company = String(job.company ? job.company : "").toLowerCase();
-    const description = String(job.description ? job.description : "").toLowerCase();
-
-    const searchItems = [title, company, description];
-
-    if (Array.isArray(job.skills)) {
-      job.skills.forEach(function(skill) {
-        searchItems.push(String(skill).toLowerCase());
-      });
-    }
-
-    const matchesSearch = searchItems.some(function(value) {
-      return value.includes(search);
-    });
-
     const matchesCategory =
       selectedCategory === "All" ? true : job.category === selectedCategory;
 
-    return matchesSearch && matchesCategory;
+    return matchesJobSearch(job, appliedSearchTerm) && matchesCategory;
   });
 
   return (
@@ -180,9 +167,10 @@ function Jobs() {
             around the world.
           </p>
 
-          <div className="jobs-search">
+          <form className="jobs-search" role="search" onSubmit={applySearch}>
             <input
-              type="text"
+              type="search"
+              aria-label="Search open jobs by title, client, description, or skill"
               placeholder="Search jobs or companies..."
               value={searchTerm}
               onChange={function(event) {
@@ -190,10 +178,10 @@ function Jobs() {
               }}
             />
 
-            <button type="button">
+            <button type="submit">
               Search
             </button>
-          </div>
+          </form>
         </div>
       </section>
 
