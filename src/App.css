@@ -402,6 +402,25 @@ footer p {
   font-size: 14px;
 }
 
+.auth-notice {
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.auth-notice--error {
+  color: #ffd6d6;
+  background: #5a202a;
+  border: 1px solid #93414d;
+}
+
+.auth-notice--success {
+  color: #c9f7de;
+  background: #123b32;
+  border: 1px solid #286d59;
+}
+
 .login-card form {
   display: flex;
   flex-direction: column;
@@ -1389,6 +1408,12 @@ footer p {
   gap: 12px;
 }
 
+.account-type-section > p {
+  margin: 2px 0 10px;
+  color: #d5e2f2;
+  font-size: 14px;
+}
+
 .account-type-card {
   position: relative;
   min-width: 0;
@@ -1401,10 +1426,30 @@ footer p {
   transition: 0.3s ease;
 }
 
+.login-card form .account-type-card {
+  appearance: none;
+  padding: 22px 12px;
+  color: #fff;
+  font: inherit;
+  font-weight: normal;
+  background: #0b1b30;
+  border: 1px solid #29415d;
+}
+
+.login-card form .account-type-card:focus-visible {
+  outline: 3px solid #9bc4ff;
+  outline-offset: 3px;
+}
+
 .account-type-card:hover {
   border-color: #3987ff;
   background: #142e4d;
   transform: translateY(-3px);
+}
+
+.login-card form .account-type-card:hover {
+  background: #142e4d;
+  border-color: #3987ff;
 }
 
 .account-type-card.selected {
@@ -1413,18 +1458,26 @@ footer p {
   box-shadow: 0 0 18px rgba(57, 135, 255, 0.18);
 }
 
+.login-card form .account-type-card.selected {
+  border: 2px solid #3987ff;
+  background: linear-gradient(145deg, #173d75, #10233b);
+}
+
 .account-type-icon {
+  display: block;
   font-size: 30px;
   margin-bottom: 12px;
 }
 
-.account-type-card h3 {
+.account-type-title {
+  display: block;
   color: #ffffff;
   font-size: 15px;
   margin-bottom: 8px;
 }
 
-.account-type-card p {
+.account-type-description {
+  display: block;
   color: #aabbd1;
   font-size: 11px;
   line-height: 1.5;
@@ -1455,11 +1508,15 @@ footer p {
     padding: 20px 8px;
   }
 
-  .account-type-card h3 {
+  .login-card form .account-type-card {
+    padding: 20px 8px;
+  }
+
+  .account-type-title {
     font-size: 13px;
   }
 
-  .account-type-card p {
+  .account-type-description {
     font-size: 10px;
   }
 }

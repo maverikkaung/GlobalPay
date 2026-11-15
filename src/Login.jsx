@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "./supabase.js";
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [savedEmail] = useState(() => localStorage.getItem("TechKarvo_remembered_email"));
   const [email, setEmail] = useState(savedEmail || "");
@@ -11,11 +12,13 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(Boolean(savedEmail));
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleLogin(event) {
     event.preventDefault();
 
     setLoading(true);
+    setError("");
 
     const cleanEmail = email.trim().toLowerCase();
 
@@ -26,7 +29,7 @@ function Login() {
       });
 
       if (result.error) {
-        alert(result.error.message);
+        setError(result.error.message);
         return;
       }
 
@@ -43,7 +46,7 @@ function Login() {
 
       if (accountType !== "freelancer" && accountType !== "client") {
         await supabase.auth.signOut();
-        alert("Your account profile could not be verified. Please try again or contact support.");
+        setError("Your account profile could not be verified. Please try again or contact support.");
         return;
       }
 
@@ -55,7 +58,7 @@ function Login() {
 
       navigate(accountType === "freelancer" ? "/freelancer-dashboard" : "/client-dashboard");
     } catch (error) {
-      alert("Login failed: " + error.message);
+      setError("Login failed: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -69,11 +72,15 @@ function Login() {
         <h2>Welcome Back</h2>
         <p>Login to your TechKarvo account</p>
 
+        {location.state?.notice && <p className="auth-notice auth-notice--success" role="status">{location.state.notice}</p>}
+        {error && <p className="auth-notice auth-notice--error" role="alert">{error}</p>}
+
         <form onSubmit={handleLogin}>
-          <label>Email Address</label>
+          <label htmlFor="login-email">Email Address</label>
 
           <input
             type="email"
+            id="login-email"
             placeholder="Enter your email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -81,11 +88,12 @@ function Login() {
             required
           />
 
-          <label>Password</label>
+          <label htmlFor="login-password">Password</label>
 
           <div className="password-wrapper">
             <input
               type={showPassword ? "text" : "password"}
+              id="login-password"
               placeholder="Enter your password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -96,6 +104,7 @@ function Login() {
             <button
               type="button"
               className="password-toggle"
+              aria-label={showPassword ? "Hide password" : "Show password"}
               onClick={() => setShowPassword(!showPassword)}
             >
               {showPassword ? "🙈" : "👁"}

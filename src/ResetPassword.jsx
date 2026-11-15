@@ -9,34 +9,36 @@ function ResetPassword() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [updated, setUpdated] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleUpdatePassword(event) {
     event.preventDefault();
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match!");
+      setError("Passwords do not match.");
       return;
     }
 
     if (password.length < 6) {
-      alert("Password must be at least 6 characters.");
+      setError("Password must be at least 6 characters.");
       return;
     }
 
     setLoading(true);
+    setError("");
 
-    const result = await supabase.auth.updateUser({
-      password: password
-    });
-
-    setLoading(false);
-
-    if (result.error) {
-      alert(result.error.message);
-      return;
+    try {
+      const result = await supabase.auth.updateUser({ password });
+      if (result.error) {
+        setError(result.error.message);
+        return;
+      }
+      setUpdated(true);
+    } catch (updateError) {
+      setError("Unable to update your password. " + updateError.message);
+    } finally {
+      setLoading(false);
     }
-
-    setUpdated(true);
   }
 
   async function handleContinue() {
@@ -56,10 +58,12 @@ function ResetPassword() {
             <p>Enter your new password below.</p>
 
             <form onSubmit={handleUpdatePassword}>
-              <label>New Password</label>
+              {error && <p className="auth-notice auth-notice--error" role="alert">{error}</p>}
+              <label htmlFor="new-password">New Password</label>
 
               <input
                 type="password"
+                id="new-password"
                 placeholder="Enter new password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -67,10 +71,11 @@ function ResetPassword() {
                 required
               />
 
-              <label>Confirm New Password</label>
+              <label htmlFor="confirm-new-password">Confirm New Password</label>
 
               <input
                 type="password"
+                id="confirm-new-password"
                 placeholder="Confirm new password"
                 value={confirmPassword}
                 onChange={(event) =>

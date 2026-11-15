@@ -14,16 +14,18 @@ function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleSignup(event) {
     event.preventDefault();
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match!");
+      setError("Passwords do not match.");
       return;
     }
 
     setLoading(true);
+    setError("");
 
     const cleanName = name.trim();
     const cleanEmail = email.trim().toLowerCase();
@@ -42,20 +44,22 @@ function Signup() {
       });
 
       if (result.error) {
-        alert(result.error.message);
-        setLoading(false);
+        setError(result.error.message);
         return;
       }
 
-      alert(
-        "Account created successfully! Please check your email and confirm your account before logging in."
-      );
-
-      setLoading(false);
-      navigate("/login");
+      if (result.data.session) {
+        navigate(accountType === "Freelancer" ? "/freelancer-dashboard" : "/client-dashboard", { replace: true });
+      } else {
+        navigate("/login", {
+          replace: true,
+          state: { notice: "Your account was created. Check your email to confirm your address before logging in." }
+        });
+      }
 
     } catch (error) {
-      alert("Signup failed: " + error.message);
+      setError("Signup failed: " + error.message);
+    } finally {
       setLoading(false);
     }
   }
@@ -68,28 +72,33 @@ function Signup() {
         <p>Join TechKarvo and start your global journey.</p>
 
         <form onSubmit={handleSignup}>
-          <label>Full Name</label>
+          {error && <p className="auth-notice auth-notice--error" role="alert">{error}</p>}
+
+          <label htmlFor="signup-name">Full Name</label>
           <input
             type="text"
+            id="signup-name"
             placeholder="Enter your full name"
             value={name}
             onChange={(event) => setName(event.target.value)}
             required
           />
 
-          <label>Email Address</label>
+          <label htmlFor="signup-email">Email Address</label>
           <input
             type="email"
+            id="signup-email"
             placeholder="Enter your email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
           />
 
-          <label>Password</label>
+          <label htmlFor="signup-password">Password</label>
           <div className="password-wrapper">
             <input
               type={showPassword ? "text" : "password"}
+              id="signup-password"
               placeholder="Create a password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -100,16 +109,18 @@ function Signup() {
             <button
               type="button"
               className="password-toggle"
+              aria-label={showPassword ? "Hide password" : "Show password"}
               onClick={() => setShowPassword(!showPassword)}
             >
               {showPassword ? "🙈" : "👁"}
             </button>
           </div>
 
-          <label>Confirm Password</label>
+          <label htmlFor="signup-confirm-password">Confirm Password</label>
           <div className="password-wrapper">
             <input
               type={showConfirmPassword ? "text" : "password"}
+              id="signup-confirm-password"
               placeholder="Confirm your password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
@@ -119,6 +130,7 @@ function Signup() {
             <button
               type="button"
               className="password-toggle"
+              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
               onClick={() =>
                 setShowConfirmPassword(!showConfirmPassword)
               }
@@ -128,40 +140,44 @@ function Signup() {
           </div>
 
           <div className="account-type-section">
-            <label>Choose Account Type</label>
+            <p id="account-type-label">Choose Account Type</p>
 
-            <div className="account-type-options">
-               <div
+            <div className="account-type-options" role="group" aria-labelledby="account-type-label">
+               <button
+                type="button"
                 className={
                   "account-type-card " +
                   (accountType === "Freelancer" ? "selected" : "")
                 }
+                aria-pressed={accountType === "Freelancer"}
                 onClick={() => setAccountType("Freelancer")}
               >
-                <div className="account-type-icon">💻</div>
-                <h3>Freelancer</h3>
-                <p>Find jobs and earn money.</p>
+                <span className="account-type-icon" aria-hidden="true">💻</span>
+                <span className="account-type-title">Freelancer</span>
+                <span className="account-type-description">Find jobs and earn money.</span>
 
                 {accountType === "Freelancer" && (
                   <span className="account-check">✓</span>
                 )}
-              </div>
+              </button>
 
-              <div
+              <button
+                type="button"
                 className={
                   "account-type-card " +
                   (accountType === "Client" ? "selected" : "")
                 }
+                aria-pressed={accountType === "Client"}
                 onClick={() => setAccountType("Client")}
               >
-                <div className="account-type-icon">🏢</div>
-                <h3>Client</h3>
-                <p>Hire talented freelancers.</p>
+                <span className="account-type-icon" aria-hidden="true">🏢</span>
+                <span className="account-type-title">Client</span>
+                <span className="account-type-description">Hire talented freelancers.</span>
 
                 {accountType === "Client" && (
                   <span className="account-check">✓</span>
                 )}
-              </div>
+              </button>
             </div>
           </div>
 

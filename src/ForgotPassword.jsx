@@ -6,29 +6,34 @@ function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleResetRequest(event) {
     event.preventDefault();
 
     setLoading(true);
+    setError("");
 
     const cleanEmail = email.trim().toLowerCase();
+    try {
+      const result = await supabase.auth.resetPasswordForEmail(
+        cleanEmail,
+        {
+          redirectTo: window.location.origin + "/reset-password"
+        }
+      );
 
-    const result = await supabase.auth.resetPasswordForEmail(
-      cleanEmail,
-      {
-        redirectTo: window.location.origin + "/reset-password"
+      if (result.error) {
+        setError(result.error.message);
+        return;
       }
-    );
 
-    setLoading(false);
-
-    if (result.error) {
-      alert(result.error.message);
-      return;
+      setSent(true);
+    } catch (requestError) {
+      setError("Unable to request a reset link. " + requestError.message);
+    } finally {
+      setLoading(false);
     }
-
-    setSent(true);
   }
 
   return (
@@ -45,10 +50,12 @@ function ForgotPassword() {
             </p>
 
             <form onSubmit={handleResetRequest}>
-              <label>Email Address</label>
+              {error && <p className="auth-notice auth-notice--error" role="alert">{error}</p>}
+              <label htmlFor="reset-email">Email Address</label>
 
               <input
                 type="email"
+                id="reset-email"
                 placeholder="Enter your registered email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
