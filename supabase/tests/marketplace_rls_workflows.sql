@@ -1,3 +1,24 @@
+-- Simulate legacy permissive policies; the migration's restrictive boundaries
+-- must keep them from widening access.
+create policy "CI legacy profile read" on public.profiles
+  for select to authenticated using (true);
+create policy "CI legacy profile update" on public.profiles
+  for update to authenticated using (true) with check (true);
+create policy "CI legacy job access" on public.jobs
+  for all to anon, authenticated using (true) with check (true);
+create policy "CI legacy application access" on public.job_applications
+  for all to authenticated using (true) with check (true);
+create policy "CI legacy conversation access" on public.conversations
+  for all to authenticated using (true) with check (true);
+create policy "CI legacy message access" on public.messages
+  for all to authenticated using (true) with check (true);
+create policy "CI legacy notification access" on public.notifications
+  for all to authenticated using (true) with check (true);
+create policy "CI legacy portfolio access" on public.portfolio_items
+  for all to authenticated using (true) with check (true);
+create policy "CI legacy review insert" on public.reviews
+  for insert to authenticated with check (true);
+
 begin;
 
 insert into auth.users (id, raw_user_meta_data) values
@@ -115,6 +136,53 @@ values ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-3333333
 insert into public.messages (conversation_id, sender_id, body)
 select id, '11111111-1111-4111-8111-111111111111', 'The completed work looks great.'
 from public.conversations where application_id = '44444444-4444-4444-8444-444444444444';
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222223', true);
+
+do $$
+declare
+  outsider_review_blocked boolean := false;
+begin
+  if (select count(*) from public.profiles) <> 1 then
+    raise exception 'A legacy profile policy exposed another user profile';
+  end if;
+  if exists (
+    select 1 from public.job_applications
+    where freelancer_id <> (select auth.uid())
+  ) then
+    raise exception 'A legacy application policy exposed another freelancer application';
+  end if;
+  if exists (select 1 from public.jobs where status = 'completed') then
+    raise exception 'A legacy jobs policy exposed a completed project to an outsider';
+  end if;
+  if (select count(*) from public.conversations) <> 0
+    or (select count(*) from public.messages) <> 0
+    or (select count(*) from public.portfolio_items) <> 0 then
+    raise exception 'A legacy policy exposed another user’s private marketplace data';
+  end if;
+  if exists (
+    select 1 from public.notifications
+    where user_id <> (select auth.uid())
+  ) then
+    raise exception 'A legacy notification policy exposed another user’s notifications';
+  end if;
+
+  begin
+    insert into public.reviews (application_id, job_id, reviewer_id, reviewee_id, rating, body)
+    values ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-333333333333',
+      (select auth.uid()), '11111111-1111-4111-8111-111111111111', 1, 'Unauthorized review');
+    raise exception 'A legacy review policy allowed a non-participant to review';
+  exception when insufficient_privilege then
+    outsider_review_blocked := true;
+  end;
+  if not outsider_review_blocked then
+    raise exception 'A non-participant review was not blocked';
+  end if;
+end;
+$$;
 
 reset role;
 set local role authenticated;

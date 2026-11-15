@@ -89,6 +89,9 @@ alter table public.notifications enable row level security;
 alter table public.portfolio_items enable row level security;
 alter table public.reviews enable row level security;
 
+revoke all on table public.conversations, public.messages, public.notifications,
+  public.portfolio_items, public.reviews from public, anon, authenticated;
+
 grant select, insert on public.conversations to authenticated;
 grant select, insert, update on public.messages to authenticated;
 grant select, update on public.notifications to authenticated;
@@ -153,6 +156,42 @@ create policy "Participants can start an application conversation"
     )
   );
 
+drop policy if exists "Conversation participant boundary" on public.conversations;
+create policy "Conversation participant boundary"
+  on public.conversations as restrictive for all to authenticated
+  using (client_id = (select auth.uid()) or freelancer_id = (select auth.uid()))
+  with check (client_id = (select auth.uid()) or freelancer_id = (select auth.uid()));
+
+drop policy if exists "Conversation insert boundary" on public.conversations;
+create policy "Conversation insert boundary"
+  on public.conversations as restrictive for insert to authenticated
+  with check (
+    created_by = (select auth.uid())
+    and exists (
+      select 1 from public.job_applications a
+      where a.id::text = conversations.application_id
+        and a.job_id::text = conversations.job_id
+        and a.client_id = conversations.client_id
+        and a.freelancer_id = conversations.freelancer_id
+        and a.status in ('Pending', 'Accepted')
+    )
+  );
+
+drop policy if exists "Anonymous users cannot access conversations" on public.conversations;
+create policy "Anonymous users cannot access conversations"
+  on public.conversations as restrictive for all to anon
+  using (false) with check (false);
+
+drop policy if exists "Conversation updates are unavailable" on public.conversations;
+create policy "Conversation updates are unavailable"
+  on public.conversations as restrictive for update to authenticated
+  using (false) with check (false);
+
+drop policy if exists "Conversation deletes are unavailable" on public.conversations;
+create policy "Conversation deletes are unavailable"
+  on public.conversations as restrictive for delete to authenticated
+  using (false);
+
 drop policy if exists "Conversation participants can read messages" on public.messages;
 create policy "Conversation participants can read messages"
   on public.messages for select to authenticated
@@ -162,9 +201,30 @@ create policy "Conversation participants can read messages"
       and (c.client_id = (select auth.uid()) or c.freelancer_id = (select auth.uid()))
   ));
 
+drop policy if exists "Conversation message read boundary" on public.messages;
+create policy "Conversation message read boundary"
+  on public.messages as restrictive for select to authenticated
+  using (exists (
+    select 1 from public.conversations c
+    where c.id = messages.conversation_id
+      and (c.client_id = (select auth.uid()) or c.freelancer_id = (select auth.uid()))
+  ));
+
 drop policy if exists "Conversation participants can send messages" on public.messages;
 create policy "Conversation participants can send messages"
   on public.messages for insert to authenticated
+  with check (
+    sender_id = (select auth.uid())
+    and exists (
+      select 1 from public.conversations c
+      where c.id = messages.conversation_id
+        and (c.client_id = (select auth.uid()) or c.freelancer_id = (select auth.uid()))
+    )
+  );
+
+drop policy if exists "Conversation message insert boundary" on public.messages;
+create policy "Conversation message insert boundary"
+  on public.messages as restrictive for insert to authenticated
   with check (
     sender_id = (select auth.uid())
     and exists (
@@ -223,9 +283,40 @@ create policy "Message recipients can mark messages read"
         or (c.freelancer_id = (select auth.uid()) and messages.sender_id = c.client_id))
   ));
 
+drop policy if exists "Message recipient update boundary" on public.messages;
+create policy "Message recipient update boundary"
+  on public.messages as restrictive for update to authenticated
+  using (exists (
+    select 1 from public.conversations c
+    where c.id = messages.conversation_id
+      and ((c.client_id = (select auth.uid()) and messages.sender_id = c.freelancer_id)
+        or (c.freelancer_id = (select auth.uid()) and messages.sender_id = c.client_id))
+  ))
+  with check (exists (
+    select 1 from public.conversations c
+    where c.id = messages.conversation_id
+      and ((c.client_id = (select auth.uid()) and messages.sender_id = c.freelancer_id)
+        or (c.freelancer_id = (select auth.uid()) and messages.sender_id = c.client_id))
+  ));
+
+drop policy if exists "Message deletes are unavailable" on public.messages;
+create policy "Message deletes are unavailable"
+  on public.messages as restrictive for delete to authenticated
+  using (false);
+
+drop policy if exists "Anonymous users cannot access messages" on public.messages;
+create policy "Anonymous users cannot access messages"
+  on public.messages as restrictive for all to anon
+  using (false) with check (false);
+
 drop policy if exists "Users can read their notifications" on public.notifications;
 create policy "Users can read their notifications"
   on public.notifications for select to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "Notification owner read boundary" on public.notifications;
+create policy "Notification owner read boundary"
+  on public.notifications as restrictive for select to authenticated
   using (user_id = (select auth.uid()));
 
 drop policy if exists "Users can mark their notifications read" on public.notifications;
@@ -233,6 +324,27 @@ create policy "Users can mark their notifications read"
   on public.notifications for update to authenticated
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
+
+drop policy if exists "Notification owner update boundary" on public.notifications;
+create policy "Notification owner update boundary"
+  on public.notifications as restrictive for update to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+drop policy if exists "Notification inserts are unavailable" on public.notifications;
+create policy "Notification inserts are unavailable"
+  on public.notifications as restrictive for insert to authenticated
+  with check (false);
+
+drop policy if exists "Notification deletes are unavailable" on public.notifications;
+create policy "Notification deletes are unavailable"
+  on public.notifications as restrictive for delete to authenticated
+  using (false);
+
+drop policy if exists "Anonymous users cannot access notifications" on public.notifications;
+create policy "Anonymous users cannot access notifications"
+  on public.notifications as restrictive for all to anon
+  using (false) with check (false);
 
 create or replace function public.techkarvo_protect_notification_update()
 returns trigger
@@ -269,9 +381,26 @@ create policy "Freelancers can read portfolios"
     where p.id = (select auth.uid()) and p.account_type = 'client'
   ) or freelancer_id = (select auth.uid()));
 
+drop policy if exists "Portfolio read boundary" on public.portfolio_items;
+create policy "Portfolio read boundary"
+  on public.portfolio_items as restrictive for select to authenticated
+  using (exists (
+    select 1 from public.profiles p
+    where p.id = (select auth.uid()) and p.account_type = 'client'
+  ) or freelancer_id = (select auth.uid()));
+
 drop policy if exists "Freelancers manage their own portfolio" on public.portfolio_items;
 create policy "Freelancers manage their own portfolio"
   on public.portfolio_items for insert to authenticated
+  with check (
+    freelancer_id = (select auth.uid())
+    and exists (select 1 from public.profiles p
+      where p.id = (select auth.uid()) and p.account_type = 'freelancer')
+  );
+
+drop policy if exists "Portfolio insert boundary" on public.portfolio_items;
+create policy "Portfolio insert boundary"
+  on public.portfolio_items as restrictive for insert to authenticated
   with check (
     freelancer_id = (select auth.uid())
     and exists (select 1 from public.profiles p
@@ -284,10 +413,35 @@ create policy "Freelancers update their own portfolio"
   using (freelancer_id = (select auth.uid()))
   with check (freelancer_id = (select auth.uid()));
 
+drop policy if exists "Portfolio update boundary" on public.portfolio_items;
+create policy "Portfolio update boundary"
+  on public.portfolio_items as restrictive for update to authenticated
+  using (freelancer_id = (select auth.uid()) and exists (
+    select 1 from public.profiles p
+    where p.id = (select auth.uid()) and p.account_type = 'freelancer'
+  ))
+  with check (freelancer_id = (select auth.uid()) and exists (
+    select 1 from public.profiles p
+    where p.id = (select auth.uid()) and p.account_type = 'freelancer'
+  ));
+
 drop policy if exists "Freelancers delete their own portfolio" on public.portfolio_items;
 create policy "Freelancers delete their own portfolio"
   on public.portfolio_items for delete to authenticated
   using (freelancer_id = (select auth.uid()));
+
+drop policy if exists "Portfolio delete boundary" on public.portfolio_items;
+create policy "Portfolio delete boundary"
+  on public.portfolio_items as restrictive for delete to authenticated
+  using (freelancer_id = (select auth.uid()) and exists (
+    select 1 from public.profiles p
+    where p.id = (select auth.uid()) and p.account_type = 'freelancer'
+  ));
+
+drop policy if exists "Anonymous users cannot access portfolios" on public.portfolio_items;
+create policy "Anonymous users cannot access portfolios"
+  on public.portfolio_items as restrictive for all to anon
+  using (false) with check (false);
 
 create or replace function public.techkarvo_is_application_participant(p_application_id text)
 returns boolean
@@ -314,6 +468,11 @@ create policy "Completed job participants can read reviews"
   on public.reviews for select to anon, authenticated
   using (true);
 
+drop policy if exists "Public review read boundary" on public.reviews;
+create policy "Public review read boundary"
+  on public.reviews as restrictive for select to anon, authenticated
+  using (true);
+
 drop policy if exists "Participants can create one review after completion" on public.reviews;
 create policy "Participants can create one review after completion"
   on public.reviews for insert to authenticated
@@ -330,6 +489,48 @@ create policy "Participants can create one review after completion"
         )
     )
   );
+
+drop policy if exists "Review insert boundary" on public.reviews;
+create policy "Review insert boundary"
+  on public.reviews as restrictive for insert to authenticated
+  with check (
+    reviewer_id = (select auth.uid())
+    and public.techkarvo_is_application_participant(application_id)
+    and exists (
+      select 1 from public.job_applications a
+      where a.id::text = reviews.application_id
+        and a.job_id::text = reviews.job_id
+        and (
+          (a.client_id = (select auth.uid()) and a.freelancer_id = reviews.reviewee_id)
+          or (a.freelancer_id = (select auth.uid()) and a.client_id = reviews.reviewee_id)
+        )
+    )
+  );
+
+drop policy if exists "Anonymous review writes are unavailable" on public.reviews;
+create policy "Anonymous review writes are unavailable"
+  on public.reviews as restrictive for insert to anon
+  with check (false);
+
+drop policy if exists "Review updates are unavailable" on public.reviews;
+create policy "Review updates are unavailable"
+  on public.reviews as restrictive for update to authenticated
+  using (false) with check (false);
+
+drop policy if exists "Review deletes are unavailable" on public.reviews;
+create policy "Review deletes are unavailable"
+  on public.reviews as restrictive for delete to authenticated
+  using (false);
+
+drop policy if exists "Anonymous review updates are unavailable" on public.reviews;
+create policy "Anonymous review updates are unavailable"
+  on public.reviews as restrictive for update to anon
+  using (false) with check (false);
+
+drop policy if exists "Anonymous review deletes are unavailable" on public.reviews;
+create policy "Anonymous review deletes are unavailable"
+  on public.reviews as restrictive for delete to anon
+  using (false);
 
 create or replace function public.techkarvo_validate_job_completion()
 returns trigger
