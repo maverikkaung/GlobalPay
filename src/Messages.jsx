@@ -175,22 +175,33 @@ function Messages() {
 
     setSending(true);
     setError("");
-    const result = await supabase.from("messages").insert({
-      conversation_id: selectedId,
-      sender_id: user.id,
-      body
-    });
-    setSending(false);
-    if (result.error) {
-      setError("Message could not be sent. " + result.error.message);
-      return;
-    }
+    try {
+      const result = await supabase.from("messages").insert({
+        conversation_id: selectedId,
+        sender_id: user.id,
+        body
+      });
+      if (result.error) {
+        console.error("Message send failed:", result.error.message);
+        setError("Message could not be sent. Please try again.");
+        return;
+      }
 
-    setDraft("");
-    const refreshed = await supabase.from("messages").select("*")
-      .eq("conversation_id", selectedId).order("created_at", { ascending: true });
-    if (refreshed.error) setError("Your message was sent, but the conversation could not be refreshed.");
-    else setMessages(refreshed.data || []);
+      setDraft("");
+      const refreshed = await supabase.from("messages").select("*")
+        .eq("conversation_id", selectedId).order("created_at", { ascending: true });
+      if (refreshed.error) {
+        console.error("Message refresh failed:", refreshed.error.message);
+        setError("Your message was sent, but the conversation could not be refreshed.");
+      } else {
+        setMessages(refreshed.data || []);
+      }
+    } catch (sendError) {
+      console.error("Message send failed:", sendError);
+      setError("A network error interrupted sending. Please try again.");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (

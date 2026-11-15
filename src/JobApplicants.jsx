@@ -11,6 +11,8 @@ function JobApplicants() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [updatingApplicationId, setUpdatingApplicationId] = useState("");
+  const [updatingStatus, setUpdatingStatus] = useState("");
 
   useEffect(function() {
     let active = true;
@@ -65,22 +67,34 @@ function JobApplicants() {
   }, [userId, accountType]);
 
   async function updateStatus(application, newStatus) {
-    const result = await supabase.from("job_applications")
-      .update({ status: newStatus })
-      .eq("id", application.applicationId)
-      .eq("client_id", userId)
-      .select("id, status")
-      .single();
-
-    if (result.error) {
-      setError("Application status could not be updated. " + result.error.message);
-      return;
-    }
-
-    setApplications((current) => current.map((item) => item.applicationId === application.applicationId
-      ? { ...item, status: result.data.status }
-      : item));
+    if (updatingApplicationId) return;
+    setUpdatingApplicationId(application.applicationId);
+    setUpdatingStatus(newStatus);
     setError("");
+    try {
+      const result = await supabase.from("job_applications")
+        .update({ status: newStatus })
+        .eq("id", application.applicationId)
+        .eq("client_id", userId)
+        .select("id, status")
+        .single();
+
+      if (result.error) {
+        console.error("Application status update failed:", result.error.message);
+        setError("Application status could not be updated. Refresh and try again.");
+        return;
+      }
+
+      setApplications((current) => current.map((item) => item.applicationId === application.applicationId
+        ? { ...item, status: result.data.status }
+        : item));
+    } catch (updateError) {
+      console.error("Application status update failed:", updateError);
+      setError("A network error interrupted the status update. Please try again.");
+    } finally {
+      setUpdatingApplicationId("");
+      setUpdatingStatus("");
+    }
   }
 
   if (!user) {
@@ -231,21 +245,23 @@ function JobApplicants() {
                         <button
                           type="button"
                           className="apply-btn"
+                          disabled={Boolean(updatingApplicationId)}
                           onClick={function() {
                             updateStatus(application, "Accepted");
                           }}
                         >
-                          Accept
+                          {updatingApplicationId === application.applicationId && updatingStatus === "Accepted" ? "Accepting…" : "Accept"}
                         </button>
 
                         <button
                           type="button"
                           className="dashboard-logout"
+                          disabled={Boolean(updatingApplicationId)}
                           onClick={function() {
                             updateStatus(application, "Rejected");
                           }}
                         >
-                          Reject
+                          {updatingApplicationId === application.applicationId && updatingStatus === "Rejected" ? "Rejecting…" : "Reject"}
                         </button>
 
                       </div>

@@ -16,6 +16,8 @@ function Notifications() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [savingId, setSavingId] = useState("");
+  const [savingAll, setSavingAll] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -36,24 +38,46 @@ function Notifications() {
   }, [user.id]);
 
   async function markRead(id) {
-    const result = await supabase.from("notifications").update({ read_at: new Date().toISOString() })
-      .eq("id", id).eq("user_id", user.id).select("id, read_at").single();
-    if (result.error) {
-      setError("Unable to update notification. " + result.error.message);
-      return;
+    if (savingId || savingAll) return;
+    setSavingId(id);
+    setError("");
+    try {
+      const result = await supabase.from("notifications").update({ read_at: new Date().toISOString() })
+        .eq("id", id).eq("user_id", user.id).select("id, read_at").single();
+      if (result.error) {
+        console.error("Notification update failed:", result.error.message);
+        setError("Unable to update notification. Please try again.");
+        return;
+      }
+      setItems((current) => current.map((item) => item.id === id ? { ...item, read_at: result.data.read_at } : item));
+    } catch (updateError) {
+      console.error("Notification update failed:", updateError);
+      setError("A network error interrupted the notification update.");
+    } finally {
+      setSavingId("");
     }
-    setItems((current) => current.map((item) => item.id === id ? { ...item, read_at: result.data.read_at } : item));
   }
 
   async function markAllRead() {
-    const result = await supabase.from("notifications").update({ read_at: new Date().toISOString() })
-      .eq("user_id", user.id).is("read_at", null).select("id, read_at");
-    if (result.error) {
-      setError("Unable to mark notifications read. " + result.error.message);
-      return;
+    if (savingAll || savingId) return;
+    setSavingAll(true);
+    setError("");
+    try {
+      const result = await supabase.from("notifications").update({ read_at: new Date().toISOString() })
+        .eq("user_id", user.id).is("read_at", null).select("id, read_at");
+      if (result.error) {
+        console.error("Mark all notifications read failed:", result.error.message);
+        setError("Unable to mark notifications read. Please try again.");
+        return;
+      }
+      const readAt = new Date().toISOString();
+      setItems((current) => current.map((item) => item.read_at ? item : { ...item, read_at: readAt }));
+    } catch (updateError) {
+      console.error("Mark all notifications read failed:", updateError);
+      setError("A network error interrupted the notification update.");
+    } finally {
+      setSavingAll(false);
     }
-    const readAt = new Date().toISOString();
-    setItems((current) => current.map((item) => item.read_at ? item : { ...item, read_at: readAt }));
   }
 
   const unreadCount = items.filter((item) => !item.read_at).length;
@@ -70,7 +94,7 @@ function Notifications() {
           <span className="dashboard-tag">ACCOUNT UPDATES</span>
           <h1>Notifications</h1>
           <p>{unreadCount ? `${unreadCount} unread update${unreadCount === 1 ? "" : "s"}` : "You’re all caught up."}</p>
-          {unreadCount > 0 && <button type="button" className="secondary-btn" onClick={markAllRead}>Mark all as read</button>}
+          {unreadCount > 0 && <button type="button" className="secondary-btn" disabled={savingAll || Boolean(savingId)} onClick={markAllRead}>{savingAll ? "Updating…" : "Mark all as read"}</button>}
         </div>
         {error && <p role="alert">{error}</p>}
         <section className="dashboard-section notification-list">
@@ -86,7 +110,7 @@ function Notifications() {
               </div>
               <div className="notification-actions">
                 <Link to={getNotificationLink(item)} onClick={() => !item.read_at && markRead(item.id)}>Open</Link>
-                {!item.read_at && <button type="button" onClick={() => markRead(item.id)}>Mark read</button>}
+                {!item.read_at && <button type="button" disabled={savingAll || Boolean(savingId)} onClick={() => markRead(item.id)}>{savingId === item.id ? "Updating…" : "Mark read"}</button>}
               </div>
             </article>
           ))}

@@ -11,6 +11,7 @@ function Reviews() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const dashboard = user.accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard";
 
   useEffect(() => {
@@ -62,25 +63,32 @@ function Reviews() {
     const rating = ratings[application.id] || 5;
     setSavingId(application.id);
     setError("");
+    setNotice("");
+    try {
+      const result = await supabase.from("reviews").insert({
+        application_id: String(application.id),
+        job_id: String(application.job_id),
+        reviewer_id: user.id,
+        reviewee_id: application.revieweeId,
+        rating,
+        body: comments[application.id]?.trim() || ""
+      });
 
-    const result = await supabase.from("reviews").insert({
-      application_id: String(application.id),
-      job_id: String(application.job_id),
-      reviewer_id: user.id,
-      reviewee_id: application.revieweeId,
-      rating,
-      body: comments[application.id]?.trim() || ""
-    });
-
-    setSavingId("");
-    if (result.error) {
-      setError(result.error.code === "23505"
-        ? "You have already reviewed this project. Refresh to update the list."
-        : "Unable to submit your review. " + result.error.message);
-      return;
+      if (result.error) {
+        console.error("Review submission failed:", result.error.message);
+        setError(result.error.code === "23505"
+          ? "You have already reviewed this project. Refresh to update the list."
+          : "Unable to submit your review. Please try again.");
+        return;
+      }
+      setEligibleJobs((items) => items.filter((item) => item.id !== application.id));
+      setNotice("Your review was submitted.");
+    } catch (submitError) {
+      console.error("Review submission failed:", submitError);
+      setError("A network error interrupted review submission. Please try again.");
+    } finally {
+      setSavingId("");
     }
-
-    setEligibleJobs((items) => items.filter((item) => item.id !== application.id));
   }
 
   return (
@@ -96,6 +104,7 @@ function Reviews() {
           <p>Share a fair, useful review after a project is marked complete.</p>
         </div>
         {error && <p role="alert">{error}</p>}
+        {notice && <p role="status">{notice}</p>}
         {loading ? <div className="no-jobs"><h3>Loading review opportunities…</h3></div> : eligibleJobs.length === 0 ? (
           <div className="no-jobs"><h3>No reviews to write</h3><p>Completed projects will appear here when they are ready for feedback.</p></div>
         ) : (

@@ -63,7 +63,12 @@ function MyFreelancers() {
       setLoading(false);
     }
 
-    loadFreelancers();
+    loadFreelancers().catch((loadError) => {
+      if (!active) return;
+      console.error("Unable to load hired freelancers:", loadError);
+      setError("Unable to load hired freelancers. Please try again.");
+      setLoading(false);
+    });
     return () => { active = false; };
   }, [userId, accountType]);
 
