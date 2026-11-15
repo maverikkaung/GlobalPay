@@ -2,7 +2,8 @@ begin;
 
 insert into auth.users (id, raw_user_meta_data) values
   ('11111111-1111-4111-8111-111111111111', '{"full_name":"CI Client","account_type":"client"}'),
-  ('22222222-2222-4222-8222-222222222222', '{"full_name":"CI Freelancer","account_type":"freelancer"}');
+  ('22222222-2222-4222-8222-222222222222', '{"full_name":"CI Freelancer","account_type":"freelancer"}'),
+  ('22222222-2222-4222-8222-222222222223', '{"full_name":"CI Second Freelancer","account_type":"freelancer"}');
 
 insert into public.jobs (id, client_id, title, description, budget) values
   ('33333333-3333-4333-8333-333333333333', '11111111-1111-4111-8111-111111111111', 'Accepted project', 'Workflow fixture', 100),
@@ -50,6 +51,16 @@ $$;
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222223', true);
+
+insert into public.job_applications (id, job_id, client_id, freelancer_id, full_name, email)
+values ('44444444-4444-4444-8444-444444444446', '33333333-3333-4333-8333-333333333333',
+  '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222223',
+  'CI Second Freelancer', 'ci-second-freelancer@example.invalid');
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
 
 do $$
@@ -73,6 +84,25 @@ where id = '44444444-4444-4444-8444-444444444444';
 update public.jobs set status = 'completed'
 where id = '33333333-3333-4333-8333-333333333333';
 
+do $$
+begin
+  if not exists (
+    select 1 from public.job_applications
+    where id = '44444444-4444-4444-8444-444444444446' and status = 'Rejected'
+  ) then
+    raise exception 'Completing a project should close pending applications';
+  end if;
+
+  begin
+    update public.job_applications set status = 'Accepted'
+    where id = '44444444-4444-4444-8444-444444444446';
+    raise exception 'A closed application must not be accepted afterward';
+  exception when check_violation then
+    null;
+  end;
+end;
+$$;
+
 insert into public.reviews (application_id, job_id, reviewer_id, reviewee_id, rating, body)
 values ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-333333333333',
   '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', 5, 'Great work');
@@ -90,6 +120,17 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', true);
+
+do $$
+begin
+  if not exists (
+    select 1 from public.job_applications
+    where id = '44444444-4444-4444-8444-444444444444' and status = 'Accepted'
+  ) then
+    raise exception 'The accepted freelancer should retain their accepted status';
+  end if;
+end;
+$$;
 
 update public.messages set read_at = now()
 where conversation_id = (select id from public.conversations
@@ -118,6 +159,19 @@ begin
       and kind = 'new_message' and read_at is not null
   ) then
     raise exception 'Message notifications and read receipts should work';
+  end if;
+end;
+$$;
+
+reset role;
+do $$
+begin
+  if not exists (
+    select 1 from public.notifications
+    where user_id = '22222222-2222-4222-8222-222222222223'
+      and kind = 'application_rejected'
+  ) then
+    raise exception 'Closing a pending application should notify its freelancer';
   end if;
 end;
 $$;

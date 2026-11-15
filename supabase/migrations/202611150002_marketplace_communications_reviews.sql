@@ -338,17 +338,23 @@ security definer
 set search_path = ''
 as $$
 begin
-  if new.status = 'completed'
-    and old.status is distinct from new.status
-    and coalesce(auth.role(), '') <> 'service_role'
-    and not exists (
-      select 1 from public.job_applications a
-      where a.job_id::text = new.id::text
-        and a.client_id = auth.uid()
-        and a.status = 'Accepted'
-    ) then
-    raise exception 'A project needs an accepted freelancer before completion'
-      using errcode = '23514';
+  if new.status = 'completed' and old.status is distinct from new.status then
+    update public.job_applications
+    set status = 'Rejected'
+    where job_id::text = new.id::text
+      and client_id = new.client_id
+      and status = 'Pending';
+
+    if coalesce(auth.role(), '') <> 'service_role'
+      and not exists (
+        select 1 from public.job_applications a
+        where a.job_id::text = new.id::text
+          and a.client_id = auth.uid()
+          and a.status = 'Accepted'
+      ) then
+      raise exception 'A project needs an accepted freelancer before completion'
+        using errcode = '23514';
+    end if;
   end if;
   return new;
 end;

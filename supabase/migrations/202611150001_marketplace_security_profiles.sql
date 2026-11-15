@@ -134,7 +134,19 @@ begin
   end if;
 
   if old.status <> 'Pending' or new.status not in ('Accepted', 'Rejected') then
-    raise exception 'This application status transition is not allowed';
+    raise exception 'This application status transition is not allowed'
+      using errcode = '23514';
+  end if;
+
+  if new.status is distinct from old.status and coalesce(auth.role(), '') <> 'service_role'
+    and not exists (
+      select 1 from public.jobs j
+      where j.id::text = old.job_id::text
+        and j.client_id = old.client_id
+        and j.status = 'open'
+    ) then
+    raise exception 'Applications can only be decided while the job is open'
+      using errcode = '23514';
   end if;
 
   return new;
