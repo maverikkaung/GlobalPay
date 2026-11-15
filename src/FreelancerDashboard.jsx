@@ -14,6 +14,7 @@ function FreelancerDashboard() {
   const [activeJobs, setActiveJobs] = useState(0);
   const [pendingApplications, setPendingApplications] = useState(0);
   const [rejectedApplications, setRejectedApplications] = useState(0);
+  const [withdrawnApplications, setWithdrawnApplications] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -51,6 +52,7 @@ function FreelancerDashboard() {
         setActiveJobs(countOpenAcceptedJobs(applications, jobs));
         setPendingApplications(counts.pending);
         setRejectedApplications(counts.rejected);
+        setWithdrawnApplications(counts.withdrawn);
       } catch (loadError) {
         if (!active) return;
         setError("Unable to load your dashboard summary. " + loadError.message);
@@ -123,6 +125,12 @@ function FreelancerDashboard() {
             <span>Rejected Applications</span>
             <h2>{loading ? "…" : rejectedApplications}</h2>
             <p>Applications not accepted</p>
+          </div>
+
+          <div className="dashboard-stat-card">
+            <span>Withdrawn Applications</span>
+            <h2>{loading ? "…" : withdrawnApplications}</h2>
+            <p>Applications you withdrew</p>
           </div>
 
         </div>

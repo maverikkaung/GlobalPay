@@ -216,6 +216,11 @@ function MyApplications() {
             <h2>{rejectedCount}</h2>
           </div>
 
+          <div className="application-summary-card">
+            <span>Withdrawn</span>
+            <h2>{withdrawnCount}</h2>
+          </div>
+
         </section>
 
         <section className="applications-section">

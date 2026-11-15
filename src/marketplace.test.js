@@ -19,8 +19,9 @@ test("account roles accept only supported database values", () => {
 
 test("application summaries count only known workflow statuses", () => {
   assert.deepEqual(countApplicationStatuses([
-    { status: "Accepted" }, { status: "Pending" }, { status: "Rejected" }, { status: "withdrawn" }
-  ]), { accepted: 1, pending: 1, rejected: 1 });
+    { status: "Accepted" }, { status: "Pending" }, { status: "Rejected" },
+    { status: "Withdrawn" }, { status: "withdrawn" }
+  ]), { accepted: 1, pending: 1, rejected: 1, withdrawn: 1 });
 });
 
 test("freelancer active jobs exclude completed projects and duplicate applications", () => {

@@ -9,8 +9,9 @@ export function countApplicationStatuses(applications = []) {
     if (application.status === "Accepted") counts.accepted += 1;
     if (application.status === "Pending") counts.pending += 1;
     if (application.status === "Rejected") counts.rejected += 1;
+    if (application.status === "Withdrawn") counts.withdrawn += 1;
     return counts;
-  }, { accepted: 0, pending: 0, rejected: 0 });
+  }, { accepted: 0, pending: 0, rejected: 0, withdrawn: 0 });
 }
 
 export function countOpenAcceptedJobs(applications = [], jobs = []) {
