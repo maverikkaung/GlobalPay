@@ -127,7 +127,10 @@ function Messages() {
 
     loadConversations().catch((loadError) => {
       if (!active) return;
-      setError(loadError.message || "Unable to load conversations.");
+      console.error("Conversation loading failed:", loadError);
+      setError(loadError.message === "This application is not available for messaging."
+        ? loadError.message
+        : "Unable to load conversations. Please try again.");
       setLoading(false);
     });
 
@@ -148,17 +151,22 @@ function Messages() {
       setMessages(result.data || []);
       const unreadIds = (result.data || []).filter((item) => item.sender_id !== user.id && !item.read_at).map((item) => item.id);
       if (unreadIds.length) {
-        await supabase.from("messages").update({ read_at: new Date().toISOString() })
+        const readResult = await supabase.from("messages").update({ read_at: new Date().toISOString() })
           .in("id", unreadIds);
+        if (readResult.error) console.error("Message read receipt update failed:", readResult.error.message);
       }
     }
 
     loadMessages().catch((loadError) => {
-      if (active) setError(loadError.message || "Unable to load messages.");
+      if (!active) return;
+      console.error("Message loading failed:", loadError);
+      setError("Unable to load messages for this conversation. Please try again.");
     });
     const refresh = window.setInterval(() => {
       loadMessages().catch((loadError) => {
-        if (active) setError(loadError.message || "Unable to refresh messages.");
+        if (!active) return;
+        console.error("Message refresh failed:", loadError);
+        setError("Unable to refresh messages. Please try again.");
       });
     }, 12000);
 
