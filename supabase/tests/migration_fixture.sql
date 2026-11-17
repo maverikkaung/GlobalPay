@@ -1,5 +1,6 @@
--- Minimal disposable Supabase-like schema used only by GitHub Actions.
--- This fixture is not connected to the TechKarvo production project.
+-- Supabase Auth compatibility primitives for a fresh disposable PostgreSQL
+-- database used only by GitHub Actions. The base migration creates the app
+-- tables; this fixture is not connected to any TechKarvo Supabase project.
 create role anon nologin;
 create role authenticated nologin;
 create role service_role nologin bypassrls;
@@ -26,26 +27,5 @@ as $$
   select nullif(current_setting('request.jwt.claim.role', true), '');
 $$;
 
-create table public.profiles (
-  id uuid primary key,
-  full_name text not null default '',
-  account_type text not null default 'freelancer'
-);
-
-create table public.jobs (
-  id uuid primary key default gen_random_uuid(),
-  client_id uuid not null,
-  title text not null,
-  description text not null,
-  budget numeric not null
-);
-
-create table public.job_applications (
-  id uuid primary key default gen_random_uuid(),
-  job_id uuid not null,
-  freelancer_id uuid not null
-);
-
 grant usage on schema public, auth to anon, authenticated, service_role;
-grant select, insert, update, delete on public.profiles, public.jobs, public.job_applications to anon, authenticated, service_role;
 grant select on auth.users to anon, authenticated, service_role;

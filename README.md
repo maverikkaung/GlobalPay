@@ -29,7 +29,7 @@ GitHub Actions runs these checks for pushes and pull requests. A separate job ap
 
 ## Supabase schema
 
-Database changes are versioned in `supabase/migrations/`. The app requires the existing `profiles`, `jobs`, and `job_applications` tables plus the marketplace migrations. The migrations add profile fields and RLS boundaries, messaging, notifications, portfolios, reviews, and least-privilege grants that replace inherited table access. Applying them changes the connected database; verify the target schema and obtain approval before applying them to any shared environment. They have not been applied to the connected TechKarvo project.
+Database changes are versioned in `supabase/migrations/`. Fresh projects start with `202611150000_marketplace_base_schema.sql`, followed by the eight marketplace security and feature migrations. The base migration intentionally fails if core tables already exist; legacy projects require schema review before choosing a migration path. Later migrations add profile fields and RLS boundaries, messaging, notifications, portfolios, reviews, and least-privilege grants. Applying migrations changes the connected database; verify the target and obtain approval before applying them to any shared environment. They have not been applied to the connected TechKarvo projects.
 
 The application relies on RLS for authorization. Client-side route checks are for navigation only and are not a security boundary.
 

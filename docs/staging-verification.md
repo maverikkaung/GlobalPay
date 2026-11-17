@@ -1,6 +1,6 @@
 # TechKarvo staging setup and verification
 
-This plan is for a dedicated, disposable Supabase staging project. It is documentation only: no project has been created or linked, and no migration or auth setting has been changed. Do not point these steps at production.
+This plan is for the dedicated Supabase project `techkarvo-staging` (reference `ntucgiieksrwebwvcmun`). The project was verified Healthy in Tokyo and the dashboard reported no migrations applied. No database migration or Auth setting has been changed. Do not point these steps at production.
 
 ## Prerequisites
 
@@ -13,10 +13,10 @@ This plan is for a dedicated, disposable Supabase staging project. It is documen
 ## Prepare the staging database
 
 1. Confirm the project reference and dashboard hostname identify staging. Record the target in the change log without recording credentials.
-2. Inspect the current schema and migration history. This repo expects existing `profiles`, `jobs`, and `job_applications` tables; the GitHub fixture is intentionally minimal and is not proof that a real project's schema matches. Compare columns, constraints, grants, policies, and existing rows against the migrations before proceeding.
+2. Inspect the current schema and migration history. A fresh project must use `202611150000_marketplace_base_schema.sql` before the eight follow-up migrations. The base migration intentionally fails if the three core tables already exist, so do not use it on a legacy database. The GitHub fixture provides Auth compatibility primitives only; CI creates the application tables by applying the base migration and verifies its constraints, indexes, grants, and RLS.
 3. Confirm the target contains no production data. Capture a staging backup/snapshot and verify the recovery procedure.
-4. Review the ordered migrations `supabase/migrations/202611150001_...sql` through `202611150008_...sql`, including the policies, triggers, grants, backfills, and preservation behavior. The migrations are intended to preserve existing marketplace records, but must still be reviewed against the actual staging schema.
-5. On a machine authenticated only to the staging project, inspect the migration plan (`supabase db push --dry-run` when supported by the installed CLI). Review the target reference and every pending migration. Stop if the target or schema is uncertain.
+4. Review the ordered migrations `202611150000_marketplace_base_schema.sql`, then `202611150001_...sql` through `202611150008_...sql`, including the policies, triggers, grants, backfills, and preservation behavior. The base migration creates the core schema for an empty project; follow-up migrations add marketplace fields and features. Do not use the fresh-project base migration on a legacy database.
+5. On a machine authenticated only to the staging project, inspect the migration plan (`supabase db push --dry-run` when supported by the installed CLI). Confirm the linked reference is `ntucgiieksrwebwvcmun` (or re-verify the intended staging ref), review every pending migration, and stop if the target or schema is uncertain. A dry-run is review only; it does not authorize an apply.
 6. After a separately approved staging change window, apply migrations to staging only. Confirm the migration history, run `supabase/tests/migration_assertions.sql` and `supabase/tests/marketplace_rls_workflows.sql` where compatible, inspect database logs, and verify the app can read/write each expected table under authenticated user roles. Never use a service-role key from the browser.
 7. Keep this staged schema and test data isolated. Do not apply the migrations to production without a separate explicit approval.
 

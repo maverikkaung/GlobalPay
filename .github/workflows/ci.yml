@@ -34,11 +34,17 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - name: Create isolated Supabase schema fixture
+      - name: Create isolated Supabase Auth compatibility fixture
         run: psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/migration_fixture.sql
         env:
           PGPASSWORD: postgres
-      - name: Apply marketplace migrations to isolated fixture
+      - name: Apply and verify fresh marketplace base schema
+        run: |
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150000_marketplace_base_schema.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/base_schema_assertions.sql
+        env:
+          PGPASSWORD: postgres
+      - name: Apply marketplace security and feature migrations
         run: |
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150001_marketplace_security_profiles.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150002_marketplace_communications_reviews.sql
