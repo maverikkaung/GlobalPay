@@ -45,7 +45,6 @@ values ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-3333333
 do $$
 declare
   duplicate_blocked boolean := false;
-  self_decision_blocked boolean := false;
 begin
   begin
     insert into public.job_applications (id, job_id, client_id, freelancer_id, full_name, email)
@@ -62,14 +61,14 @@ begin
   begin
     update public.job_applications set status = 'Accepted'
     where id = '44444444-4444-4444-8444-444444444444';
-  exception when insufficient_privilege then
-    self_decision_blocked := true;
+  exception when raise_exception or insufficient_privilege then
+    null;
   end;
-  if not self_decision_blocked and exists (
+  if not exists (
     select 1 from public.job_applications
-    where id = '44444444-4444-4444-8444-444444444444' and status = 'Accepted'
+    where id = '44444444-4444-4444-8444-444444444444' and status = 'Pending'
   ) then
-    raise exception 'Freelancers must not decide their own applications';
+    raise exception 'Freelancers must not change their own application decision';
   end if;
 
   if (select count(*) from public.profiles) <> 1 then
