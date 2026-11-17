@@ -61,7 +61,7 @@ begin
   begin
     update public.job_applications set status = 'Accepted'
     where id = '44444444-4444-4444-8444-444444444444';
-  exception when raise_exception or insufficient_privilege then
+  exception when check_violation or insufficient_privilege then
     null;
   end;
   if not exists (
