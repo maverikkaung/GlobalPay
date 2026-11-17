@@ -78,10 +78,15 @@ function FreelancerDashboard() {
     }
   }, [user, navigate]);
 
-   async function handleLogout() {
-  await logoutUser();
-  navigate("/login");
-}
+  async function handleLogout() {
+    setError("");
+    const result = await logoutUser();
+    if (result.error) {
+      setError(getRequestErrorMessage("Unable to log out", result.error));
+      return;
+    }
+    navigate("/login");
+  }
 
   if (!user || user.accountType !== "Freelancer") {
     return null;

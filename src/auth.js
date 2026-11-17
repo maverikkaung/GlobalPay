@@ -1,7 +1,8 @@
 import { supabase } from "./supabase.js";
+import { clearLegacyUserAfterLogout } from "./logout-state.js";
 
 export async function logoutUser() {
   const result = await supabase.auth.signOut();
-  localStorage.removeItem("TechKarvo_current_user");
+  clearLegacyUserAfterLogout(result, localStorage);
   return result;
 }
