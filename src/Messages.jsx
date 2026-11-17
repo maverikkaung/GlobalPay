@@ -140,20 +140,46 @@ function Messages() {
   useEffect(() => {
     if (!selectedId) return undefined;
     let active = true;
+    let loadInProgress = false;
+    let conversationNotificationsMarkedRead = false;
 
     async function loadMessages() {
-      const result = await supabase.from("messages").select("*")
-        .eq("conversation_id", selectedId)
-        .order("created_at", { ascending: true });
-      if (result.error) throw result.error;
-      if (!active) return;
+      if (loadInProgress) return;
+      loadInProgress = true;
 
-      setMessages(result.data || []);
-      const unreadIds = (result.data || []).filter((item) => item.sender_id !== user.id && !item.read_at).map((item) => item.id);
-      if (unreadIds.length) {
-        const readResult = await supabase.from("messages").update({ read_at: new Date().toISOString() })
-          .in("id", unreadIds);
-        if (readResult.error) console.error("Message read receipt update failed:", readResult.error.message);
+      try {
+        const result = await supabase.from("messages").select("*")
+          .eq("conversation_id", selectedId)
+          .order("created_at", { ascending: true });
+        if (result.error) throw result.error;
+        if (!active) return;
+
+        const conversationMessages = result.data || [];
+        setMessages(conversationMessages);
+        const unreadIds = conversationMessages
+          .filter((item) => item.sender_id !== user.id && !item.read_at)
+          .map((item) => item.id);
+        if (unreadIds.length) {
+          const readResult = await supabase.from("messages").update({ read_at: new Date().toISOString() })
+            .in("id", unreadIds);
+          if (readResult.error) console.error("Message read receipt update failed:", readResult.error.message);
+        }
+
+        if (!conversationNotificationsMarkedRead) {
+          const notificationsResult = await supabase.from("notifications")
+            .update({ read_at: new Date().toISOString() })
+            .eq("user_id", user.id)
+            .eq("kind", "new_message")
+            .is("read_at", null)
+            .contains("data", { conversation_id: selectedId });
+          if (notificationsResult.error) {
+            console.error("Message notification read update failed:", notificationsResult.error.message);
+          } else {
+            conversationNotificationsMarkedRead = true;
+          }
+        }
+      } finally {
+        loadInProgress = false;
       }
     }
 
