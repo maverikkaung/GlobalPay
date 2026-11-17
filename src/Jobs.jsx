@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
-import { matchesJobSearch, parseSkills } from "./marketplace.js";
+import { getJobCategories, matchesJobSearch, parseSkills } from "./marketplace.js";
 import "./App.css";
 
 function Jobs() {
@@ -91,16 +91,7 @@ function Jobs() {
     return () => { active = false; };
   }, [loadAttempt, isAuthenticated, currentUserId]);
 
-  const categories = [
-    "All",
-    "Web Development",
-    "Design",
-    "Writing",
-    "Marketing",
-    "Graphic Design",
-    "Video Editing",
-    "Other"
-  ];
+  const categories = getJobCategories(supabaseJobs);
 
   const allJobs = supabaseJobs;
   function applySearch(event) {

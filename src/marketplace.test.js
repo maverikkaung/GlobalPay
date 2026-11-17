@@ -4,6 +4,8 @@ import {
   calculateClientHiringMetrics,
   countApplicationStatuses,
   countOpenAcceptedJobs,
+  getJobCategories,
+  JOB_CATEGORIES,
   matchesJobSearch,
   normalizeAccountType,
   parseSkills,
@@ -15,6 +17,15 @@ test("account roles accept only supported database values", () => {
   assert.equal(normalizeAccountType("freelancer"), "Freelancer");
   assert.equal(normalizeAccountType("admin"), null);
   assert.equal(normalizeAccountType(null), null);
+});
+
+test("job filters include posting categories and legacy stored categories once", () => {
+  assert.deepEqual(getJobCategories([
+    { category: "Design" },
+    { category: "  Custom Category " },
+    { category: "Graphic Design" },
+    { category: null }
+  ]), ["All", ...JOB_CATEGORIES, "Design", "Custom Category"]);
 });
 
 test("application summaries count only known workflow statuses", () => {

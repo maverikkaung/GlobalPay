@@ -1,3 +1,19 @@
+export const JOB_CATEGORIES = [
+  "Web Development",
+  "Graphic Design",
+  "Writing",
+  "Marketing",
+  "Video Editing",
+  "Other"
+];
+
+export function getJobCategories(jobs = []) {
+  const storedCategories = jobs
+    .map((job) => String(job.category || "").trim())
+    .filter(Boolean);
+  return ["All", ...new Set([...JOB_CATEGORIES, ...storedCategories])];
+}
+
 export function normalizeAccountType(value) {
   if (value === "freelancer") return "Freelancer";
   if (value === "client") return "Client";

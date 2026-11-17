@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import { JOB_CATEGORIES } from "./marketplace.js";
 
 function PostJob() {
   const navigate = useNavigate();
@@ -124,12 +125,7 @@ function PostJob() {
             required
           >
             <option value="">Select Category</option>
-            <option value="Web Development">Web Development</option>
-            <option value="Graphic Design">Graphic Design</option>
-            <option value="Writing">Writing</option>
-            <option value="Marketing">Marketing</option>
-            <option value="Video Editing">Video Editing</option>
-            <option value="Other">Other</option>
+            {JOB_CATEGORIES.map((jobCategory) => <option key={jobCategory} value={jobCategory}>{jobCategory}</option>)}
           </select>
 
           <label htmlFor="post-job-description">Job Description</label>
