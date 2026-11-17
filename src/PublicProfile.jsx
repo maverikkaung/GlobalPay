@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { summarizeRatings } from "./marketplace.js";
+import { toSafeExternalUrl } from "./external-urls.js";
 
 function PublicProfile() {
   const { id } = useParams();
@@ -85,10 +86,10 @@ function PublicProfile() {
         {profile.bio && <section className="dashboard-section"><h2>About</h2><p>{profile.bio}</p></section>}
         {profile.skills && <section className="dashboard-section"><h2>Skills</h2><p>{profile.skills}</p></section>}
         {profile.experience && <section className="dashboard-section"><h2>Experience</h2><p>{profile.experience}</p></section>}
-        {profile.portfolio_url && <section className="dashboard-section"><a href={profile.portfolio_url} target="_blank" rel="noreferrer">Portfolio link ↗</a></section>}
+        {toSafeExternalUrl(profile.portfolio_url) && <section className="dashboard-section"><a href={toSafeExternalUrl(profile.portfolio_url)} target="_blank" rel="noopener noreferrer">Portfolio link ↗</a></section>}
 
         {portfolio.length > 0 && <section className="dashboard-section"><h2>Selected work</h2><div className="portfolio-grid">{portfolio.map((item) => (
-          <article className="portfolio-card" key={item.id}>{item.image_url && <img src={item.image_url} alt="" loading="lazy" />}<div><h3>{item.title}</h3><p>{item.description}</p><a href={item.project_url} target="_blank" rel="noreferrer">View project ↗</a></div></article>
+          <article className="portfolio-card" key={item.id}>{toSafeExternalUrl(item.image_url) && <img src={toSafeExternalUrl(item.image_url)} alt="" loading="lazy" />}<div><h3>{item.title}</h3><p>{item.description}</p>{toSafeExternalUrl(item.project_url) && <a href={toSafeExternalUrl(item.project_url)} target="_blank" rel="noopener noreferrer">View project ↗</a>}</div></article>
         ))}</div></section>}
 
         <section className="dashboard-section"><h2>Reviews</h2>{reviews.length === 0 ? <p>No reviews yet.</p> : <div className="public-review-list">{reviews.map((item) => (

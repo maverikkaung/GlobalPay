@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import { toSafeExternalUrl } from "./external-urls.js";
 
 function FreelancerProfile() {
   const navigate = useNavigate();
@@ -70,6 +71,10 @@ function FreelancerProfile() {
       setSaving(true);
       setError("");
       setNotice("");
+      const portfolioUrl = portfolio.trim() ? toSafeExternalUrl(portfolio) : null;
+      if (portfolio.trim() && !portfolioUrl) {
+        throw new Error("Enter a valid portfolio URL starting with http:// or https://.");
+      }
       const result = await supabase.from("profiles").update({
         full_name: fullName.trim(),
         country: country.trim(),
@@ -77,7 +82,7 @@ function FreelancerProfile() {
         bio: bio.trim(),
         skills: skills.trim(),
         experience,
-        portfolio_url: portfolio.trim() || null
+        portfolio_url: portfolioUrl
       }).eq("id", userId).select("id").maybeSingle();
 
       if (result.error) throw result.error;

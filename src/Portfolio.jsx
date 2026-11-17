@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import { toSafeExternalUrl } from "./external-urls.js";
 
 function Portfolio() {
   const { user } = useAuth();
@@ -59,12 +60,18 @@ function Portfolio() {
     const itemDetails = {
       title: title.trim(),
       description: description.trim(),
-      project_url: projectUrl.trim(),
-      image_url: imageUrl.trim() || null,
+      project_url: toSafeExternalUrl(projectUrl),
+      image_url: imageUrl.trim() ? toSafeExternalUrl(imageUrl) : null,
       updated_at: new Date().toISOString()
     };
 
     try {
+      if (!itemDetails.project_url) {
+        throw new Error("Enter a valid project URL starting with http:// or https://.");
+      }
+      if (imageUrl.trim() && !itemDetails.image_url) {
+        throw new Error("Enter a valid image URL starting with http:// or https://.");
+      }
       const result = editingId
         ? await supabase.from("portfolio_items").update(itemDetails)
           .eq("id", editingId).eq("freelancer_id", user.id).select("*").single()
@@ -138,9 +145,9 @@ function Portfolio() {
         <section className="portfolio-grid" aria-label="Portfolio projects">
           {loading ? <p>Loading portfolio…</p> : items.length === 0 ? <div className="no-jobs"><h3>Your portfolio is ready to grow</h3><p>Add your first project above.</p></div> : items.map((item) => (
             <article className="portfolio-card" key={item.id}>
-              {item.image_url && <img src={item.image_url} alt="" loading="lazy" />}
+              {toSafeExternalUrl(item.image_url) && <img src={toSafeExternalUrl(item.image_url)} alt="" loading="lazy" />}
               <div>
-                <h2>{item.title}</h2><p>{item.description}</p><a href={item.project_url} target="_blank" rel="noreferrer">View project ↗</a>
+                <h2>{item.title}</h2><p>{item.description}</p>{toSafeExternalUrl(item.project_url) && <a href={toSafeExternalUrl(item.project_url)} target="_blank" rel="noopener noreferrer">View project ↗</a>}
                 <div className="portfolio-card-actions">
                   <button type="button" className="portfolio-edit-button" disabled={saving || Boolean(deletingId)} onClick={() => editItem(item)}>Edit</button>
                   <button type="button" className="portfolio-delete-button" disabled={saving || Boolean(deletingId)} onClick={() => deleteItem(item)}>{deletingId === item.id ? "Deleting…" : "Delete"}</button>
