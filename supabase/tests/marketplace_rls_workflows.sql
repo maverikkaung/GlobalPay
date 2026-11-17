@@ -204,10 +204,16 @@ begin
   begin
     update public.job_applications set status = 'Accepted'
     where id = '44444444-4444-4444-8444-444444444446';
-    raise exception 'A closed application must not be accepted afterward';
   exception when check_violation then
     null;
   end;
+
+  if not exists (
+    select 1 from public.job_applications
+    where id = '44444444-4444-4444-8444-444444444446' and status = 'Rejected'
+  ) then
+    raise exception 'A closed application must not be accepted afterward';
+  end if;
 end;
 $$;
 
