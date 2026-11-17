@@ -45,7 +45,7 @@ function Signup() {
       });
 
       if (result.error) {
-        setError(result.error.message);
+        setError(getAuthErrorMessage("Signup", result.error));
         return;
       }
 

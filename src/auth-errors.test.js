@@ -9,6 +9,13 @@ test("auth network failures explain that the service could not be reached", () =
   );
 });
 
+test("Supabase Auth retryable fetch errors use the network explanation", () => {
+  assert.equal(
+    getAuthErrorMessage("Signup", { name: "AuthRetryableFetchError", message: "Failed to fetch" }),
+    "TechKarvo could not reach the authentication service. Check your internet or network settings and try again."
+  );
+});
+
 test("auth server errors retain their useful message", () => {
   assert.equal(
     getAuthErrorMessage("Signup", new Error("Email address is invalid")),
