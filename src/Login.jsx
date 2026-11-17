@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "./supabase.js";
+import { getAuthErrorMessage } from "./auth-errors.js";
 
 function Login() {
   const navigate = useNavigate();
@@ -67,7 +68,7 @@ function Login() {
         : null;
       navigate(safeReturnPath || (accountType === "freelancer" ? "/freelancer-dashboard" : "/client-dashboard"));
     } catch (error) {
-      setError("Login failed: " + error.message);
+      setError(getAuthErrorMessage("Login", error));
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "./supabase.js";
+import { getAuthErrorMessage } from "./auth-errors.js";
 
 function Signup() {
   const navigate = useNavigate();
@@ -58,7 +59,7 @@ function Signup() {
       }
 
     } catch (error) {
-      setError("Signup failed: " + error.message);
+      setError(getAuthErrorMessage("Signup", error));
     } finally {
       setLoading(false);
     }
