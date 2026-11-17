@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import { getRequestErrorMessage } from "./request-errors.js";
 
 function MyFreelancers() {
   const { user } = useAuth();
@@ -30,7 +31,7 @@ function MyFreelancers() {
 
       if (!active) return;
       if (result.error) {
-        setError("Unable to load hired freelancers. " + result.error.message);
+        setError(getRequestErrorMessage("Unable to load hired freelancers", result.error));
         setLoading(false);
         return;
       }

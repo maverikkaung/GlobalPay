@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import { getRequestErrorMessage } from "./request-errors.js";
 
 function ClientProfile() {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ function ClientProfile() {
       .eq("id", userId).maybeSingle()
       .then(({ data, error: loadError }) => {
         if (!active) return;
-        if (loadError) setError("Unable to load your profile. " + loadError.message);
+        if (loadError) setError(getRequestErrorMessage("Unable to load your profile", loadError));
         else if (data) {
           setFullName(data.full_name || userName || "");
           setCountry(data.country || "");
@@ -39,7 +40,7 @@ function ClientProfile() {
         setLoading(false);
       }).catch((loadError) => {
         if (!active) return;
-        setError("Unable to load your profile. " + loadError.message);
+        setError(getRequestErrorMessage("Unable to load your profile", loadError));
         setLoading(false);
       });
     return () => { active = false; };
@@ -60,7 +61,7 @@ function ClientProfile() {
       refreshProfile();
       setNotice("Your profile has been saved.");
     } catch (saveError) {
-      setError("Unable to save your profile. " + saveError.message);
+      setError(getRequestErrorMessage("Unable to save your profile", saveError));
     } finally {
       setSaving(false);
     }

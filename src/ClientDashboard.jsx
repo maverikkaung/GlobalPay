@@ -4,6 +4,7 @@ import { logoutUser } from "./auth.js";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { calculateClientHiringMetrics } from "./marketplace.js";
+import { getRequestErrorMessage } from "./request-errors.js";
 
 function ClientDashboard() {
   const navigate = useNavigate();
@@ -66,7 +67,7 @@ function ClientDashboard() {
       } catch (error) {
         if (!active) return;
         console.error("Dashboard loading error:", error);
-        setError("Unable to load dashboard data. " + error.message);
+        setError(getRequestErrorMessage("Unable to load dashboard data", error));
       } finally {
         if (active) setLoading(false);
       }

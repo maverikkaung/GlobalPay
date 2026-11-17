@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import { getRequestErrorMessage } from "./request-errors.js";
 
 function JobApplicants() {
   const { user } = useAuth();
@@ -23,7 +24,7 @@ function JobApplicants() {
         .eq("client_id", userId).order("applied_at", { ascending: false });
       if (!active) return;
       if (result.error) {
-        setError("Unable to load applicants. " + result.error.message);
+        setError(getRequestErrorMessage("Unable to load applicants", result.error));
         setLoading(false);
         return;
       }
@@ -59,7 +60,7 @@ function JobApplicants() {
 
     loadApplications().catch((loadError) => {
       if (active) {
-        setError("Unable to load applicants. " + loadError.message);
+        setError(getRequestErrorMessage("Unable to load applicants", loadError));
         setLoading(false);
       }
     });

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { toSafeExternalUrl } from "./external-urls.js";
+import { getRequestErrorMessage } from "./request-errors.js";
 
 function FreelancerProfile() {
   const navigate = useNavigate();
@@ -40,7 +41,7 @@ function FreelancerProfile() {
       .then(({ data, error: loadError }) => {
         if (!active) return;
         if (loadError) {
-          setError("Unable to load your profile. " + loadError.message);
+          setError(getRequestErrorMessage("Unable to load your profile", loadError));
         } else if (data) {
           setFullName(data.full_name || userName || "");
           setCountry(data.country || "");
@@ -53,7 +54,7 @@ function FreelancerProfile() {
         setLoading(false);
       }).catch((loadError) => {
         if (!active) return;
-        setError("Unable to load your profile. " + loadError.message);
+        setError(getRequestErrorMessage("Unable to load your profile", loadError));
         setLoading(false);
       });
     return () => { active = false; };
@@ -73,7 +74,8 @@ function FreelancerProfile() {
       setNotice("");
       const portfolioUrl = portfolio.trim() ? toSafeExternalUrl(portfolio) : null;
       if (portfolio.trim() && !portfolioUrl) {
-        throw new Error("Enter a valid portfolio URL starting with http:// or https://.");
+        setError("Enter a valid portfolio URL starting with http:// or https://.");
+        return;
       }
       const result = await supabase.from("profiles").update({
         full_name: fullName.trim(),
@@ -90,7 +92,7 @@ function FreelancerProfile() {
       setNotice("Your profile has been saved.");
       refreshProfile();
     } catch (saveError) {
-      setError("Unable to save your profile. " + saveError.message);
+      setError(getRequestErrorMessage("Unable to save your profile", saveError));
     } finally {
       setSaving(false);
     }

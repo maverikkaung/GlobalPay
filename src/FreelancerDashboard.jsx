@@ -4,6 +4,7 @@ import { logoutUser } from "./auth.js";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { countApplicationStatuses, countOpenAcceptedJobs } from "./marketplace.js";
+import { getRequestErrorMessage } from "./request-errors.js";
 
 function FreelancerDashboard() {
   const navigate = useNavigate();
@@ -55,7 +56,7 @@ function FreelancerDashboard() {
         setWithdrawnApplications(counts.withdrawn);
       } catch (loadError) {
         if (!active) return;
-        setError("Unable to load your dashboard summary. " + loadError.message);
+        setError(getRequestErrorMessage("Unable to load your dashboard summary", loadError));
       } finally {
         if (active) setLoading(false);
       }

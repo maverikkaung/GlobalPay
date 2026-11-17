@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { toSafeExternalUrl } from "./external-urls.js";
+import { getRequestErrorMessage } from "./request-errors.js";
 
 function Portfolio() {
   const { user } = useAuth();
@@ -23,13 +24,13 @@ function Portfolio() {
       const result = await supabase.from("portfolio_items").select("*")
         .eq("freelancer_id", user.id).order("created_at", { ascending: false });
       if (!active) return;
-      if (result.error) setError("Unable to load portfolio. " + result.error.message);
+      if (result.error) setError(getRequestErrorMessage("Unable to load portfolio", result.error));
       else setItems(result.data || []);
       setLoading(false);
     }
     loadItems().catch((loadError) => {
       if (!active) return;
-      setError("Unable to load portfolio. " + loadError.message);
+      setError(getRequestErrorMessage("Unable to load portfolio", loadError));
       setLoading(false);
     });
     return () => { active = false; };
@@ -65,13 +66,18 @@ function Portfolio() {
       updated_at: new Date().toISOString()
     };
 
+    if (!itemDetails.project_url) {
+      setError("Enter a valid project URL starting with http:// or https://.");
+      setSaving(false);
+      return;
+    }
+    if (imageUrl.trim() && !itemDetails.image_url) {
+      setError("Enter a valid image URL starting with http:// or https://.");
+      setSaving(false);
+      return;
+    }
+
     try {
-      if (!itemDetails.project_url) {
-        throw new Error("Enter a valid project URL starting with http:// or https://.");
-      }
-      if (imageUrl.trim() && !itemDetails.image_url) {
-        throw new Error("Enter a valid image URL starting with http:// or https://.");
-      }
       const result = editingId
         ? await supabase.from("portfolio_items").update(itemDetails)
           .eq("id", editingId).eq("freelancer_id", user.id).select("*").single()
@@ -85,7 +91,7 @@ function Portfolio() {
       }
       clearForm();
     } catch (saveError) {
-      setError(`Unable to ${editingId ? "save" : "add"} portfolio item. ` + saveError.message);
+      setError(getRequestErrorMessage(`Unable to ${editingId ? "save" : "add"} portfolio item`, saveError));
     } finally {
       setSaving(false);
     }
@@ -104,7 +110,7 @@ function Portfolio() {
       setItems((current) => current.filter((currentItem) => currentItem.id !== item.id));
       if (editingId === item.id) clearForm();
     } catch (deleteError) {
-      setError("Unable to delete portfolio item. " + deleteError.message);
+      setError(getRequestErrorMessage("Unable to delete portfolio item", deleteError));
     } finally {
       setDeletingId("");
     }

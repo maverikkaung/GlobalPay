@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "./supabase.js";
+import { getRequestErrorMessage } from "./request-errors.js";
 
 function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -24,13 +25,13 @@ function ForgotPassword() {
       );
 
       if (result.error) {
-        setError(result.error.message);
+        setError(getRequestErrorMessage("Unable to request a reset link", result.error));
         return;
       }
 
       setSent(true);
     } catch (requestError) {
-      setError("Unable to request a reset link. " + requestError.message);
+      setError(getRequestErrorMessage("Unable to request a reset link", requestError));
     } finally {
       setLoading(false);
     }

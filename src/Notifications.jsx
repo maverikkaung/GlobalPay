@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import { getRequestErrorMessage } from "./request-errors.js";
 
 function getNotificationLink(item) {
   if (item.data?.conversation_id) return `/messages?conversation=${encodeURIComponent(item.data.conversation_id)}`;
@@ -27,13 +28,13 @@ function Notifications() {
       const result = await supabase.from("notifications").select("*")
         .eq("user_id", user.id).order("created_at", { ascending: false }).limit(100);
       if (!active) return;
-      if (result.error) setError("Unable to load notifications. " + result.error.message);
+      if (result.error) setError(getRequestErrorMessage("Unable to load notifications", result.error));
       else setItems(result.data || []);
       setLoading(false);
     }
     load().catch((loadError) => {
       if (!active) return;
-      setError("Unable to load notifications. " + loadError.message);
+      setError(getRequestErrorMessage("Unable to load notifications", loadError));
       setLoading(false);
     });
     return () => { active = false; };

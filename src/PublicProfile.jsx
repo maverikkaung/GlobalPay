@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { summarizeRatings } from "./marketplace.js";
 import { toSafeExternalUrl } from "./external-urls.js";
+import { getRequestErrorMessage } from "./request-errors.js";
 
 function PublicProfile() {
   const { id } = useParams();
@@ -53,7 +54,7 @@ function PublicProfile() {
     }
     loadProfile().catch((loadError) => {
       if (!active) return;
-      setError("Unable to load profile. " + loadError.message);
+      setError(getRequestErrorMessage("Unable to load profile", loadError));
       setLoading(false);
     });
     return () => { active = false; };

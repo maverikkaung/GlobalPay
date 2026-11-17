@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "./supabase.js";
+import { getRequestErrorMessage } from "./request-errors.js";
 
 function ResetPassword() {
   const navigate = useNavigate();
@@ -30,12 +31,12 @@ function ResetPassword() {
     try {
       const result = await supabase.auth.updateUser({ password });
       if (result.error) {
-        setError(result.error.message);
+        setError(getRequestErrorMessage("Unable to update your password", result.error));
         return;
       }
       setUpdated(true);
     } catch (updateError) {
-      setError("Unable to update your password. " + updateError.message);
+      setError(getRequestErrorMessage("Unable to update your password", updateError));
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import { getRequestErrorMessage } from "./request-errors.js";
 
 function Reviews() {
   const { user } = useAuth();
@@ -52,7 +53,7 @@ function Reviews() {
 
     loadEligibleJobs().catch((loadError) => {
       if (!active) return;
-      setError("Unable to load review opportunities. " + loadError.message);
+      setError(getRequestErrorMessage("Unable to load review opportunities", loadError));
       setLoading(false);
     });
     return () => { active = false; };
