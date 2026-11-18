@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "./supabase.js";
 import { logoutUser } from "./auth.js";
 import { useTheme } from "./useTheme.js";
@@ -34,6 +34,7 @@ function Badge({ count }) {
 
 export default function DashboardNav({ user }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const [notificationCount, setNotificationCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
@@ -43,6 +44,7 @@ export default function DashboardNav({ user }) {
   const navRef = useRef(null);
   const userId = user.id;
   const dashboardPath = user.accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard";
+  const isDashboard = ["/client-dashboard", "/freelancer-dashboard"].includes(location.pathname);
   const myProfilePath = getProfilePath(user.accountType);
 
   const refreshCounts = useCallback(async () => {
@@ -124,6 +126,7 @@ export default function DashboardNav({ user }) {
     <>
       <header className="dashboard-navbar" ref={navRef}>
         <Link to={dashboardPath} className="dashboard-logo" aria-label="TechKarvo dashboard">Tech<span>Karvo</span></Link>
+        {!isDashboard && <Link className="dashboard-back-link" to={dashboardPath} aria-label="Back to dashboard">← <span>Back</span></Link>}
         <div className="dashboard-nav-actions">
           <Link className="dashboard-icon-link" to="/messages" aria-label={`Messages, ${messageCount} unread`} title="Messages">
             <Icon name="messages" /><Badge count={messageCount} />
@@ -154,6 +157,7 @@ export default function DashboardNav({ user }) {
             {activeMenu === "profile" && <section className="nav-dropdown profile-dropdown" id="profile-menu" aria-label="Profile options">
               <div className="profile-dropdown-heading"><strong>{user.name || "TechKarvo member"}</strong><span>{user.accountType}</span></div>
               {myProfilePath && <Link to={myProfilePath} onClick={() => setActiveMenu("")}>My Profile</Link>}
+              <Link to="/account-settings" onClick={() => setActiveMenu("")}>Account Settings</Link>
               <button type="button" className="theme-toggle-row" role="switch" aria-checked={theme === "dark"} onClick={toggleTheme}>
                 <span>{theme === "dark" ? "Dark mode" : "Light mode"}</span>
                 <span className="theme-switch-track" aria-hidden="true"><span /></span>

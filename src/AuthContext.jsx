@@ -11,6 +11,8 @@ function toAppUser(authUser, profile) {
     id: authUser.id,
     name: profile?.full_name || authUser.user_metadata?.full_name || authUser.email || "Member",
     email: authUser.email || "",
+    createdAt: authUser.created_at || null,
+    emailConfirmedAt: authUser.email_confirmed_at || null,
     accountType: normalizeAccountType(profile?.account_type)
   };
 }

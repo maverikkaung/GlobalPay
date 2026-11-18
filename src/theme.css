@@ -51,6 +51,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .dashboard-logo, .dashboard-logo span { color: var(--tk-blue-soft); }
 .dashboard-logo { color: var(--tk-text); font-weight: 800; }
 .dashboard-logo span { color: var(--tk-blue-soft); }
+.dashboard-back-link { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 8px 10px; border: 1px solid var(--tk-border); border-radius: 9px; color: var(--tk-text); text-decoration: none; font-size: 13px; font-weight: 700; }
+.dashboard-back-link:hover { background: var(--tk-hover); color: var(--tk-blue-soft); }
 .dashboard-nav-actions { margin-left: auto; gap: 8px; }
 .dashboard-icon-link {
   width: 42px;
@@ -660,6 +662,38 @@ html[data-theme="dark"] .connection-status--accepted { color: #8fe3b9; border-co
 .message-shared-post > p, .message-share-draft > p { margin: 0; color: var(--tk-text); white-space: pre-wrap; }
 .message-shared-post > a { color: var(--tk-blue-soft); font-weight: 700; }
 .message-share-draft > button { justify-self: start; border: 0; background: transparent; color: var(--tk-blue-soft); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+
+/* Account settings stay readable in both TechKarvo themes. */
+.account-settings-page { min-height: 100vh; background: var(--tk-page); color: var(--tk-text); }
+.account-settings-container { display: grid; gap: 20px; max-width: 920px; }
+.account-settings-card { display: grid; gap: 14px; padding: clamp(18px, 3vw, 28px); border: 1px solid var(--tk-border); border-radius: 16px; background: var(--tk-card); box-shadow: 0 10px 28px var(--tk-shadow); }
+.account-settings-card h2 { color: var(--tk-text); font-size: 20px; }
+.account-settings-card p, .account-settings-private-note { color: var(--tk-muted); line-height: 1.65; }
+.account-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.account-details-grid > div { min-width: 0; padding: 14px; border: 1px solid var(--tk-border); border-radius: 10px; background: var(--tk-page-soft); }
+.account-details-grid dt { margin-bottom: 5px; color: var(--tk-muted); font-size: 12px; font-weight: 700; }
+.account-details-grid dd { overflow-wrap: anywhere; color: var(--tk-text); font-weight: 700; }
+.account-settings-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); align-items: center; gap: 12px 16px; }
+.account-settings-form label { color: var(--tk-text); font-weight: 650; }
+.account-settings-form input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--tk-border); border-radius: 9px; background: var(--tk-input); color: var(--tk-text); }
+.account-settings-form button { grid-column: 2; justify-self: start; min-height: 42px; }
+.account-settings-secondary-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.account-settings-secondary-actions button, .account-block-list button { min-height: 40px; padding: 8px 12px; border: 1px solid var(--tk-border); border-radius: 9px; background: var(--tk-page-soft); color: var(--tk-blue-soft); font: inherit; font-weight: 700; cursor: pointer; }
+.account-settings-secondary-actions button:hover, .account-block-list button:hover { background: var(--tk-hover); }
+.account-settings-alert { width: min(920px, calc(100% - 36px)); margin: 0 auto; padding: 12px 14px; border-radius: 10px; }
+.account-settings-alert--error { border: 1px solid #bc5b64; background: #4a2029; color: #ffe1e4; }
+.account-settings-alert--success { border: 1px solid #3d9969; background: #163b2c; color: #d4ffe6; }
+.account-settings-pending { padding: 12px; border: 1px dashed var(--tk-border); border-radius: 10px; }
+.account-block-list { display: grid; gap: 8px; list-style: none; }
+.account-block-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--tk-border); border-radius: 10px; }
+
+@media (max-width: 640px) {
+  .account-details-grid, .account-settings-form { grid-template-columns: 1fr; }
+  .account-settings-form { gap: 8px; }
+  .account-settings-form label:not(:first-child) { margin-top: 8px; }
+  .account-settings-form button { grid-column: 1; }
+  .account-block-list li { align-items: flex-start; }
+}
 
 @media (max-width: 700px) {
   .social-feed-heading { align-items: flex-start; flex-direction: column; }

@@ -4,6 +4,7 @@ import { getProfilePath, getQuickActions } from "./dashboard-navigation.js";
 
 test("client quick actions contain only client workflow destinations", () => {
   assert.deepEqual(getQuickActions("Client"), [
+    ["Daily Feed", "/social"],
     ["Post a Job", "/post-job"],
     ["My Applicants", "/job-applicants"],
     ["My Freelancers", "/my-freelancers"],
@@ -14,6 +15,7 @@ test("client quick actions contain only client workflow destinations", () => {
 
 test("freelancer quick actions contain only freelancer workflow destinations", () => {
   assert.deepEqual(getQuickActions("Freelancer"), [
+    ["Daily Feed", "/social"],
     ["Find Jobs", "/jobs"],
     ["My Applications", "/my-applications"],
     ["My Portfolio", "/portfolio"],

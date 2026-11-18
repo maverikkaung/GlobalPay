@@ -132,29 +132,23 @@ export function SocialFeed({ user }) {
   const loadFeed = useCallback(async () => {
     const request = ++requestId.current;
     try {
-      const [postsResult, jobsResult, connectionsResult, portfolioResult] = await Promise.all([
+      const [postsResult, connectionsResult, portfolioResult] = await Promise.all([
         supabase.from("posts").select("*").order("created_at", { ascending: false }).limit(40),
-        accountType === "Freelancer"
-          ? supabase.from("jobs").select("id, client_id, title, description, budget, currency, category, skills, created_at")
-            .eq("status", "open").order("created_at", { ascending: false }).limit(20)
-          : Promise.resolve({ data: [], error: null }),
         supabase.from("connections").select("id, requester_id, recipient_id, status")
           .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`),
         accountType === "Freelancer"
           ? supabase.from("portfolio_items").select("id, title").eq("freelancer_id", userId).order("created_at", { ascending: false })
           : Promise.resolve({ data: [], error: null })
       ]);
-      for (const result of [jobsResult, portfolioResult]) if (result.error) throw result.error;
+      if (portfolioResult.error) throw portfolioResult.error;
       const missingPosts = ["PGRST205", "42P01"].includes(postsResult.error?.code);
       const missingConnections = ["PGRST205", "42P01"].includes(connectionsResult.error?.code);
       if (postsResult.error && !missingPosts) throw postsResult.error;
       if (connectionsResult.error && !missingConnections) throw connectionsResult.error;
       const posts = missingPosts ? [] : postsResult.data || [];
-      const jobs = jobsResult.data || [];
       const postIds = posts.map((item) => item.id);
       const profileIds = [...new Set([
         ...posts.map((item) => item.author_id),
-        ...jobs.map((item) => item.client_id),
         ...(connectionsResult.data || []).flatMap((item) => [item.requester_id, item.recipient_id]),
         userId
       ])];
@@ -169,7 +163,7 @@ export function SocialFeed({ user }) {
         if (result.error) throw result.error;
       }
       const profiles = Object.fromEntries([...(freelancerProfiles.data || []), ...(clientProfiles.data || [])].map((profile) => [profile.id, profile]));
-      const items = buildSocialFeed(posts, jobs, profiles, accountType, userId);
+      const items = buildSocialFeed(posts, profiles);
       const enriched = mapPostEngagement(items, likesResult.data || [], commentsResult.data || [], profiles, userId);
       if (request !== requestId.current) return;
       setFeed(enriched);
@@ -363,8 +357,8 @@ export function SocialFeed({ user }) {
   }
 
   return <section className="social-feed" aria-labelledby="social-feed-heading">
-    <header className="social-feed-heading"><div><span className="dashboard-tag">TECHKARVO COMMUNITY</span><h2 id="social-feed-heading">Professional feed</h2><p>{isFreelancer ? "Client opportunities and updates from your community." : "Freelancer work, services, and professional updates."}</p></div>
-      <div className="social-feed-links"><Link to="/social">Open feed</Link><Link to="/connections">Connections</Link></div>
+    <header className="social-feed-heading"><div><span className="dashboard-tag">TECHKARVO COMMUNITY</span><h2 id="social-feed-heading">Daily Feed</h2><p>Professional updates, work samples, and services from your community.</p></div>
+      <div className="social-feed-links"><Link to="/social">Open feed</Link><Link to="/jobs">Job Feed</Link><Link to="/connections">Connections</Link></div>
     </header>
 
     <form className="social-composer" onSubmit={savePost}>
@@ -389,7 +383,7 @@ export function SocialFeed({ user }) {
     {error && feed.length > 0 && <div className="social-feed-error social-feed-error--retry" role="alert"><span>{error}</span><button type="button" disabled={loading} onClick={() => { setLoading(true); loadFeed(); }}>Retry</button></div>}
     {loading ? <div className="social-feed-state" role="status"><span className="applicant-spinner" aria-hidden="true" /><h3>Loading your feed…</h3></div>
         : error && feed.length === 0 ? <div className="social-feed-state"><h3>Feed setup is pending</h3><p>{error}</p><button type="button" disabled={loading} onClick={() => { setLoading(true); loadFeed(); }}>Try again</button></div>
-        : sortedFeed.length === 0 ? <div className="social-feed-state"><h3>Your feed is ready for its first update</h3><p>Share a professional post, or check back when new opportunities and member work are published.</p></div>
+        : sortedFeed.length === 0 ? <div className="social-feed-state"><h3>Your feed is ready for its first update</h3><p>Share a professional post, or check back when people in your community publish updates.</p></div>
           : <div className="social-feed-list">{sortedFeed.map((item) => <SocialPost
             key={`${item.feedType}-${item.id}`} item={item} user={user}
             connection={item.feedType === "post" ? getConnectionForPair(connections, userId, item.author_id) : null}

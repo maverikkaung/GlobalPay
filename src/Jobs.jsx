@@ -152,7 +152,7 @@ function Jobs() {
       <section className="jobs-hero">
         <div className="jobs-hero-content">
           <span className="section-label">
-            TechKarvo JOB MARKETPLACE
+            TechKarvo JOB FEED
           </span>
 
           <h1>

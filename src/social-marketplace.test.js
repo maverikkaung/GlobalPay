@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildSocialFeed, getConnectionForPair, isValidMarketplaceImage, mapPostEngagement } from "./social-marketplace.js";
 
-test("role-based feeds show the other side's work and real client jobs", () => {
+test("the daily feed shows all social posts and never mixes in job offers", () => {
   const profiles = {
     client: { id: "client", account_type: "client" },
     freelancer: { id: "freelancer", account_type: "freelancer" },
@@ -13,9 +13,7 @@ test("role-based feeds show the other side's work and real client jobs", () => {
     { id: "cp", author_id: "client", created_at: "2026-11-18T01:00:00Z" },
     { id: "own", author_id: "self", created_at: "2026-11-18T00:00:00Z" }
   ];
-  const jobs = [{ id: "job", client_id: "client", created_at: "2026-11-18T03:00:00Z" }];
-  assert.deepEqual(buildSocialFeed(posts, jobs, profiles, "Client", "self").map((item) => item.id), ["fp", "own"]);
-  assert.deepEqual(buildSocialFeed(posts, jobs, profiles, "Freelancer", "freelancer").map((item) => item.id), ["job", "fp", "cp", "own"]);
+  assert.deepEqual(buildSocialFeed(posts, profiles).map((item) => item.id), ["fp", "cp", "own"]);
 });
 
 test("connection lookup finds the same pair in either direction", () => {

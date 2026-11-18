@@ -13,15 +13,9 @@ export function getConnectionForPair(connections, userId, otherId) {
   ) || null;
 }
 
-export function buildSocialFeed(posts, jobs, profiles, accountType, userId) {
-  const relevantRole = accountType === "Client" ? "freelancer" : "client";
-  const postItems = posts
-    .filter((post) => post.author_id === userId || profiles[post.author_id]?.account_type === relevantRole)
-    .map((post) => ({ ...post, feedType: "post", author: profiles[post.author_id] || null }));
-  const jobItems = accountType === "Freelancer"
-    ? jobs.map((job) => ({ ...job, feedType: "job", author: profiles[job.client_id] || null }))
-    : [];
-  return [...postItems, ...jobItems].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+export function buildSocialFeed(posts, profiles) {
+  const postItems = posts.map((post) => ({ ...post, feedType: "post", author: profiles[post.author_id] || null }));
+  return postItems.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
 }
 
 export function mapPostEngagement(items, likes, comments, profiles, userId) {
