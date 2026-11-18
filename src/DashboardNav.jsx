@@ -117,7 +117,7 @@ export default function DashboardNav({ user, title = "Dashboard" }) {
           <div className="notification-menu" ref={menuRef}>
             <button className="dashboard-icon-link" type="button" aria-label={`Notifications, ${notificationCount} unread`}
               aria-expanded={menuOpen} aria-controls="notification-preview" onClick={() => setMenuOpen((open) => !open)}>
-              <span aria-hidden="true">♢</span><Badge count={notificationCount} />
+              <span aria-hidden="true">🔔</span><Badge count={notificationCount} />
             </button>
             {menuOpen && <section className="notification-preview" id="notification-preview" aria-label="Recent notifications">
               <div className="notification-preview-heading"><strong>Notifications</strong><Link to="/notifications" onClick={() => setMenuOpen(false)}>View all</Link></div>
