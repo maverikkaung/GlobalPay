@@ -59,7 +59,12 @@ function SocialPost({ item, user, connection, busy, onLike, onComment, onComment
       <div className="social-engagement-summary"><span>{item.likeCount} {item.likeCount === 1 ? "like" : "likes"}</span><span>{item.comments.length} {item.comments.length === 1 ? "comment" : "comments"}</span></div>
       <div className="social-post-actions">
         <button type="button" onClick={() => onLike(item)} disabled={busy}>{item.likedByMe ? "Unlike" : "Like"}</button>
-        <button type="button" onClick={() => document.getElementById(`comment-${item.id}`)?.focus()}>Comment</button>
+        <button type="button" onClick={() => {
+          const commentField = document.getElementById(`comment-${item.id}`);
+          const comments = commentField?.closest("details");
+          if (comments) comments.open = true;
+          commentField?.focus();
+        }}>Comment</button>
         <button type="button" onClick={() => onShare(item)}>Share</button>
         {!isOwn && <button type="button" className="social-connect-button" onClick={() => onConnect(item)} disabled={busy}>
           {connection?.status === "Accepted" ? "Message" : connection?.status === "Pending" && connection.requester_id === user.id ? "Request pending" : connection?.status === "Pending" ? "Accept connect" : connection?.status === "Declined" ? "Request declined" : "Connect"}
