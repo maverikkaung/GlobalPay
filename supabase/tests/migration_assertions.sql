@@ -97,6 +97,10 @@ begin
   if not has_column_privilege('authenticated', 'public.connections', 'status', 'UPDATE') then
     raise exception 'Connection recipients need status updates to accept or decline';
   end if;
+  if has_function_privilege('anon', 'public.techkarvo_can_connect(uuid,uuid)', 'EXECUTE')
+    or not has_function_privilege('authenticated', 'public.techkarvo_can_connect(uuid,uuid)', 'EXECUTE') then
+    raise exception 'Only authenticated members may use the non-disclosing connection-role check';
+  end if;
   if not has_column_privilege('authenticated', 'public.messages', 'shared_post_id', 'INSERT') then
     raise exception 'Authenticated participants need the rich post preview field';
   end if;

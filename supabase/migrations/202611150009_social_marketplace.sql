@@ -245,16 +245,35 @@ drop policy if exists "Connection read boundary" on public.connections;
 create policy "Connection read boundary"
   on public.connections as restrictive for select to authenticated
   using (requester_id = (select auth.uid()) or recipient_id = (select auth.uid()));
+
+-- Profile rows are intentionally private. Use a narrow, non-disclosing helper
+-- to validate that connection requests cross the client/freelancer boundary.
+create or replace function public.techkarvo_can_connect(p_requester_id uuid, p_recipient_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p_requester_id = auth.uid()
+    and p_requester_id <> p_recipient_id
+    and exists (
+      select 1 from public.profiles requester, public.profiles recipient
+      where requester.id = p_requester_id and recipient.id = p_recipient_id
+        and requester.account_type in ('client', 'freelancer')
+        and recipient.account_type in ('client', 'freelancer')
+        and requester.account_type <> recipient.account_type
+    );
+$$;
+revoke all on function public.techkarvo_can_connect(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.techkarvo_can_connect(uuid, uuid) to authenticated;
+
 drop policy if exists "Users can request a connection" on public.connections;
 create policy "Users can request a connection"
   on public.connections for insert to authenticated
   with check (
-    requester_id = (select auth.uid()) and requester_id <> recipient_id
-    and exists (select 1 from public.profiles mine, public.profiles target
-      where mine.id = requester_id and target.id = recipient_id
-        and mine.account_type in ('client', 'freelancer')
-        and target.account_type in ('client', 'freelancer')
-        and mine.account_type <> target.account_type)
+    requester_id = (select auth.uid())
+    and public.techkarvo_can_connect(requester_id, recipient_id)
   );
 drop policy if exists "Connection insert boundary" on public.connections;
 create policy "Connection insert boundary"
