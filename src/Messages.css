@@ -91,6 +91,20 @@
   color: #72809a;
 }
 
+.conversation-unread {
+  min-width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #168b72;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 750;
+}
+
 .messages-empty {
   display: grid;
   gap: 7px;
@@ -152,6 +166,10 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.message-meta { display: flex; justify-content: flex-end; align-items: center; gap: 7px; margin-top: 7px; }
+.message-meta time { font-size: 10px; }
+.message-seen { color: #168b72; font-size: 10px; font-weight: 700; }
 
 .message-bubble time {
   display: block;

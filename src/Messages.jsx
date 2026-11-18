@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import DashboardNav from "./DashboardNav.jsx";
+import { countUnreadMessagesByConversation } from "./marketplace.js";
 import "./Messages.css";
 
 function Messages() {
@@ -73,6 +75,14 @@ function Messages() {
 
       const rows = result.data || [];
       const applicationIds = rows.map((item) => item.application_id);
+      const conversationIds = rows.map((item) => item.id);
+      let unreadByConversation = {};
+      if (conversationIds.length) {
+        const unreadResult = await supabase.from("messages").select("conversation_id")
+          .in("conversation_id", conversationIds).neq("sender_id", user.id).is("read_at", null);
+        if (unreadResult.error) throw unreadResult.error;
+        unreadByConversation = countUnreadMessagesByConversation(unreadResult.data || []);
+      }
       let applicationsById = {};
       if (applicationIds.length) {
         const applicationsResult = await supabase.from("job_applications")
@@ -112,7 +122,8 @@ function Messages() {
           otherName,
           otherTitle: application?.professional_title || "Marketplace member",
           jobTitle: jobsById[String(item.job_id)] || "Project conversation",
-          messagingOpen: ["Pending", "Accepted"].includes(application?.status)
+          messagingOpen: ["Pending", "Accepted"].includes(application?.status),
+          unreadCount: unreadByConversation[item.id] || 0
         };
       });
       setConversations(formatted);
@@ -163,6 +174,7 @@ function Messages() {
           const readResult = await supabase.from("messages").update({ read_at: new Date().toISOString() })
             .in("id", unreadIds);
           if (readResult.error) console.error("Message read receipt update failed:", readResult.error.message);
+          else setConversations((current) => current.map((item) => item.id === selectedId ? { ...item, unreadCount: 0 } : item));
         }
 
         if (!conversationNotificationsMarkedRead) {
@@ -195,10 +207,19 @@ function Messages() {
         setError("Unable to refresh messages. Please try again.");
       });
     }, 12000);
+    const channel = supabase.channel(`messages-${selectedId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `conversation_id=eq.${selectedId}` }, () => {
+        loadMessages().catch((loadError) => {
+          if (active) setError("Unable to refresh messages. Please try again.");
+          console.error("Real-time message refresh failed:", loadError);
+        });
+      })
+      .subscribe();
 
     return () => {
       active = false;
       window.clearInterval(refresh);
+      supabase.removeChannel(channel);
     };
   }, [selectedId, user?.id]);
 
@@ -240,10 +261,7 @@ function Messages() {
 
   return (
     <main className="dashboard-page messages-page">
-      <header className="dashboard-navbar">
-        <Link to={user?.accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard"} className="dashboard-logo">TechKarvo</Link>
-        <Link to={user?.accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard"} className="dashboard-logout">Back to Dashboard</Link>
-      </header>
+      <DashboardNav user={user} title="Messages" />
 
       <div className="messages-shell">
         <section className="messages-list-panel" aria-label="Conversations">
@@ -263,6 +281,7 @@ function Messages() {
                 <button key={item.id} type="button" className={"conversation-item " + (selectedId === item.id ? "selected" : "")} onClick={() => setSelectedId(item.id)}>
                   <span className="conversation-avatar">{item.otherName.charAt(0).toUpperCase()}</span>
                   <span className="conversation-copy"><strong>{item.otherName}</strong><small>{item.jobTitle}</small></span>
+                  {item.unreadCount > 0 && <span className="conversation-unread" aria-label={`${item.unreadCount} unread messages`}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</span>}
                 </button>
               ))}
             </div>
@@ -280,7 +299,7 @@ function Messages() {
                 {messages.length === 0 ? <p className="messages-empty">Start the conversation with a short introduction.</p> : messages.map((item) => (
                   <article key={item.id} className={"message-bubble " + (item.sender_id === user.id ? "mine" : "theirs")}>
                     <p>{item.body}</p>
-                    <time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>
+                    <span className="message-meta"><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>{item.sender_id === user.id && item.read_at && <span className="message-seen" aria-label="Seen">Seen</span>}</span>
                   </article>
                 ))}
               </div>

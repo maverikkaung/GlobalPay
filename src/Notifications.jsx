@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { getRequestErrorMessage } from "./request-errors.js";
+import DashboardNav from "./DashboardNav.jsx";
 
 function getNotificationLink(item) {
   if (item.data?.conversation_id) return `/messages?conversation=${encodeURIComponent(item.data.conversation_id)}`;
@@ -84,14 +85,9 @@ function Notifications() {
   }
 
   const unreadCount = items.filter((item) => !item.read_at).length;
-  const dashboard = user.accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard";
-
   return (
     <div className="dashboard-page">
-      <header className="dashboard-navbar">
-        <Link to={dashboard} className="dashboard-logo">TechKarvo</Link>
-        <Link to={dashboard} className="dashboard-logout">Back to Dashboard</Link>
-      </header>
+      <DashboardNav user={user} title="Notifications" />
       <main className="dashboard-container">
         <div className="dashboard-welcome">
           <span className="dashboard-tag">ACCOUNT UPDATES</span>

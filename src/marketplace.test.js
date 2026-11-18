@@ -4,6 +4,7 @@ import {
   calculateClientHiringMetrics,
   countApplicationStatuses,
   countOpenAcceptedJobs,
+  countUnreadMessagesByConversation,
   getJobCategories,
   JOB_CATEGORIES,
   matchesJobSearch,
@@ -46,6 +47,12 @@ test("freelancer active jobs exclude completed projects and duplicate applicatio
     { id: 8, status: "completed" },
     { id: 9, status: "open" }
   ]), 1);
+});
+
+test("unread message totals are grouped by conversation", () => {
+  assert.deepEqual(countUnreadMessagesByConversation([
+    { conversation_id: "a" }, { conversation_id: "b" }, { conversation_id: "a" }
+  ]), { a: 2, b: 1 });
 });
 
 test("client hiring totals count each hire and each accepted job budget once", () => {

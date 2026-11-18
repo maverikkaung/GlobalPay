@@ -1,10 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { logoutUser } from "./auth.js";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { countApplicationStatuses, countOpenAcceptedJobs } from "./marketplace.js";
 import { getRequestErrorMessage } from "./request-errors.js";
+import DashboardNav from "./DashboardNav.jsx";
 
 function FreelancerDashboard() {
   const navigate = useNavigate();
@@ -78,16 +78,6 @@ function FreelancerDashboard() {
     }
   }, [user, navigate]);
 
-  async function handleLogout() {
-    setError("");
-    const result = await logoutUser();
-    if (result.error) {
-      setError(getRequestErrorMessage("Unable to log out", result.error));
-      return;
-    }
-    navigate("/login");
-  }
-
   if (!user || user.accountType !== "Freelancer") {
     return null;
   }
@@ -95,15 +85,7 @@ function FreelancerDashboard() {
   return (
     <div className="dashboard-page">
 
-      <header className="dashboard-navbar">
-        <Link to="/" className="dashboard-logo">
-          TechKarvo
-        </Link>
-
-        <button onClick={handleLogout} className="dashboard-logout">
-          Logout
-        </button>
-      </header>
+      <DashboardNav user={user} title="Overview" />
 
       <main className="dashboard-container">
 

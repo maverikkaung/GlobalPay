@@ -39,6 +39,14 @@ export function countOpenAcceptedJobs(applications = [], jobs = []) {
     .map((application) => String(application.job_id))).size;
 }
 
+export function countUnreadMessagesByConversation(messages = []) {
+  return messages.reduce((counts, message) => {
+    const key = String(message.conversation_id);
+    counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {});
+}
+
 export function calculateClientHiringMetrics(applications = [], jobs = []) {
   const accepted = applications.filter((item) => item.status === "Accepted");
   const acceptedJobIds = new Set(accepted.map((item) => String(item.job_id)));
