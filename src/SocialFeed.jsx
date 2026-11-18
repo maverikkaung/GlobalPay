@@ -132,19 +132,22 @@ export function SocialFeed({ user }) {
   const loadFeed = useCallback(async () => {
     const request = ++requestId.current;
     try {
-      const [postsResult, connectionsResult, portfolioResult] = await Promise.all([
+      const [postsResult, connectionsResult, portfolioResult, mutesResult] = await Promise.all([
         supabase.from("posts").select("*").order("created_at", { ascending: false }).limit(40),
         supabase.from("connections").select("id, requester_id, recipient_id, status")
           .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`),
         accountType === "Freelancer"
           ? supabase.from("portfolio_items").select("id, title").eq("freelancer_id", userId).order("created_at", { ascending: false })
-          : Promise.resolve({ data: [], error: null })
+          : Promise.resolve({ data: [], error: null }),
+        supabase.from("muted_users").select("muted_user_id").eq("user_id", userId)
       ]);
       if (portfolioResult.error) throw portfolioResult.error;
       const missingPosts = ["PGRST205", "42P01"].includes(postsResult.error?.code);
       const missingConnections = ["PGRST205", "42P01"].includes(connectionsResult.error?.code);
+      const missingMutes = ["PGRST205", "42P01"].includes(mutesResult.error?.code);
       if (postsResult.error && !missingPosts) throw postsResult.error;
       if (connectionsResult.error && !missingConnections) throw connectionsResult.error;
+      if (mutesResult.error && !missingMutes) throw mutesResult.error;
       const posts = missingPosts ? [] : postsResult.data || [];
       const postIds = posts.map((item) => item.id);
       const profileIds = [...new Set([
@@ -163,7 +166,7 @@ export function SocialFeed({ user }) {
         if (result.error) throw result.error;
       }
       const profiles = Object.fromEntries([...(freelancerProfiles.data || []), ...(clientProfiles.data || [])].map((profile) => [profile.id, profile]));
-      const items = buildSocialFeed(posts, profiles);
+      const items = buildSocialFeed(posts, profiles, (mutesResult.data || []).map((item) => item.muted_user_id));
       const enriched = mapPostEngagement(items, likesResult.data || [], commentsResult.data || [], profiles, userId);
       if (request !== requestId.current) return;
       setFeed(enriched);

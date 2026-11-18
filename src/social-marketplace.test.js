@@ -14,6 +14,7 @@ test("the daily feed shows all social posts and never mixes in job offers", () =
     { id: "own", author_id: "self", created_at: "2026-11-18T00:00:00Z" }
   ];
   assert.deepEqual(buildSocialFeed(posts, profiles).map((item) => item.id), ["fp", "cp", "own"]);
+  assert.deepEqual(buildSocialFeed(posts, profiles, ["client"]).map((item) => item.id), ["fp", "own"]);
 });
 
 test("connection lookup finds the same pair in either direction", () => {

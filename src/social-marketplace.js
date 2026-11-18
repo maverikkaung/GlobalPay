@@ -13,8 +13,10 @@ export function getConnectionForPair(connections, userId, otherId) {
   ) || null;
 }
 
-export function buildSocialFeed(posts, profiles) {
-  const postItems = posts.map((post) => ({ ...post, feedType: "post", author: profiles[post.author_id] || null }));
+export function buildSocialFeed(posts, profiles, mutedUserIds = []) {
+  const mutedIds = new Set(mutedUserIds);
+  const postItems = posts.filter((post) => !mutedIds.has(post.author_id))
+    .map((post) => ({ ...post, feedType: "post", author: profiles[post.author_id] || null }));
   return postItems.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
 }
 

@@ -7,6 +7,7 @@ import { toSafeExternalUrl } from "./external-urls.js";
 import { getRequestErrorMessage } from "./request-errors.js";
 import { MARKETPLACE_MEDIA_BUCKET } from "./social-marketplace.js";
 import DashboardNav from "./DashboardNav.jsx";
+import MemberSafetyActions from "./MemberSafetyActions.jsx";
 
 function publicImage(path) {
   if (!path) return "";
@@ -22,6 +23,7 @@ function PublicProfile() {
   const [reviews, setReviews] = useState([]);
   const [posts, setPosts] = useState([]);
   const [connection, setConnection] = useState(null);
+  const [blockedByMe, setBlockedByMe] = useState(false);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
@@ -78,7 +80,7 @@ function PublicProfile() {
   const average = ratingSummary.average === null ? "New" : ratingSummary.average.toFixed(1);
 
   async function connectOrMessage() {
-    if (!profile || profile.id === user.id) return;
+    if (!profile || profile.id === user.id || blockedByMe) return;
     setWorking(true); setError(""); setNotice("");
     try {
       let currentConnection = connection;
@@ -130,10 +132,12 @@ function PublicProfile() {
             <p>{profile.professional_title || profile.country || "Marketplace member"}</p>
             {profile.country && <span className="public-profile-location">{profile.country}</span>}
           </div>
-          {user.id !== profile.id && <button className="social-primary-button" type="button" disabled={working || connection?.status === "Pending" && connection.requester_id === user.id || connection?.status === "Declined"} onClick={connectOrMessage}>{working ? "Opening…" : connectionText}</button>}
+          {user.id !== profile.id && <button className="social-primary-button" type="button" disabled={blockedByMe || working || connection?.status === "Pending" && connection.requester_id === user.id || connection?.status === "Declined"} onClick={connectOrMessage}>{blockedByMe ? "Blocked" : working ? "Opening…" : connectionText}</button>}
           <div className="profile-rating"><strong>{average}</strong><span>{ratingSummary.count ? `${ratingSummary.count} verified completed-project review${ratingSummary.count === 1 ? "" : "s"}` : "No verified reviews yet"}</span></div>
         </div>
       </section>
+
+      {user.id !== profile.id && <MemberSafetyActions user={user} memberId={profile.id} memberName={profile.full_name} onBlockedChange={setBlockedByMe} />}
 
       {profile.bio && <section className="dashboard-section public-profile-section"><h2>About</h2><p>{profile.bio}</p></section>}
       {profile.skills && <section className="dashboard-section public-profile-section"><h2>Skills</h2><div className="public-profile-skills">{String(profile.skills).split(",").map((skill) => skill.trim()).filter(Boolean).map((skill) => <span key={skill}>{skill}</span>)}</div></section>}

@@ -7,6 +7,7 @@ import { countUnreadMessagesByConversation } from "./marketplace.js";
 import { classifyConversation, countUnreadByFolder, getConversationsForFolder } from "./message-folders.js";
 import { MARKETPLACE_MEDIA_BUCKET } from "./social-marketplace.js";
 import { toSafeExternalUrl } from "./external-urls.js";
+import MemberSafetyActions from "./MemberSafetyActions.jsx";
 import "./Messages.css";
 
 function sharedImageUrl(path) {
@@ -25,6 +26,7 @@ function Messages() {
   const [activeFolder, setActiveFolder] = useState("job");
   const [selectedId, setSelectedId] = useState("");
   const [messages, setMessages] = useState([]);
+  const [currentTime, setCurrentTime] = useState(0);
   const [draft, setDraft] = useState("");
   const [sharePostDraft, setSharePostDraft] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -33,6 +35,13 @@ function Messages() {
   const selectedConversation = useMemo(() => conversations.find((item) => item.id === selectedId), [conversations, selectedId]);
   const folderConversations = useMemo(() => getConversationsForFolder(conversations, activeFolder), [activeFolder, conversations]);
   const folderUnread = useMemo(() => countUnreadByFolder(conversations), [conversations]);
+
+  useEffect(() => {
+    const refreshTime = () => setCurrentTime(Date.now());
+    refreshTime();
+    const timer = window.setInterval(refreshTime, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!requestedSharePostId) return undefined;
@@ -108,7 +117,10 @@ function Messages() {
         .order("created_at", { ascending: false });
       if (result.error) throw result.error;
 
-      const rows = result.data || [];
+      const hiddenResult = await supabase.from("conversation_hides").select("conversation_id").eq("user_id", user.id);
+      if (hiddenResult.error && !["PGRST205", "42P01"].includes(hiddenResult.error.code)) throw hiddenResult.error;
+      const hiddenIds = new Set((hiddenResult.data || []).map((item) => item.conversation_id));
+      const rows = (result.data || []).filter((item) => !hiddenIds.has(item.id));
       const applicationRows = rows.filter((item) => !item.application_id.startsWith("connection:"));
       const directRows = rows.filter((item) => item.application_id.startsWith("connection:"));
       const applicationIds = applicationRows.map((item) => item.application_id);
@@ -173,6 +185,7 @@ function Messages() {
           jobTitle: isDirect ? "TechKarvo connection" : jobsById[String(item.job_id)] || "Project conversation",
           messagingOpen: isDirect ? connectionsById[connectionId]?.status === "Accepted" : ["Pending", "Accepted"].includes(application?.status),
           messageFolder: classifyConversation(item.application_id),
+          otherId,
           unreadCount: unreadByConversation[item.id] || 0
         };
       });
@@ -328,6 +341,36 @@ function Messages() {
     }
   }
 
+  async function hideSelectedConversation() {
+    if (!selectedConversation || !window.confirm("Delete this conversation for you? The other participant keeps their copy, and messages remain retained for history.")) return;
+    setError(""); setSending(true);
+    const result = await supabase.from("conversation_hides").insert({ conversation_id: selectedConversation.id, user_id: user.id });
+    if (result.error) {
+      setError("This conversation could not be hidden. Please try again after refreshing.");
+    } else {
+      const remaining = conversations.filter((item) => item.id !== selectedConversation.id);
+      setConversations(remaining);
+      setSelectedId(remaining.find((item) => item.messageFolder === activeFolder)?.id || "");
+      setMessages([]);
+    }
+    setSending(false);
+  }
+
+  async function redactMessage(message) {
+    if (!message.deleted_for_everyone_at || message.deleted_for_everyone_at === null) {
+      if (!window.confirm("Remove this message and its shared preview for everyone? A restricted audit copy is retained for safety.")) return;
+    }
+    setSending(true); setError("");
+    const result = await supabase.rpc("techkarvo_delete_message_for_everyone", { p_message_id: message.id });
+    if (result.error) setError("This message could not be removed. It may be older than 15 minutes or already removed.");
+    else {
+      setMessages((current) => current.map((item) => item.id === message.id
+        ? { ...item, body: "[Message removed]", sharedPost: null, shared_post_id: null, deleted_for_everyone_at: new Date().toISOString() }
+        : item));
+    }
+    setSending(false);
+  }
+
   return (
     <main className="dashboard-page messages-page">
       <DashboardNav user={user} />
@@ -366,12 +409,15 @@ function Messages() {
             <>
               <div className="thread-heading">
                 <div><span>{selectedConversation.jobTitle}</span><h2>{selectedConversation.otherName}</h2></div>
-                <small>{selectedConversation.otherTitle}</small>
+                <div className="thread-heading-actions"><small>{selectedConversation.otherTitle}</small><button type="button" disabled={sending} onClick={hideSelectedConversation}>Delete for Me</button></div>
               </div>
+              {selectedConversation.otherId && <MemberSafetyActions user={user} memberId={selectedConversation.otherId}
+                memberName={selectedConversation.otherName}
+                applicationId={selectedConversation.messageFolder === "job" ? selectedConversation.application_id : null} />}
               <div className="thread-messages" aria-live="polite">
                 {messages.length === 0 ? <p className="messages-empty">Start the conversation with a short introduction.</p> : messages.map((item) => (
                   <article key={item.id} className={"message-bubble " + (item.sender_id === user.id ? "mine" : "theirs")}>
-                    {item.sharedPost && <article className="message-shared-post">
+                    {item.sharedPost && item.body !== "[Message removed]" && <article className="message-shared-post">
                       <span>Shared professional post</span><strong>{item.sharedPost.authorName}</strong>
                       {item.sharedPost.image_path && sharedImageUrl(item.sharedPost.image_path) && <img src={sharedImageUrl(item.sharedPost.image_path)} alt="Shared post image" loading="lazy" />}
                       {item.sharedPost.body && <p>{item.sharedPost.body}</p>}
@@ -379,6 +425,9 @@ function Messages() {
                     </article>}
                     <p>{item.body}</p>
                     <span className="message-meta"><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>{item.sender_id === user.id && item.read_at && <span className="message-seen" aria-label="Seen">Seen</span>}</span>
+                    {item.sender_id === user.id && item.deleted_for_everyone_at === null
+                      && currentTime > 0 && currentTime - Date.parse(item.created_at) <= 15 * 60 * 1000
+                      && <button type="button" className="message-delete-everyone" disabled={sending} onClick={() => redactMessage(item)}>Delete for Everyone</button>}
                   </article>
                 ))}
               </div>
