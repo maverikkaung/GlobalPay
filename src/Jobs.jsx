@@ -14,6 +14,7 @@ function Jobs() {
   const [searchTerm, setSearchTerm] = useState("");
   const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [sortMode, setSortMode] = useState("newest");
   const [supabaseJobs, setSupabaseJobs] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [jobsError, setJobsError] = useState("");
@@ -77,6 +78,8 @@ function Jobs() {
           location: "Remote",
           type: item.payment_type || "Freelance",
           category: item.category || "Other",
+          createdAt: item.created_at,
+          budget: Number(item.budget) || 0,
           salary: String(item.currency ? item.currency : "USD") + " " + String(item.budget),
           description: item.description,
           skills: parseSkills(item.skills)
@@ -112,12 +115,15 @@ function Jobs() {
 
     navigate("/apply/" + job.id);
   }
-    const filteredJobs = allJobs.filter(function(job) {
+  const filteredJobs = allJobs.filter(function(job) {
     const matchesCategory =
       selectedCategory === "All" ? true : job.category === selectedCategory;
 
     return matchesJobSearch(job, appliedSearchTerm) && matchesCategory;
-  });
+  }).sort((first, second) => sortMode === "title"
+    ? first.title.localeCompare(second.title)
+    : new Date(second.createdAt || 0).getTime() - new Date(first.createdAt || 0).getTime());
+  const hasActiveFilters = Boolean(appliedSearchTerm || selectedCategory !== "All");
 
   return (
     <div className="jobs-page">
@@ -186,7 +192,7 @@ function Jobs() {
               </p>
             </div>
 
-            <span className="jobs-count">
+            <span className="jobs-count" aria-live="polite">
               {jobsLoading ? "Loading jobs…" : `${filteredJobs.length} Jobs Found`}
             </span>
           </div>
@@ -200,6 +206,7 @@ function Jobs() {
                   className={
                     selectedCategory === category ? "active" : ""
                   }
+                  aria-pressed={selectedCategory === category}
                   onClick={function() {
                     setSelectedCategory(category);
                   }}
@@ -208,6 +215,23 @@ function Jobs() {
                 </button>
               );
             })}
+          </div>
+
+          <div className="jobs-results-controls">
+            <p>{hasActiveFilters ? `Showing ${filteredJobs.length} matching ${filteredJobs.length === 1 ? "job" : "jobs"}` : "Browse all open opportunities"}</p>
+            <div className="jobs-results-actions">
+              {hasActiveFilters && <button type="button" className="clear-job-filters" onClick={() => {
+                setSearchTerm("");
+                setAppliedSearchTerm("");
+                setSelectedCategory("All");
+              }}>Clear filters</button>}
+              <label className="jobs-sort-label" htmlFor="jobs-sort">Sort by
+                <select id="jobs-sort" value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
+                  <option value="newest">Most recent</option>
+                  <option value="title">Title A to Z</option>
+                </select>
+              </label>
+            </div>
           </div>
 
           <div className="jobs-grid">
