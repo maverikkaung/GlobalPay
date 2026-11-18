@@ -5,6 +5,7 @@ import { supabase } from "./supabase.js";
 import { countApplicationStatuses, countOpenAcceptedJobs } from "./marketplace.js";
 import { getRequestErrorMessage } from "./request-errors.js";
 import DashboardNav from "./DashboardNav.jsx";
+import { SocialFeed } from "./SocialFeed.jsx";
 
 function FreelancerDashboard() {
   const navigate = useNavigate();
@@ -124,6 +125,8 @@ function FreelancerDashboard() {
         </div>
 
         {error && <p role="alert">{error}</p>}
+
+        <SocialFeed user={user} />
 
  </main>
     </div>

@@ -27,6 +27,8 @@ const Notifications = lazy(() => import("./Notifications.jsx"));
 const Reviews = lazy(() => import("./Reviews.jsx"));
 const Portfolio = lazy(() => import("./Portfolio.jsx"));
 const PublicProfile = lazy(() => import("./PublicProfile.jsx"));
+const SocialPage = lazy(() => import("./SocialFeed.jsx").then((module) => ({ default: module.SocialPage })));
+const Connections = lazy(() => import("./Connections.jsx"));
 
 
 function Home() {
@@ -411,6 +413,8 @@ function App() {
       />
 
       <Route path="/messages" element={<RequireAuth roles={["Client", "Freelancer"]}><Messages /></RequireAuth>} />
+      <Route path="/social" element={<RequireAuth roles={["Client", "Freelancer"]}><SocialPage /></RequireAuth>} />
+      <Route path="/connections" element={<RequireAuth roles={["Client", "Freelancer"]}><Connections /></RequireAuth>} />
       <Route path="/notifications" element={<RequireAuth roles={["Client", "Freelancer"]}><Notifications /></RequireAuth>} />
       <Route path="/reviews" element={<RequireAuth roles={["Client", "Freelancer"]}><Reviews /></RequireAuth>} />
       <Route path="/portfolio" element={<RequireAuth roles={["Freelancer"]}><Portfolio /></RequireAuth>} />

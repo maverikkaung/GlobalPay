@@ -4,7 +4,8 @@ declare
 begin
   foreach table_name in array array[
     'profiles', 'jobs', 'job_applications', 'conversations',
-    'messages', 'notifications', 'portfolio_items', 'reviews'
+    'messages', 'notifications', 'portfolio_items', 'reviews',
+    'posts', 'post_likes', 'post_comments', 'connections'
   ] loop
     if not exists (
       select 1 from pg_class c
@@ -83,6 +84,36 @@ begin
       and not tgisinternal
   ) then
     raise exception 'Job completion guard is missing';
+  end if;
+  if has_table_privilege('anon', 'public.posts', 'SELECT')
+    or has_table_privilege('anon', 'public.connections', 'SELECT')
+    or has_table_privilege('anon', 'public.post_comments', 'INSERT') then
+    raise exception 'Anonymous users must not access authenticated social data';
+  end if;
+  if has_table_privilege('authenticated', 'public.connections', 'DELETE')
+    or has_table_privilege('authenticated', 'public.connections', 'UPDATE') then
+    raise exception 'Connection responses should only permit status updates, never deletion/table-wide edits';
+  end if;
+  if not has_column_privilege('authenticated', 'public.connections', 'status', 'UPDATE') then
+    raise exception 'Connection recipients need status updates to accept or decline';
+  end if;
+  if not has_column_privilege('authenticated', 'public.messages', 'shared_post_id', 'INSERT') then
+    raise exception 'Authenticated participants need the rich post preview field';
+  end if;
+  if exists (select 1 from information_schema.columns where table_schema = 'public'
+    and table_name in ('freelancer_public_profiles', 'client_public_profiles') and column_name = 'email') then
+    raise exception 'Public profile views must not expose email addresses';
+  end if;
+  if not exists (select 1 from storage.buckets where id = 'techkarvo-marketplace'
+    and public = true and file_size_limit = 5242880
+    and allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']::text[]) then
+    raise exception 'Public marketplace image bucket must enforce the 5 MiB image-only policy';
+  end if;
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime' and not puballtables)
+    and exists (select 1 from unnest(array['posts', 'post_likes', 'post_comments', 'connections']) as t(social_table)
+      where not exists (select 1 from pg_publication_tables
+        where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t.social_table)) then
+    raise exception 'Social marketplace tables should be in the Supabase Realtime publication';
   end if;
 end;
 $$;

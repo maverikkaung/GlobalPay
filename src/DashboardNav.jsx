@@ -17,6 +17,8 @@ function Icon({ name }) {
 
 function notificationTarget(item) {
   if (item.data?.conversation_id) return `/messages?conversation=${encodeURIComponent(item.data.conversation_id)}`;
+  if (item.data?.connection_id) return `/connections?request=${encodeURIComponent(item.data.connection_id)}`;
+  if (item.data?.post_id) return `/social?post=${encodeURIComponent(item.data.post_id)}`;
   if (item.data?.application_id) {
     return ["application_received", "application_withdrawn"].includes(item.kind)
       ? "/job-applicants"

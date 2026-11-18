@@ -5,6 +5,7 @@ import { supabase } from "./supabase.js";
 import { calculateClientHiringMetrics } from "./marketplace.js";
 import { getRequestErrorMessage } from "./request-errors.js";
 import DashboardNav from "./DashboardNav.jsx";
+import { SocialFeed } from "./SocialFeed.jsx";
 
 function ClientDashboard() {
   const navigate = useNavigate();
@@ -139,6 +140,8 @@ function ClientDashboard() {
           </div>
 
         </div>
+
+        <SocialFeed user={user} />
 
       </main>
     </div>

@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import DashboardNav from "./DashboardNav.jsx";
 import { countUnreadMessagesByConversation } from "./marketplace.js";
+import { MARKETPLACE_MEDIA_BUCKET } from "./social-marketplace.js";
+import { toSafeExternalUrl } from "./external-urls.js";
 import "./Messages.css";
+
+function sharedImageUrl(path) {
+  if (!path) return "";
+  return toSafeExternalUrl(supabase.storage.from(MARKETPLACE_MEDIA_BUCKET).getPublicUrl(path).data?.publicUrl) || "";
+}
 
 function Messages() {
   const { user } = useAuth();
@@ -12,14 +19,38 @@ function Messages() {
   const [searchParams] = useSearchParams();
   const requestedApplicationId = searchParams.get("application");
   const requestedConversationId = searchParams.get("conversation");
+  const requestedSharePostId = searchParams.get("sharePost");
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
+  const [sharePostDraft, setSharePostDraft] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const selectedConversation = useMemo(() => conversations.find((item) => item.id === selectedId), [conversations, selectedId]);
+
+  useEffect(() => {
+    if (!requestedSharePostId) return undefined;
+    let active = true;
+    supabase.from("posts").select("id, author_id, post_type, body, image_path")
+      .eq("id", requestedSharePostId).maybeSingle().then(async ({ data, error: postError }) => {
+        if (postError) throw postError;
+        if (!data || !active) return;
+        const [freelancer, client] = await Promise.all([
+          supabase.from("freelancer_public_profiles").select("id, full_name").eq("id", data.author_id).maybeSingle(),
+          supabase.from("client_public_profiles").select("id, full_name").eq("id", data.author_id).maybeSingle()
+        ]);
+        if (!active) return;
+        setSharePostDraft({ ...data, authorName: freelancer.data?.full_name || client.data?.full_name || "TechKarvo member" });
+      }).catch((shareError) => {
+        if (active) {
+          console.error("Shared post preview could not be loaded:", shareError);
+          setError("This post preview is no longer available.");
+        }
+      });
+    return () => { active = false; };
+  }, [requestedSharePostId]);
 
   useEffect(() => {
     let active = true;
@@ -74,7 +105,10 @@ function Messages() {
       if (result.error) throw result.error;
 
       const rows = result.data || [];
-      const applicationIds = rows.map((item) => item.application_id);
+      const applicationRows = rows.filter((item) => !item.application_id.startsWith("connection:"));
+      const directRows = rows.filter((item) => item.application_id.startsWith("connection:"));
+      const applicationIds = applicationRows.map((item) => item.application_id);
+      const connectionIds = directRows.map((item) => item.application_id.slice("connection:".length));
       const conversationIds = rows.map((item) => item.id);
       let unreadByConversation = {};
       if (conversationIds.length) {
@@ -92,19 +126,27 @@ function Messages() {
         applicationsById = Object.fromEntries((applicationsResult.data || []).map((item) => [String(item.id), item]));
       }
 
-      let clientProfilesById = {};
-      if (accountType === "Freelancer") {
-        const clientIds = [...new Set(rows.map((item) => item.client_id))];
-        if (clientIds.length) {
-          const profilesResult = await supabase.from("client_public_profiles")
-            .select("id, full_name").in("id", clientIds);
-          if (!profilesResult.error) {
-            clientProfilesById = Object.fromEntries((profilesResult.data || []).map((item) => [item.id, item.full_name]));
-          }
-        }
+      let connectionsById = {};
+      if (connectionIds.length) {
+        const connectionsResult = await supabase.from("connections")
+          .select("id, requester_id, recipient_id, status").in("id", connectionIds).eq("status", "Accepted");
+        if (connectionsResult.error) throw connectionsResult.error;
+        connectionsById = Object.fromEntries((connectionsResult.data || []).map((item) => [item.id, item]));
       }
 
-      const jobIds = [...new Set(rows.map((item) => item.job_id))];
+      const directMemberIds = [...new Set(directRows.flatMap((item) => [item.client_id, item.freelancer_id]))];
+      let directProfilesById = {};
+      if (directMemberIds.length) {
+        const [freelancers, clients] = await Promise.all([
+          supabase.from("freelancer_public_profiles").select("*").in("id", directMemberIds),
+          supabase.from("client_public_profiles").select("*").in("id", directMemberIds)
+        ]);
+        if (freelancers.error) throw freelancers.error;
+        if (clients.error) throw clients.error;
+        directProfilesById = Object.fromEntries([...(freelancers.data || []), ...(clients.data || [])].map((item) => [item.id, item]));
+      }
+
+      const jobIds = [...new Set(rows.filter((item) => !item.job_id.startsWith("connection:")).map((item) => item.job_id))];
       let jobsById = {};
       if (jobIds.length) {
         const jobsResult = await supabase.from("jobs").select("id, title").in("id", jobIds);
@@ -114,15 +156,18 @@ function Messages() {
       if (!active) return;
       const formatted = rows.map((item) => {
         const application = applicationsById[String(item.application_id)];
-        const otherName = item.client_id === user.id
-          ? application?.full_name || "Freelancer"
-          : clientProfilesById[item.client_id] || "Client";
+        const isDirect = item.application_id.startsWith("connection:");
+        const connectionId = isDirect ? item.application_id.slice("connection:".length) : "";
+        const otherId = item.client_id === user.id ? item.freelancer_id : item.client_id;
+        const otherProfile = directProfilesById[otherId];
+        const otherName = isDirect ? otherProfile?.full_name || "TechKarvo member"
+          : item.client_id === user.id ? application?.full_name || "Freelancer" : "Client";
         return {
           ...item,
           otherName,
-          otherTitle: application?.professional_title || "Marketplace member",
-          jobTitle: jobsById[String(item.job_id)] || "Project conversation",
-          messagingOpen: ["Pending", "Accepted"].includes(application?.status),
+          otherTitle: isDirect ? otherProfile?.professional_title || otherProfile?.country || "Marketplace member" : application?.professional_title || "Marketplace member",
+          jobTitle: isDirect ? "TechKarvo connection" : jobsById[String(item.job_id)] || "Project conversation",
+          messagingOpen: isDirect ? connectionsById[connectionId]?.status === "Accepted" : ["Pending", "Accepted"].includes(application?.status),
           unreadCount: unreadByConversation[item.id] || 0
         };
       });
@@ -165,7 +210,22 @@ function Messages() {
         if (result.error) throw result.error;
         if (!active) return;
 
-        const conversationMessages = result.data || [];
+        let conversationMessages = result.data || [];
+        const sharedPostIds = [...new Set(conversationMessages.map((item) => item.shared_post_id).filter(Boolean))];
+        if (sharedPostIds.length) {
+          const postsResult = await supabase.from("posts").select("id, author_id, post_type, body, image_path")
+            .in("id", sharedPostIds);
+          if (!postsResult.error) {
+            const authorIds = [...new Set((postsResult.data || []).map((item) => item.author_id))];
+            const [freelancers, clients] = await Promise.all([
+              supabase.from("freelancer_public_profiles").select("id, full_name").in("id", authorIds),
+              supabase.from("client_public_profiles").select("id, full_name").in("id", authorIds)
+            ]);
+            const authors = Object.fromEntries([...(freelancers.data || []), ...(clients.data || [])].map((item) => [item.id, item.full_name]));
+            const postsById = Object.fromEntries((postsResult.data || []).map((item) => [item.id, { ...item, authorName: authors[item.author_id] || "TechKarvo member" }]));
+            conversationMessages = conversationMessages.map((item) => ({ ...item, sharedPost: postsById[item.shared_post_id] || null }));
+          }
+        }
         setMessages(conversationMessages);
         const unreadIds = conversationMessages
           .filter((item) => item.sender_id !== user.id && !item.read_at)
@@ -225,7 +285,7 @@ function Messages() {
 
   async function sendMessage(event) {
     event.preventDefault();
-    const body = draft.trim();
+    const body = draft.trim() || (sharePostDraft ? "Shared a TechKarvo post" : "");
     if (!body || !selectedId) return;
 
     setSending(true);
@@ -234,7 +294,8 @@ function Messages() {
       const result = await supabase.from("messages").insert({
         conversation_id: selectedId,
         sender_id: user.id,
-        body
+        body,
+        shared_post_id: sharePostDraft?.id || null
       });
       if (result.error) {
         console.error("Message send failed:", result.error.message);
@@ -243,6 +304,7 @@ function Messages() {
       }
 
       setDraft("");
+      setSharePostDraft(null);
       const refreshed = await supabase.from("messages").select("*")
         .eq("conversation_id", selectedId).order("created_at", { ascending: true });
       if (refreshed.error) {
@@ -298,6 +360,12 @@ function Messages() {
               <div className="thread-messages" aria-live="polite">
                 {messages.length === 0 ? <p className="messages-empty">Start the conversation with a short introduction.</p> : messages.map((item) => (
                   <article key={item.id} className={"message-bubble " + (item.sender_id === user.id ? "mine" : "theirs")}>
+                    {item.sharedPost && <article className="message-shared-post">
+                      <span>Shared professional post</span><strong>{item.sharedPost.authorName}</strong>
+                      {item.sharedPost.image_path && sharedImageUrl(item.sharedPost.image_path) && <img src={sharedImageUrl(item.sharedPost.image_path)} alt="Shared post image" loading="lazy" />}
+                      {item.sharedPost.body && <p>{item.sharedPost.body}</p>}
+                      <Link to={`/social?post=${encodeURIComponent(item.sharedPost.id)}`}>View post</Link>
+                    </article>}
                     <p>{item.body}</p>
                     <span className="message-meta"><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>{item.sender_id === user.id && item.read_at && <span className="message-seen" aria-label="Seen">Seen</span>}</span>
                   </article>
@@ -305,9 +373,15 @@ function Messages() {
               </div>
               {selectedConversation.messagingOpen ? (
                 <form className="message-composer" onSubmit={sendMessage}>
+                  {sharePostDraft && <div className="message-share-draft" role="status">
+                    <span>Post ready to share · {sharePostDraft.authorName}</span>
+                    {sharePostDraft.image_path && sharedImageUrl(sharePostDraft.image_path) && <img src={sharedImageUrl(sharePostDraft.image_path)} alt="Selected post preview" />}
+                    {sharePostDraft.body && <p>{sharePostDraft.body}</p>}
+                    <button type="button" onClick={() => setSharePostDraft(null)}>Remove post preview</button>
+                  </div>}
                   <label className="visually-hidden" htmlFor="message-body">Write a message</label>
-                  <textarea id="message-body" maxLength={10000} rows={2} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write a message…" required />
-                  <button type="submit" className="primary-btn" disabled={sending || !draft.trim()}>{sending ? "Sending…" : "Send"}</button>
+                  <textarea id="message-body" maxLength={10000} rows={2} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={sharePostDraft ? "Add a note (optional)…" : "Write a message…"} />
+                  <button type="submit" className="primary-btn" disabled={sending || (!draft.trim() && !sharePostDraft)}>{sending ? "Sending…" : sharePostDraft ? "Share in conversation" : "Send"}</button>
                 </form>
               ) : (
                 <p className="messages-closed-note" role="status">This application is closed. You can read the conversation, but new messages are disabled.</p>

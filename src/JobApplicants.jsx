@@ -6,13 +6,17 @@ import { getRequestErrorMessage } from "./request-errors.js";
 import { parseSkills, summarizeRatings } from "./marketplace.js";
 import { filterApplicants, sortApplicants } from "./applicant-list.js";
 import { toSafeExternalUrl } from "./external-urls.js";
+import { MARKETPLACE_MEDIA_BUCKET } from "./social-marketplace.js";
 import DashboardNav from "./DashboardNav.jsx";
 
 function ApplicantCard({ application, profile, portfolio, rating, busy, onDecision }) {
   const displayName = profile?.full_name || application.full_name || "Freelancer";
   const title = profile?.professional_title || application.professional_title || "Independent professional";
   const skills = parseSkills(profile?.skills || application.skills);
-  const avatarUrl = toSafeExternalUrl(profile?.avatar_url);
+  const avatarUrl = toSafeExternalUrl(profile?.avatar_url)
+    || (profile?.avatar_path
+      ? toSafeExternalUrl(supabase.storage.from(MARKETPLACE_MEDIA_BUCKET).getPublicUrl(profile.avatar_path).data?.publicUrl)
+      : "");
   const appliedDate = application.applied_at
     ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(application.applied_at))
     : "Date unavailable";
@@ -130,7 +134,7 @@ function JobApplicants() {
       const [jobsResult, profilesResult, portfolioResult, reviewsResult] = await Promise.all([
         jobIds.length ? supabase.from("jobs").select("id, title").in("id", jobIds).eq("client_id", userId) : Promise.resolve({ data: [], error: null }),
         freelancerIds.length ? supabase.from("freelancer_public_profiles")
-          .select("id, full_name, country, professional_title, bio, skills, experience, portfolio_url, avatar_url, cover_url")
+          .select("*")
           .in("id", freelancerIds) : Promise.resolve({ data: [], error: null }),
         freelancerIds.length ? supabase.from("portfolio_items")
           .select("id, freelancer_id, title, project_url, image_url, created_at")
