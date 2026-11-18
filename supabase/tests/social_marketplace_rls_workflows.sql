@@ -26,6 +26,7 @@ end;
 $$;
 
 reset role;
+set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', '71111111-1111-4111-8111-111111111111', true);
 do $$
@@ -58,6 +59,7 @@ end;
 $$;
 
 reset role;
+set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', '72222222-2222-4222-8222-222222222222', true);
 update public.connections set status = 'Accepted'
@@ -83,6 +85,7 @@ end;
 $$;
 
 reset role;
+set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', '73333333-3333-4333-8333-333333333333', true);
 do $$
