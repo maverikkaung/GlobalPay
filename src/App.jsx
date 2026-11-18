@@ -30,6 +30,7 @@ const PublicProfile = lazy(() => import("./PublicProfile.jsx"));
 const SocialPage = lazy(() => import("./SocialFeed.jsx").then((module) => ({ default: module.SocialPage })));
 const Connections = lazy(() => import("./Connections.jsx"));
 const AccountSettings = lazy(() => import("./AccountSettings.jsx"));
+const DemoMode = lazy(() => import("./DemoMode.jsx"));
 
 
 function Home() {
@@ -105,6 +106,7 @@ function Home() {
         <div className="nav-buttons">
 
           {!loading && user ? <Link to={dashboardPath} className="signup-btn">Dashboard</Link> : <>
+            <Link to="/demo" className="secondary-btn">Try Demo</Link>
             <Link to="/login" className="login-btn">Log In</Link>
             <Link to="/signup" className="signup-btn">Get Started</Link>
           </>}
@@ -158,6 +160,7 @@ function Home() {
           {!user && <Link to="/signup" className="secondary-btn">
                 Become a Freelancer
           </Link>}
+          <Link to="/demo" className="secondary-btn demo-hero-link">Try the interactive demo</Link>
 
             </div>
 
@@ -348,6 +351,11 @@ function NotFound() {
 
 
 function App() {
+  const location = useLocation();
+  if (location.pathname === "/demo") {
+    return <Suspense fallback={<main className="route-loading" aria-live="polite">Loading demo…</main>}><DemoMode /></Suspense>;
+  }
+
   if (!isSupabaseConfigured) {
     return (
       <main className="configuration-error" role="alert">
