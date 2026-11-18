@@ -101,7 +101,7 @@ function FreelancerDashboard() {
           <div className="dashboard-stat-card">
             <span>Active Jobs</span>
             <h2>{loading ? "…" : activeJobs}</h2>
-            <p>Accepted applications</p>
+            <p>Accepted open jobs · payment is not secured</p>
           </div>
 
           <div className="dashboard-stat-card">

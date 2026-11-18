@@ -3161,6 +3161,19 @@ footer p {
   overflow-wrap: anywhere;
 }
 
+.project-work-status {
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--tk-border);
+  border-left: 4px solid var(--tk-blue);
+  border-radius: 10px;
+  background: var(--tk-card-raised);
+  color: var(--tk-text);
+}
+
+.project-work-status strong { display: block; font-size: 13px; }
+.project-work-status p { margin: 4px 0 0; color: var(--tk-muted); font-size: 12px; line-height: 1.5; }
+
 .my-project-category {
   display: inline-block;
   margin-top: 8px;

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import DashboardNav from "./DashboardNav.jsx";
+import { getAcceptedWorkPresentation, isOptionalContractSchemaMissing } from "./project-workflow.js";
 
 function MyApplications() {
   const navigate = useNavigate();
@@ -51,7 +52,7 @@ function MyApplications() {
           const jobIds = applicationRows.map((item) => item.job_id);
           const jobsResult = await supabase
             .from("jobs")
-            .select("id, title, category, budget, currency")
+            .select("id, title, category, budget, currency, status")
             .in("id", jobIds);
           if (!active) return;
 
@@ -65,6 +66,22 @@ function MyApplications() {
           }
         }
 
+        const acceptedApplications = applicationRows.filter((item) => item.status === "Accepted");
+        const contractByApplication = {};
+        if (acceptedApplications.length) {
+          const contractsResult = await supabase.from("contracts")
+            .select("application_id, status")
+            .in("application_id", acceptedApplications.map((item) => item.id));
+          if (!active) return;
+          if (!contractsResult.error) {
+            (contractsResult.data || []).forEach((contract) => {
+              contractByApplication[String(contract.application_id)] = contract.status;
+            });
+          } else if (!isOptionalContractSchemaMissing(contractsResult.error)) {
+            setError("Your applications loaded, but contract status is temporarily unavailable.");
+          }
+        }
+
         setApplications(applicationRows.map((item) => {
           const job = jobMap[String(item.job_id)];
           return {
@@ -74,6 +91,8 @@ function MyApplications() {
             title: job ? job.title : "Job #" + item.job_id,
             company: job?.category || "Client",
             status: item.status,
+            jobStatus: job?.status || null,
+            contractStatus: contractByApplication[String(item.id)] || null,
             expectedSalary: item.expected_salary,
             salaryType: item.salary_type,
             appliedAt: item.applied_at
@@ -354,6 +373,18 @@ function MyApplications() {
                       </div>
 
                     </div>
+
+                    {item.status === "Accepted" && (() => {
+                      const presentation = getAcceptedWorkPresentation({
+                        applicationStatus: item.status,
+                        jobStatus: item.jobStatus,
+                        contractStatus: item.contractStatus
+                      });
+                      return <div className="project-work-status" aria-label="Hiring and contract status">
+                        <strong>{presentation.label}</strong>
+                        <p>{presentation.detail}</p>
+                      </div>;
+                    })()}
 
                     <div className="application-card-bottom">
                       <span className="application-reference">

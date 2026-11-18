@@ -136,7 +136,7 @@ function ClientDashboard() {
             <h2>
               {loading ? "..." : "$" + totalSpending.toFixed(2)}
             </h2>
-            <p>Based on accepted projects</p>
+            <p>Estimated from accepted projects · no funds are held</p>
           </div>
 
         </div>

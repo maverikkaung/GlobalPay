@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import DashboardNav from "./DashboardNav.jsx";
+import { getAcceptedWorkPresentation, isOptionalContractSchemaMissing } from "./project-workflow.js";
 
 function MyProjects() {
   const { user } = useAuth();
@@ -10,6 +11,8 @@ function MyProjects() {
   const accountType = user ? user.accountType : null;
 
   const [projects, setProjects] = useState([]);
+  const [workflowByJob, setWorkflowByJob] = useState({});
+  const [workflowError, setWorkflowError] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,7 +44,44 @@ function MyProjects() {
           .eq("client_id", userId).order("created_at", { ascending: false });
         if (!active) return;
         if (result.error) throw result.error;
-        setProjects(result.data || []);
+        const projectRows = result.data || [];
+        setProjects(projectRows);
+        setWorkflowByJob({});
+        setWorkflowError("");
+        if (!projectRows.length) return;
+
+        const projectIds = projectRows.map((project) => project.id);
+        const applicationsResult = await supabase.from("job_applications")
+          .select("id, job_id, status").eq("client_id", userId)
+          .eq("status", "Accepted").in("job_id", projectIds);
+        if (!active) return;
+        if (applicationsResult.error) {
+          setWorkflowError("Project details loaded, but hiring status could not be refreshed.");
+          return;
+        }
+
+        const accepted = applicationsResult.data || [];
+        const contractByApplication = {};
+        if (accepted.length) {
+          const contractsResult = await supabase.from("contracts")
+            .select("application_id, status").in("application_id", accepted.map((item) => item.id));
+          if (!active) return;
+          if (!contractsResult.error) {
+            (contractsResult.data || []).forEach((contract) => {
+              contractByApplication[String(contract.application_id)] = contract.status;
+            });
+          } else if (!isOptionalContractSchemaMissing(contractsResult.error)) {
+            setWorkflowError("Project details loaded, but contract status is temporarily unavailable.");
+          }
+        }
+        const acceptedByJob = Object.fromEntries(accepted.map((item) => [String(item.job_id), item]));
+        setWorkflowByJob(Object.fromEntries(projectRows.map((project) => {
+          const application = acceptedByJob[String(project.id)];
+          return [String(project.id), {
+            applicationStatus: application?.status || null,
+            contractStatus: application ? contractByApplication[String(application.id)] || null : null
+          }];
+        })));
       } catch (error) {
         if (!active) return;
         console.error("Unable to load projects:", error);
@@ -272,6 +312,7 @@ function MyProjects() {
         </section>
 
         {loadError && <div role="alert"><p>{loadError}</p><button type="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button></div>}
+        {workflowError && <p role="status">{workflowError}</p>}
         {actionError && <p role="alert">{actionError}</p>}
         {actionNotice && <p role="status">{actionNotice}</p>}
 
@@ -398,6 +439,11 @@ function MyProjects() {
 
               {projects.map(function(project) {
                 const status = project.status || "unknown";
+                const presentation = getAcceptedWorkPresentation({
+                  applicationStatus: workflowByJob[String(project.id)]?.applicationStatus,
+                  jobStatus: status,
+                  contractStatus: workflowByJob[String(project.id)]?.contractStatus
+                });
 
                 return (
                   <article className="my-project-card" key={project.id}>
@@ -413,6 +459,11 @@ function MyProjects() {
                     </div>
 
                     <h3>{project.title}</h3>
+
+                    {presentation && <div className="project-work-status" aria-label="Hiring and contract status">
+                      <strong>{presentation.label}</strong>
+                      <p>{presentation.detail}</p>
+                    </div>}
 
                     <p className="my-project-description">
                       {project.description || "No description provided."}
