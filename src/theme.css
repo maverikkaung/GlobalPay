@@ -252,6 +252,9 @@ html[data-theme="dark"] .thread-heading small { color: var(--tk-muted); }
 html[data-theme="dark"] .conversation-item { color: var(--tk-text); }
 html[data-theme="dark"] .conversation-item:hover,
 html[data-theme="dark"] .conversation-item.selected { background: var(--tk-hover); }
+html[data-theme="dark"] .message-folder-tabs { border-color: var(--tk-border); background: var(--tk-page); }
+html[data-theme="dark"] .message-folder-tabs button { color: var(--tk-muted); }
+html[data-theme="dark"] .message-folder-tabs button[aria-selected="true"] { background: var(--tk-card-raised); color: var(--tk-blue-soft); }
 html[data-theme="dark"] .conversation-copy small { color: var(--tk-muted); }
 html[data-theme="dark"] .conversation-avatar { background: var(--tk-hover); color: var(--tk-blue-soft); }
 html[data-theme="dark"] .thread-heading,
@@ -376,6 +379,9 @@ html[data-theme="light"] .messages-thread-panel { background: white; }
 html[data-theme="light"] .conversation-item { color: var(--tk-text); }
 html[data-theme="light"] .conversation-item:hover,
 html[data-theme="light"] .conversation-item.selected { background: #edf4ff; }
+html[data-theme="light"] .message-folder-tabs { border-color: var(--tk-border); background: var(--tk-page); }
+html[data-theme="light"] .message-folder-tabs button { color: var(--tk-muted); }
+html[data-theme="light"] .message-folder-tabs button[aria-selected="true"] { background: var(--tk-card); color: var(--tk-blue); }
 html[data-theme="light"] .message-bubble.mine { background: #e5efff; }
 html[data-theme="light"] .message-composer textarea { background: white; color: var(--tk-text); border-color: var(--tk-border); }
 html[data-theme="light"] .home-redesign { background: radial-gradient(circle at 80% 30%, #e8f1ff 0%, transparent 35%), #f5f7fa; color: var(--tk-text); }

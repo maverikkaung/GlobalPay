@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import DashboardNav from "./DashboardNav.jsx";
 import { countUnreadMessagesByConversation } from "./marketplace.js";
+import { classifyConversation, countUnreadByFolder, getConversationsForFolder } from "./message-folders.js";
 import { MARKETPLACE_MEDIA_BUCKET } from "./social-marketplace.js";
 import { toSafeExternalUrl } from "./external-urls.js";
 import "./Messages.css";
@@ -21,6 +22,7 @@ function Messages() {
   const requestedConversationId = searchParams.get("conversation");
   const requestedSharePostId = searchParams.get("sharePost");
   const [conversations, setConversations] = useState([]);
+  const [activeFolder, setActiveFolder] = useState("job");
   const [selectedId, setSelectedId] = useState("");
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
@@ -29,6 +31,8 @@ function Messages() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const selectedConversation = useMemo(() => conversations.find((item) => item.id === selectedId), [conversations, selectedId]);
+  const folderConversations = useMemo(() => getConversationsForFolder(conversations, activeFolder), [activeFolder, conversations]);
+  const folderUnread = useMemo(() => countUnreadByFolder(conversations), [conversations]);
 
   useEffect(() => {
     if (!requestedSharePostId) return undefined;
@@ -168,6 +172,7 @@ function Messages() {
           otherTitle: isDirect ? otherProfile?.professional_title || otherProfile?.country || "Marketplace member" : application?.professional_title || "Marketplace member",
           jobTitle: isDirect ? "TechKarvo connection" : jobsById[String(item.job_id)] || "Project conversation",
           messagingOpen: isDirect ? connectionsById[connectionId]?.status === "Accepted" : ["Pending", "Accepted"].includes(application?.status),
+          messageFolder: classifyConversation(item.application_id),
           unreadCount: unreadByConversation[item.id] || 0
         };
       });
@@ -176,6 +181,8 @@ function Messages() {
         ? requestedConversationId
         : "";
       const initialId = requestedId || requestedThread || formatted[0]?.id || "";
+      const initialConversation = formatted.find((item) => item.id === initialId);
+      setActiveFolder(initialConversation?.messageFolder || "job");
       setSelectedId(initialId);
       setLoading(false);
       setError("");
@@ -330,16 +337,20 @@ function Messages() {
           <div className="messages-panel-heading">
             <span className="dashboard-tag">YOUR WORKSPACE</span>
             <h1>Messages</h1>
-            <p>Keep every project conversation in one place.</p>
+            <p>Keep project and personal conversations in separate folders.</p>
           </div>
-          {loading ? <p className="messages-empty">Loading conversations…</p> : conversations.length === 0 ? (
+          <div className="message-folder-tabs" role="tablist" aria-label="Message folders">
+            <button type="button" role="tab" aria-selected={activeFolder === "job"} onClick={() => { setActiveFolder("job"); setSelectedId(conversations.find((item) => item.messageFolder === "job")?.id || ""); }}>Job Messages{folderUnread.job > 0 && <span>{folderUnread.job > 99 ? "99+" : folderUnread.job}</span>}</button>
+            <button type="button" role="tab" aria-selected={activeFolder === "personal"} onClick={() => { setActiveFolder("personal"); setSelectedId(conversations.find((item) => item.messageFolder === "personal")?.id || ""); }}>Personal Messages{folderUnread.personal > 0 && <span>{folderUnread.personal > 99 ? "99+" : folderUnread.personal}</span>}</button>
+          </div>
+          {loading ? <p className="messages-empty">Loading conversations…</p> : folderConversations.length === 0 ? (
             <div className="messages-empty">
-              <strong>No conversations yet</strong>
-              <span>Open a conversation from an application or applicant profile.</span>
+              <strong>No {activeFolder === "job" ? "job" : "personal"} conversations yet</strong>
+              <span>{activeFolder === "job" ? "Conversations open from eligible job applications." : "Personal chats open after you accept a connection request."}</span>
             </div>
           ) : (
             <div className="conversation-list">
-              {conversations.map((item) => (
+              {folderConversations.map((item) => (
                 <button key={item.id} type="button" className={"conversation-item " + (selectedId === item.id ? "selected" : "")} onClick={() => setSelectedId(item.id)}>
                   <span className="conversation-avatar">{item.otherName.charAt(0).toUpperCase()}</span>
                   <span className="conversation-copy"><strong>{item.otherName}</strong><small>{item.jobTitle}</small></span>
