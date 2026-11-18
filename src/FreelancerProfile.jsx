@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { toSafeExternalUrl } from "./external-urls.js";
 import { getRequestErrorMessage } from "./request-errors.js";
+import DashboardNav from "./DashboardNav.jsx";
 
 function FreelancerProfile() {
   const navigate = useNavigate();
@@ -104,18 +105,7 @@ function FreelancerProfile() {
 
   return (
     <div className="dashboard-page">
-      <header className="dashboard-navbar">
-        <Link to="/freelancer-dashboard" className="dashboard-logo">
-          TechKarvo
-        </Link>
-
-        <Link
-          to="/freelancer-dashboard"
-          className="dashboard-logout"
-        >
-          Back to Dashboard
-        </Link>
-      </header>
+      <DashboardNav user={user} />
 
       <main className="dashboard-container">
         <div className="dashboard-welcome">

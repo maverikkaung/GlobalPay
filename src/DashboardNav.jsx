@@ -2,6 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "./supabase.js";
 import { logoutUser } from "./auth.js";
+import { useTheme } from "./useTheme.js";
+import { getProfilePath, getQuickActions } from "./dashboard-navigation.js";
+
+function Icon({ name }) {
+  const paths = {
+    messages: <><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z" /><path d="M7.5 10h6M7.5 13h4" /></>,
+    notifications: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></>,
+    profile: <><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></>,
+    menu: <><path d="M4 7h16M4 12h16M4 17h16" /></>
+  };
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
+}
 
 function notificationTarget(item) {
   if (item.data?.conversation_id) return `/messages?conversation=${encodeURIComponent(item.data.conversation_id)}`;
@@ -18,19 +30,20 @@ function Badge({ count }) {
   return <span className="nav-count" aria-hidden="true">{count > 99 ? "99+" : count}</span>;
 }
 
-export default function DashboardNav({ user, title = "Dashboard" }) {
+export default function DashboardNav({ user }) {
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
   const [notificationCount, setNotificationCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
   const [recent, setRecent] = useState([]);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeMenu, setActiveMenu] = useState("");
   const [logoutError, setLogoutError] = useState("");
-  const menuRef = useRef(null);
+  const navRef = useRef(null);
   const userId = user.id;
-  const dashboardPath = user?.accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard";
+  const dashboardPath = user.accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard";
+  const myProfilePath = getProfilePath(user.accountType);
 
   const refreshCounts = useCallback(async () => {
-    if (!userId) return;
     const [notifications, messages, latest] = await Promise.all([
       supabase.from("notifications").select("id", { count: "exact", head: true })
         .eq("user_id", userId).is("read_at", null),
@@ -53,7 +66,6 @@ export default function DashboardNav({ user, title = "Dashboard" }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` }, refreshCounts)
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, refreshCounts)
       .subscribe();
-    // Polling is a fallback for projects where Supabase Realtime is not enabled.
     const interval = window.setInterval(refreshCounts, 30000);
     const onVisibility = () => { if (document.visibilityState === "visible") refreshCounts(); };
     document.addEventListener("visibilitychange", onVisibility);
@@ -67,10 +79,14 @@ export default function DashboardNav({ user, title = "Dashboard" }) {
 
   useEffect(() => {
     function handleOutside(event) {
-      if (!menuRef.current?.contains(event.target)) setMenuOpen(false);
+      if (!navRef.current?.contains(event.target)) setActiveMenu("");
     }
     function handleEscape(event) {
-      if (event.key === "Escape") setMenuOpen(false);
+      if (event.key === "Escape") {
+        const trigger = navRef.current?.querySelector('[data-menu-trigger][aria-expanded="true"]');
+        setActiveMenu("");
+        trigger?.focus();
+      }
     }
     document.addEventListener("pointerdown", handleOutside);
     document.addEventListener("keydown", handleEscape);
@@ -85,13 +101,14 @@ export default function DashboardNav({ user, title = "Dashboard" }) {
     const result = await logoutUser();
     if (result.error) {
       setLogoutError("Unable to log out. Please try again.");
+      setActiveMenu("");
       return;
     }
     navigate("/login");
   }
 
   async function openNotification(item) {
-    setMenuOpen(false);
+    setActiveMenu("");
     if (!item.read_at) {
       const result = await supabase.from("notifications")
         .update({ read_at: new Date().toISOString() }).eq("id", item.id).eq("user_id", userId).select("id").maybeSingle();
@@ -103,24 +120,21 @@ export default function DashboardNav({ user, title = "Dashboard" }) {
 
   return (
     <>
-      <header className="dashboard-navbar">
-        <Link to={dashboardPath} className="dashboard-logo" aria-label="TechKarvo home">Tech<span>Karvo</span></Link>
-        <nav className="dashboard-nav-links" aria-label="Workspace navigation">
-          <Link to={dashboardPath} aria-current="page">{title}</Link>
-          <Link to="/jobs">Find work</Link>
-          <Link to="/messages">Messages</Link>
-        </nav>
+      <header className="dashboard-navbar" ref={navRef}>
+        <Link to={dashboardPath} className="dashboard-logo" aria-label="TechKarvo dashboard">Tech<span>Karvo</span></Link>
         <div className="dashboard-nav-actions">
-          <Link className="dashboard-icon-link" to="/messages" aria-label={`Messages, ${messageCount} unread`}>
-            <span aria-hidden="true">✉</span><Badge count={messageCount} />
+          <Link className="dashboard-icon-link" to="/messages" aria-label={`Messages, ${messageCount} unread`} title="Messages">
+            <Icon name="messages" /><Badge count={messageCount} />
           </Link>
-          <div className="notification-menu" ref={menuRef}>
-            <button className="dashboard-icon-link" type="button" aria-label={`Notifications, ${notificationCount} unread`}
-              aria-expanded={menuOpen} aria-controls="notification-preview" onClick={() => setMenuOpen((open) => !open)}>
-              <span aria-hidden="true">🔔</span><Badge count={notificationCount} />
+          <div className="nav-popover-anchor">
+            <button className="dashboard-icon-link" type="button" aria-label={`Notifications, ${notificationCount} unread`} title="Notifications"
+              data-menu-trigger
+              aria-expanded={activeMenu === "notifications"} aria-controls="notification-preview"
+              onClick={() => setActiveMenu((open) => open === "notifications" ? "" : "notifications")}>
+              <Icon name="notifications" /><Badge count={notificationCount} />
             </button>
-            {menuOpen && <section className="notification-preview" id="notification-preview" aria-label="Recent notifications">
-              <div className="notification-preview-heading"><strong>Notifications</strong><Link to="/notifications" onClick={() => setMenuOpen(false)}>View all</Link></div>
+            {activeMenu === "notifications" && <section className="notification-preview" id="notification-preview" aria-label="Recent notifications">
+              <div className="notification-preview-heading"><strong>Notifications</strong><Link to="/notifications" onClick={() => setActiveMenu("")}>View all</Link></div>
               {recent.length ? recent.map((item) => (
                 <button type="button" key={item.id} className={`notification-preview-item ${item.read_at ? "" : "unread"}`} onClick={() => openNotification(item)}>
                   <strong>{item.title}</strong><span>{item.body}</span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>
@@ -128,7 +142,37 @@ export default function DashboardNav({ user, title = "Dashboard" }) {
               )) : <p className="notification-preview-empty">You’re all caught up.</p>}
             </section>}
           </div>
-          <button type="button" onClick={handleLogout} className="dashboard-logout">Log out</button>
+          <div className="nav-popover-anchor">
+            <button className="dashboard-icon-link profile-icon-button" type="button" aria-label="Profile menu" title="Profile"
+              data-menu-trigger
+              aria-expanded={activeMenu === "profile"} aria-controls="profile-menu"
+              onClick={() => setActiveMenu((open) => open === "profile" ? "" : "profile")}>
+              <span className="profile-avatar-fallback" aria-hidden="true"><Icon name="profile" /></span>
+            </button>
+            {activeMenu === "profile" && <section className="nav-dropdown profile-dropdown" id="profile-menu" aria-label="Profile options">
+              <div className="profile-dropdown-heading"><strong>{user.name || "TechKarvo member"}</strong><span>{user.accountType}</span></div>
+              {myProfilePath && <Link to={myProfilePath} onClick={() => setActiveMenu("")}>My Profile</Link>}
+              <button type="button" className="theme-toggle-row" role="switch" aria-checked={theme === "dark"} onClick={toggleTheme}>
+                <span>{theme === "dark" ? "Dark mode" : "Light mode"}</span>
+                <span className="theme-switch-track" aria-hidden="true"><span /></span>
+              </button>
+              <button type="button" className="profile-logout" onClick={handleLogout}>Log Out</button>
+            </section>}
+          </div>
+          <div className="nav-popover-anchor quick-actions-anchor">
+            <button className="dashboard-icon-link quick-actions-trigger" type="button" aria-label="Quick actions" title="Quick actions"
+              data-menu-trigger
+              aria-expanded={activeMenu === "quick"} aria-controls="quick-actions-menu"
+              onClick={() => setActiveMenu((open) => open === "quick" ? "" : "quick")}>
+              <Icon name="menu" />
+            </button>
+            {activeMenu === "quick" && <nav className="nav-dropdown quick-actions-menu" id="quick-actions-menu" aria-label={`${user.accountType} quick actions`}>
+              <strong>Quick actions</strong>
+              {getQuickActions(user.accountType).map(([label, path]) => (
+                <Link key={path} to={path} onClick={() => setActiveMenu("")}>{label}</Link>
+              ))}
+            </nav>}
+          </div>
         </div>
       </header>
       {logoutError && <p className="dashboard-nav-error" role="alert">{logoutError}</p>}

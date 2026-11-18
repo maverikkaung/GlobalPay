@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { getRequestErrorMessage } from "./request-errors.js";
+import DashboardNav from "./DashboardNav.jsx";
 
 function MyFreelancers() {
   const { user } = useAuth();
@@ -96,15 +97,7 @@ function MyFreelancers() {
   return (
     <div className="dashboard-page">
 
-      <header className="dashboard-navbar">
-        <Link to="/" className="dashboard-logo">
-          TechKarvo
-        </Link>
-
-        <Link to="/client-dashboard" className="dashboard-logout">
-          Back to Dashboard
-        </Link>
-      </header>
+      <DashboardNav user={user} />
 
       <main className="dashboard-container">
 

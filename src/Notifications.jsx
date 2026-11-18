@@ -87,7 +87,7 @@ function Notifications() {
   const unreadCount = items.filter((item) => !item.read_at).length;
   return (
     <div className="dashboard-page">
-      <DashboardNav user={user} title="Notifications" />
+      <DashboardNav user={user} />
       <main className="dashboard-container">
         <div className="dashboard-welcome">
           <span className="dashboard-tag">ACCOUNT UPDATES</span>

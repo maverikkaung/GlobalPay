@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { getRequestErrorMessage } from "./request-errors.js";
+import DashboardNav from "./DashboardNav.jsx";
 
 function Reviews() {
   const { user } = useAuth();
@@ -13,8 +13,6 @@ function Reviews() {
   const [savingId, setSavingId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const dashboard = user.accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard";
-
   useEffect(() => {
     let active = true;
     async function loadEligibleJobs() {
@@ -94,10 +92,7 @@ function Reviews() {
 
   return (
     <div className="dashboard-page">
-      <header className="dashboard-navbar">
-        <Link to={dashboard} className="dashboard-logo">TechKarvo</Link>
-        <Link to={dashboard} className="dashboard-logout">Back to Dashboard</Link>
-      </header>
+      <DashboardNav user={user} />
       <main className="dashboard-container">
         <div className="dashboard-welcome">
           <span className="dashboard-tag">COMMUNITY FEEDBACK</span>

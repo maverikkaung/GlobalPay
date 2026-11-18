@@ -261,7 +261,7 @@ function Messages() {
 
   return (
     <main className="dashboard-page messages-page">
-      <DashboardNav user={user} title="Messages" />
+      <DashboardNav user={user} />
 
       <div className="messages-shell">
         <section className="messages-list-panel" aria-label="Conversations">

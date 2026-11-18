@@ -5,6 +5,7 @@ import { AuthProvider, RequireAuth } from "./AuthContext.jsx";
 import { useAuth } from "./useAuth.js";
 import { isSupabaseConfigured } from "./supabase.js";
 
+const DashboardNav = lazy(() => import("./DashboardNav.jsx"));
 const Login = lazy(() => import("./Login.jsx"));
 const Signup = lazy(() => import("./Signup.jsx"));
 const ForgotPassword = lazy(() => import("./ForgotPassword.jsx"));
@@ -53,7 +54,7 @@ function Home() {
 
       {/* NAVBAR */}
 
-      <header className="navbar">
+      {user ? <DashboardNav user={user} /> : <header className="navbar">
 
         <Link to="/" className="logo">
           Tech<span>Karvo</span>
@@ -117,7 +118,7 @@ function Home() {
           ☰
         </button>
 
-      </header>
+      </header>}
 
 
       {/* HOMEPAGE HERO */}

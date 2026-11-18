@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import DashboardNav from "./DashboardNav.jsx";
 
 function MyApplications() {
   const navigate = useNavigate();
@@ -155,15 +156,7 @@ function MyApplications() {
   return (
     <div className="dashboard-page applications-page">
 
-      <header className="dashboard-navbar">
-        <Link to="/freelancer-dashboard" className="dashboard-logo">
-          TechKarvo
-        </Link>
-
-        <Link to="/freelancer-dashboard" className="dashboard-logout">
-          Back to Dashboard
-        </Link>
-      </header>
+      <DashboardNav user={user} />
 
       <main className="dashboard-container applications-container">
 

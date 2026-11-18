@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
@@ -95,7 +95,7 @@ function ClientDashboard() {
   return (
     <div className="dashboard-page">
 
-      <DashboardNav user={user} title="Overview" />
+      <DashboardNav user={user} />
 
       <main className="dashboard-container">
 
@@ -139,83 +139,6 @@ function ClientDashboard() {
           </div>
 
         </div>
-
-        <section className="dashboard-section">
-
-          <h2>Quick Actions</h2>
-
-          <div className="dashboard-actions">
-
-            <Link
-              to="/post-job"
-              className="dashboard-action-card"
-            >
-              <span>📝</span>
-              <h3>Post a Job</h3>
-              <p>
-                Find the right freelancer for your project.
-              </p>
-            </Link>
-
-            <Link
-              to="/job-applicants"
-              className="dashboard-action-card"
-            >
-              <span>👥</span>
-              <h3>My Applicants</h3>
-              <p>
-                Review freelancers who applied for your jobs.
-              </p>
-            </Link>
-
-            <Link
-              to="/my-freelancers"
-              className="dashboard-action-card"
-            >
-              <span>👥</span>
-              <h3>My Freelancers</h3>
-              <p>
-                Manage your hired freelancers.
-              </p>
-            </Link>
-
-            <Link
-              to="/my-projects"
-              className="dashboard-action-card"
-            >
-              <span>📁</span>
-              <h3>My Projects</h3>
-              <p>
-                View and manage your projects.
-              </p>
-            </Link>
-
-            <Link to="/client-profile" className="dashboard-action-card">
-              <span>🏢</span>
-              <h3>My Profile</h3>
-              <p>Update the public details freelancers see about you.</p>
-            </Link>
-
-            <Link to="/messages" className="dashboard-action-card">
-              <span>✉️</span>
-              <h3>Messages</h3>
-              <p>Talk with freelancers about your projects.</p>
-            </Link>
-
-            <Link to="/notifications" className="dashboard-action-card">
-              <span>🔔</span>
-              <h3>Notifications</h3>
-              <p>See new applications, decisions, and messages.</p>
-            </Link>
-
-            <Link to="/reviews" className="dashboard-action-card">
-              <span>⭐</span>
-              <h3>Reviews</h3>
-              <p>Leave feedback after completed work.</p>
-            </Link>
-
-          </div>
-        </section>
 
       </main>
     </div>

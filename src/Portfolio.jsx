@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { toSafeExternalUrl } from "./external-urls.js";
 import { getRequestErrorMessage } from "./request-errors.js";
+import DashboardNav from "./DashboardNav.jsx";
 
 function Portfolio() {
   const { user } = useAuth();
@@ -116,14 +116,9 @@ function Portfolio() {
     }
   }
 
-  const dashboard = "/freelancer-dashboard";
-
   return (
     <div className="dashboard-page">
-      <header className="dashboard-navbar">
-        <Link to={dashboard} className="dashboard-logo">TechKarvo</Link>
-        <Link to={dashboard} className="dashboard-logout">Back to Dashboard</Link>
-      </header>
+      <DashboardNav user={user} />
       <main className="dashboard-container">
         <div className="dashboard-welcome">
           <span className="dashboard-tag">SHOW YOUR WORK</span>

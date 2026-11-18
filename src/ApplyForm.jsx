@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import DashboardNav from "./DashboardNav.jsx";
 
 function ApplyForm() {
   const navigate = useNavigate();
@@ -202,15 +203,7 @@ function ApplyForm() {
 
   return (
     <div className="dashboard-page">
-      <header className="dashboard-navbar">
-        <Link to="/jobs" className="dashboard-logo">
-          TechKarvo
-        </Link>
-
-        <Link to="/jobs" className="dashboard-logout">
-          Back to Jobs
-        </Link>
-      </header>
+      <DashboardNav user={user} />
 
       <main className="dashboard-container">
         <div className="dashboard-welcome">

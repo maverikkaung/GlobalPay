@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
+import DashboardNav from "./DashboardNav.jsx";
 
 function MyProjects() {
   const { user } = useAuth();
@@ -223,15 +224,7 @@ function MyProjects() {
   return (
     <div className="dashboard-page my-projects-page">
 
-      <header className="dashboard-navbar">
-        <Link to="/" className="dashboard-logo">
-          TechKarvo
-        </Link>
-
-        <Link to="/client-dashboard" className="dashboard-logout">
-          Back to Dashboard
-        </Link>
-      </header>
+      <DashboardNav user={user} />
 
       <main className="dashboard-container my-projects-container">
 

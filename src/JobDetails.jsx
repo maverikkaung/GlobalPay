@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { parseSkills } from "./marketplace.js";
+import DashboardNav from "./DashboardNav.jsx";
 import "./App.css";
 
 function JobDetails() {
@@ -110,7 +111,7 @@ function JobDetails() {
   return (
     <div className="job-details-page">
 
-      <header className="jobs-navbar">
+      {user ? <DashboardNav user={user} /> : <header className="jobs-navbar">
         <Link to="/" className="logo">
           TechKarvo
         </Link>
@@ -132,7 +133,7 @@ function JobDetails() {
             </>
           )}
         </div>
-      </header>
+      </header>}
 
       <main className="job-details-container">
 

@@ -5,6 +5,7 @@ import { supabase } from "./supabase.js";
 import { summarizeRatings } from "./marketplace.js";
 import { toSafeExternalUrl } from "./external-urls.js";
 import { getRequestErrorMessage } from "./request-errors.js";
+import DashboardNav from "./DashboardNav.jsx";
 
 function PublicProfile() {
   const { id } = useParams();
@@ -70,10 +71,7 @@ function PublicProfile() {
 
   return (
     <div className="dashboard-page">
-      <header className="dashboard-navbar">
-        <Link to={backLink} className="dashboard-logo">TechKarvo</Link>
-        <Link to={backLink} className="dashboard-logout">Back</Link>
-      </header>
+      <DashboardNav user={user} />
       <main className="dashboard-container public-profile-page">
         <section className="public-profile-hero">
           <div className="public-profile-avatar">{(profile.full_name || "M").charAt(0).toUpperCase()}</div>

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { getRequestErrorMessage } from "./request-errors.js";
+import DashboardNav from "./DashboardNav.jsx";
 
 function ClientProfile() {
   const navigate = useNavigate();
@@ -71,10 +72,7 @@ function ClientProfile() {
 
   return (
     <div className="dashboard-page">
-      <header className="dashboard-navbar">
-        <Link to="/client-dashboard" className="dashboard-logo">TechKarvo</Link>
-        <Link to="/client-dashboard" className="dashboard-logout">Back to Dashboard</Link>
-      </header>
+      <DashboardNav user={user} />
       <main className="dashboard-container">
         <div className="dashboard-welcome">
           <span className="dashboard-tag">CLIENT PROFILE</span>

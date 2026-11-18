@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
@@ -85,7 +85,7 @@ function FreelancerDashboard() {
   return (
     <div className="dashboard-page">
 
-      <DashboardNav user={user} title="Overview" />
+      <DashboardNav user={user} />
 
       <main className="dashboard-container">
 
@@ -125,56 +125,6 @@ function FreelancerDashboard() {
 
         {error && <p role="alert">{error}</p>}
 
-        <section className="dashboard-section">
-
-          <h2>Quick Actions</h2>
-
-          <div className="dashboard-actions">
-
-            <Link to="/jobs" className="dashboard-action-card">
-              <span>🔍</span>
-              <h3>Find Jobs</h3>
-              <p>Explore available freelance opportunities.</p>
-            </Link>
-
-            <Link to="/my-applications" className="dashboard-action-card">
-              <span>💼</span>
-              <h3>My Applications</h3>
-              <p>Track your job applications.</p>
-            </Link>
-
-            <Link to="/freelancer-profile" className="dashboard-action-card">
-              <span>👤</span>
-              <h3>My Profile</h3>
-              <p>Manage your professional profile and skills.</p>
-            </Link>
-
-            <Link to="/portfolio" className="dashboard-action-card">
-              <span>🗂️</span>
-              <h3>My Portfolio</h3>
-              <p>Show clients examples of your best work.</p>
-            </Link>
-
-            <Link to="/messages" className="dashboard-action-card">
-              <span>✉️</span>
-              <h3>Messages</h3>
-              <p>Talk with clients about applications and work.</p>
-            </Link>
-
-            <Link to="/notifications" className="dashboard-action-card">
-              <span>🔔</span>
-              <h3>Notifications</h3>
-              <p>See application and message updates.</p>
-            </Link>
-
-            <Link to="/reviews" className="dashboard-action-card">
-              <span>⭐</span>
-              <h3>Reviews</h3>
-              <p>Review clients when completed work is ready.</p>
-            </Link>
-
-          </div>
-        </section>
  </main>
     </div>
   );

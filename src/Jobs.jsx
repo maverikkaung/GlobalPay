@@ -3,6 +3,7 @@ import { NavLink, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { getJobCategories, matchesJobSearch, parseSkills } from "./marketplace.js";
+import DashboardNav from "./DashboardNav.jsx";
 import "./App.css";
 
 function Jobs() {
@@ -127,7 +128,7 @@ function Jobs() {
 
   return (
     <div className="jobs-page">
-      <nav className="jobs-navbar">
+      {user ? <DashboardNav user={user} /> : <nav className="jobs-navbar">
         <Link to="/" className="logo">
           TechKarvo
         </Link>
@@ -146,7 +147,7 @@ function Jobs() {
             <><Link to="/login" className="login-btn">Log In</Link><Link to="/signup" className="signup-btn">Sign Up</Link></>
           )}
         </div>
-      </nav>
+      </nav>}
 
       <section className="jobs-hero">
         <div className="jobs-hero-content">
