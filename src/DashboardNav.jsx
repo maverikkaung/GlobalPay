@@ -42,12 +42,14 @@ export default function DashboardNav({ user }) {
   const [activeMenu, setActiveMenu] = useState("");
   const [logoutError, setLogoutError] = useState("");
   const navRef = useRef(null);
-  const userId = user.id;
-  const dashboardPath = user.accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard";
+  const userId = user?.id;
+  const accountType = user?.accountType;
+  const dashboardPath = accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard";
   const isDashboard = ["/client-dashboard", "/freelancer-dashboard"].includes(location.pathname);
-  const myProfilePath = getProfilePath(user.accountType);
+  const myProfilePath = getProfilePath(accountType);
 
   const refreshCounts = useCallback(async () => {
+    if (!userId) return;
     const [notifications, messages, latest] = await Promise.all([
       supabase.from("notifications").select("id", { count: "exact", head: true })
         .eq("user_id", userId).is("read_at", null),
@@ -65,6 +67,7 @@ export default function DashboardNav({ user }) {
   }, [userId]);
 
   useEffect(() => {
+    if (!userId) return undefined;
     const initialRefresh = window.setTimeout(refreshCounts, 0);
     const channel = supabase.channel(`dashboard-alerts-${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` }, refreshCounts)
@@ -112,6 +115,7 @@ export default function DashboardNav({ user }) {
   }
 
   async function openNotification(item) {
+    if (!userId || !item?.id) return;
     setActiveMenu("");
     if (!item.read_at) {
       const result = await supabase.from("notifications")
@@ -121,6 +125,8 @@ export default function DashboardNav({ user }) {
     }
     navigate(notificationTarget(item));
   }
+
+  if (!userId || !accountType) return null;
 
   return (
     <>
@@ -172,9 +178,9 @@ export default function DashboardNav({ user }) {
               onClick={() => setActiveMenu((open) => open === "quick" ? "" : "quick")}>
               <Icon name="menu" />
             </button>
-            {activeMenu === "quick" && <nav className="nav-dropdown quick-actions-menu" id="quick-actions-menu" aria-label={`${user.accountType} quick actions`}>
+            {activeMenu === "quick" && <nav className="nav-dropdown quick-actions-menu" id="quick-actions-menu" aria-label={`${accountType} quick actions`}>
               <strong>Quick actions</strong>
-              {getQuickActions(user.accountType).map(([label, path]) => (
+              {getQuickActions(accountType).map(([label, path]) => (
                 <Link key={path} to={path} onClick={() => setActiveMenu("")}>{label}</Link>
               ))}
             </nav>}
