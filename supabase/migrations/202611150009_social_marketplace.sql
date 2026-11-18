@@ -39,8 +39,8 @@ select id, full_name, account_type, country, professional_title, bio,
 from public.profiles
 where account_type = 'client';
 
+revoke all on public.freelancer_public_profiles, public.client_public_profiles from public, anon, authenticated;
 grant select on public.freelancer_public_profiles, public.client_public_profiles to authenticated;
-revoke insert, update, delete on public.freelancer_public_profiles, public.client_public_profiles from anon, authenticated;
 
 create table public.posts (
   id uuid primary key default gen_random_uuid(),
@@ -467,8 +467,9 @@ create policy "Messages require an active application or accepted connection"
     )
   );
 
--- Public photos/posts intentionally use one dedicated public bucket. Restrict
--- uploads to owner/<random filename>, 5 MiB, and image-only MIME types.
+-- This public bucket is exclusively for profile photos, covers, and professional
+-- post images. Never store private message attachments or sensitive documents
+-- here. Restrict uploads to owner/<random filename>, 5 MiB, and image-only MIME types.
 do $$
 begin
   if exists (select 1 from storage.buckets where id = 'techkarvo-marketplace') then

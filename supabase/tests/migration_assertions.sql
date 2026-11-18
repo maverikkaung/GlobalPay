@@ -108,6 +108,12 @@ begin
     and table_name in ('freelancer_public_profiles', 'client_public_profiles') and column_name = 'email') then
     raise exception 'Public profile views must not expose email addresses';
   end if;
+  if has_table_privilege('anon', 'public.freelancer_public_profiles', 'SELECT')
+    or has_table_privilege('anon', 'public.client_public_profiles', 'SELECT')
+    or not has_table_privilege('authenticated', 'public.freelancer_public_profiles', 'SELECT')
+    or not has_table_privilege('authenticated', 'public.client_public_profiles', 'SELECT') then
+    raise exception 'Public profile projections must be readable only by authenticated marketplace members';
+  end if;
   if not exists (select 1 from storage.buckets where id = 'techkarvo-marketplace'
     and public = true and file_size_limit = 5242880
     and allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']::text[]) then
