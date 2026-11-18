@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildSocialFeed, getConnectionForPair, isValidMarketplaceImage, mapPostEngagement } from "./social-marketplace.js";
+import { buildSocialFeed, getConnectionForPair, isValidMarketplaceImage, mapPostEngagement, resolveSocialPageUser } from "./social-marketplace.js";
+
+test("standalone Daily Feed resolves the authenticated user when its route provides no prop", () => {
+  const authenticatedUser = { id: "freelancer-id", accountType: "Freelancer" };
+  assert.equal(resolveSocialPageUser(undefined, authenticatedUser), authenticatedUser);
+  const suppliedUser = { id: "client-id", accountType: "Client" };
+  assert.equal(resolveSocialPageUser(suppliedUser, authenticatedUser), suppliedUser);
+  assert.equal(resolveSocialPageUser({ id: "missing-role" }, authenticatedUser), authenticatedUser);
+});
 
 test("the daily feed shows all social posts and never mixes in job offers", () => {
   const profiles = {

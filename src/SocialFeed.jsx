@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { getRequestErrorMessage } from "./request-errors.js";
 import { toSafeExternalUrl } from "./external-urls.js";
-import { buildSocialFeed, getConnectionForPair, isValidMarketplaceImage, mapPostEngagement, MARKETPLACE_MEDIA_BUCKET } from "./social-marketplace.js";
+import { buildSocialFeed, getConnectionForPair, isValidMarketplaceImage, mapPostEngagement, MARKETPLACE_MEDIA_BUCKET, resolveSocialPageUser } from "./social-marketplace.js";
 import DashboardNav from "./DashboardNav.jsx";
 
 function imageUrl(path) {
@@ -397,6 +398,9 @@ export function SocialFeed({ user }) {
   </section>;
 }
 
-export function SocialPage({ user }) {
+export function SocialPage({ user: suppliedUser }) {
+  const { user: authUser } = useAuth();
+  const user = resolveSocialPageUser(suppliedUser, authUser);
+  if (!user?.id || !user.accountType) return <div className="dashboard-page"><main className="dashboard-container"><p role="status">Loading your community feed…</p></main></div>;
   return <div className="dashboard-page"><DashboardNav user={user} /><main className="dashboard-container"><SocialFeed user={user} /></main></div>;
 }

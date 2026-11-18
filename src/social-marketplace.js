@@ -2,6 +2,10 @@ export const MARKETPLACE_MEDIA_BUCKET = "techkarvo-marketplace";
 export const MAX_MARKETPLACE_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MARKETPLACE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+export function resolveSocialPageUser(suppliedUser, authenticatedUser) {
+  return suppliedUser?.id && suppliedUser.accountType ? suppliedUser : authenticatedUser;
+}
+
 export function isValidMarketplaceImage(file) {
   return Boolean(file && MARKETPLACE_IMAGE_TYPES.includes(file.type) && file.size > 0 && file.size <= MAX_MARKETPLACE_IMAGE_BYTES);
 }
