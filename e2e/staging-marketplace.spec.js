@@ -31,6 +31,45 @@ function readUnreadCount(label) {
   return Number(match?.[1] || 0);
 }
 
+test("staging Client acceptance makes the personal connection visible to both members", async ({ browser }) => {
+  test.skip(!credentialsAvailable, "Set staging-only QA account variables to run authenticated staging browser coverage.");
+  const clientContext = await browser.newContext();
+  const freelancerContext = await browser.newContext();
+  const client = await clientContext.newPage();
+  const freelancer = await freelancerContext.newPage();
+  client.on("dialog", (dialog) => dialog.accept());
+  try {
+    await signIn(client, clientCredentials, "Client");
+    await signIn(freelancer, freelancerCredentials, "Freelancer");
+    const postBody = `QA connection visibility ${Date.now()}`;
+    await client.goto("/social");
+    await client.locator("#social-post-body").fill(postBody);
+    await client.getByRole("button", { name: "Publish", exact: true }).click();
+    await expect(client.getByText("Your professional post is live.")).toBeVisible();
+    await freelancer.goto("/social");
+    const post = freelancer.locator("article.social-card").filter({ hasText: postBody });
+    await expect(post).toBeVisible();
+    const action = post.getByRole("button", { name: /^(Connect|Message)$/ });
+    await expect(action).toBeVisible();
+    if (await action.innerText() === "Connect") {
+      await action.click();
+      await expect(freelancer.getByText(/Connection request sent/i)).toBeVisible();
+      await client.goto("/connections");
+      const incoming = client.locator(".connection-card").filter({ hasText: "TechKarvo QA Freelancer" });
+      await expect(incoming.first()).toBeVisible();
+      await incoming.first().getByRole("button", { name: "Accept", exact: true }).click();
+      await client.waitForURL(/\/messages\?conversation=/);
+    }
+    await freelancer.goto("/connections");
+    const accepted = freelancer.locator(".connection-card").filter({ hasText: "TechKarvo QA Client" });
+    await expect(accepted.first()).toBeVisible({ timeout: 30_000 });
+    await expect(accepted.first().locator(".connection-status")).toHaveText("Accepted");
+    await expect(accepted.first().getByRole("button", { name: "Message", exact: true })).toBeVisible();
+  } finally {
+    await clientContext.close();
+    await freelancerContext.close();
+  }
+});
 test("staging Client and Freelancer workflows: media, jobs, social, messaging, safety, contracts, reviews and settings", async ({ browser }) => {
   test.skip(!credentialsAvailable, "Set staging-only QA account variables to run authenticated staging browser coverage.");
   test.setTimeout(300_000);
@@ -44,7 +83,12 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
   for (const page of [client, freelancer]) {
     page.setDefaultNavigationTimeout(60_000);
     page.on("pageerror", (error) => runtimeErrors.push(error.message));
-    page.on("requestfailed", (request) => failedRequests.push(`${request.method()} ${request.url().split("?")[0]} · ${request.failure()?.errorText || "request failed"}`));
+    page.on("requestfailed", (request) => {
+      const failure = request.failure()?.errorText || "request failed";
+      if (failure !== "net::ERR_ABORTED" && failure !== "NS_BINDING_ABORTED") {
+        failedRequests.push(`${request.method()} ${request.url().split("?")[0]} · ${failure}`);
+      }
+    });
   }
   client.on("dialog", (dialog) => dialog.accept());
   freelancer.on("dialog", (dialog) => dialog.accept());
@@ -225,7 +269,12 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
       await client.goto("/connections");
       const incomingRequest = client.locator(".connection-card").filter({ hasText: "TechKarvo QA Freelancer" }).first();
       await incomingRequest.getByRole("button", { name: "Accept", exact: true }).click();
+      await client.waitForURL(/\/messages\?conversation=/, { timeout: 30_000 });
     }
+    await freelancer.goto("/connections");
+    const acceptedConnection = freelancer.locator(".connection-card").filter({ hasText: "TechKarvo QA Client" }).first();
+    await expect(acceptedConnection).toBeVisible({ timeout: 30_000 });
+    await expect(acceptedConnection.locator(".connection-status")).toHaveText("Accepted");
     await freelancer.goto("/social");
     const sharedPost = freelancer.locator("article.social-card").filter({ hasText: `${postBody} edited` }).first();
     await expect(sharedPost.getByRole("button", { name: "Message", exact: true })).toBeVisible();
@@ -251,13 +300,16 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await selectMessageFolder(freelancer, "personal");
     const messageBubble = freelancer.locator(".message-bubble").filter({ hasText: personalMessage });
     await messageBubble.getByRole("button", { name: "Delete for Everyone" }).click();
-    await expect(freelancer.getByText("[Message removed]")).toBeVisible();
+    await expect(freelancer.locator(".message-bubble").filter({ hasText: "[Message removed]" }).last()
+      .getByText("[Message removed]", { exact: true })).toBeVisible();
     await client.goto("/messages");
     await selectMessageFolder(client, "personal");
-    await expect(client.getByText("[Message removed]")).toBeVisible();
+    const clientRedactedMessage = client.locator(".message-bubble").filter({ hasText: "[Message removed]" }).last();
+    await expect(clientRedactedMessage.getByText("[Message removed]", { exact: true })).toBeVisible();
+    await expect(client.getByText(personalMessage, { exact: true })).toHaveCount(0);
 
     // Active contract must prevent blocking; complete it, then verify block/unblock, mute and report.
-    const safety = client.locator(".member-safety-actions").filter({ hasText: "QA Test Freelancer" });
+    const safety = client.getByRole("region", { name: "Safety controls for TechKarvo QA Freelancer" });
     // Open the job conversation from its application before checking contract protection.
     await client.goto("/job-applicants");
     const activeApplicant = client.locator(".applicant-card").filter({ hasText: jobTitle });
@@ -266,9 +318,25 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await safety.getByRole("button", { name: "Block" }).click();
     await expect(safety.getByRole("alert")).toBeVisible();
     await client.goto("/my-projects");
-    const activeProject = client.locator(".my-project-card").filter({ hasText: jobTitle });
-    await activeProject.getByRole("button", { name: "Mark complete" }).click();
-    await expect(client.getByText("Project marked complete.")).toBeVisible();
+    const qaProjectCards = client.locator(".my-project-card").filter({ hasText: "QA regression job" });
+    const completeQaProjects = qaProjectCards.getByRole("button", { name: "Mark complete" });
+    let completedQaProjects = 0;
+    const currentProject = qaProjectCards.filter({ hasText: jobTitle });
+    await expect(currentProject).toBeVisible();
+    const currentProjectStatus = (await currentProject.locator(".my-project-status").textContent()).trim().toLowerCase();
+    if (currentProjectStatus === "open") {
+      await currentProject.getByRole("button", { name: "Mark complete" }).click();
+      await expect(client.getByText("Project marked complete.")).toBeVisible();
+      completedQaProjects += 1;
+    } else {
+      expect(currentProjectStatus).toBe("completed");
+    }
+    while (await completeQaProjects.count() > 0 && completedQaProjects < 20) {
+      await completeQaProjects.first().click();
+      await expect(client.getByText("Project marked complete.")).toBeVisible();
+      completedQaProjects += 1;
+    }
+    await expect(completeQaProjects).toHaveCount(0);
 
     await client.goto("/messages");
     await selectMessageFolder(client, "personal");

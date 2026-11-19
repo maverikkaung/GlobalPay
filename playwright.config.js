@@ -21,7 +21,7 @@ export default defineConfig({
     actionTimeout: 15_000,
     navigationTimeout: 60_000,
     launchOptions: executablePath ? { executablePath } : {},
-    trace: "retain-on-failure"
+    trace: "off"
   },
   webServer: externalBaseURL ? undefined : {
     command: "npm run dev -- --host 127.0.0.1",
