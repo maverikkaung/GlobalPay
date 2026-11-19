@@ -1,5 +1,11 @@
 import { test, expect } from "@playwright/test";
 
+test("owner dashboard route stays behind authentication for public visitors", async ({ page }) => {
+  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
+});
+
 test("visitor can complete a sample client-to-freelancer hiring journey without Supabase", async ({ page }) => {
   const supabaseRequests = [];
   const pageErrors = [];
