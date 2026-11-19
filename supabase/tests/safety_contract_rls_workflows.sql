@@ -138,6 +138,38 @@ select set_config('request.jwt.claim.sub', '84444444-4444-4444-8444-444444444444
 select set_config('techkarvo.test_conversation_id',
   (select id::text from public.conversations where application_id = 'connection:89999999-9999-4999-8999-999999999999'), true);
 insert into public.posts (id, author_id, body)
+values ('88888888-8888-4888-8888-888888888889', auth.uid(), 'Shared post deletion test');
+insert into public.messages (id, conversation_id, sender_id, body, shared_post_id)
+values ('87777777-7777-4777-8777-777777777778',
+  current_setting('techkarvo.test_conversation_id')::uuid, auth.uid(), 'Shared post preview retained',
+  '88888888-8888-4888-8888-888888888889');
+do $$
+declare
+  direct_reference_edit_denied boolean := false;
+begin
+  begin
+    update public.messages set shared_post_id = null where id = '87777777-7777-4777-8777-777777777778';
+  exception when insufficient_privilege then direct_reference_edit_denied := true;
+  end;
+  if not direct_reference_edit_denied then
+    raise exception 'Authenticated users must not directly edit shared-post references';
+  end if;
+end;
+$$;
+delete from public.posts where id = '88888888-8888-4888-8888-888888888889';
+do $$
+begin
+  if exists (select 1 from public.posts where id = '88888888-8888-4888-8888-888888888889') then
+    raise exception 'A post owner must be able to remove their post';
+  end if;
+  if not exists (select 1 from public.messages where id = '87777777-7777-4777-8777-777777777778'
+    and body = 'Shared post preview retained' and shared_post_id is null and deleted_for_everyone_at is null) then
+    raise exception 'Deleting a shared post must clear only its preview reference and retain the message';
+  end if;
+end;
+$$;
+
+insert into public.posts (id, author_id, body)
 values ('88888888-8888-4888-8888-888888888888', auth.uid(), 'Blocked member post');
 insert into public.post_likes (post_id, user_id)
 values ('88888888-8888-4888-8888-888888888888', auth.uid());
