@@ -31,12 +31,13 @@ The app accepts `VITE_SUPABASE_PUBLISHABLE_KEY`. `VITE_SUPABASE_ANON_KEY` remain
 ## Supabase setup and migration controls
 
 - Create separate buyer-owned development, staging, and production projects. Never reuse the seller's project or credentials.
-- Migrations `202611150000`–`202611150011` form the current marketplace schema sequence. Review the SQL, RLS, triggers, grants, storage policies, and CI fixture before applying it to a buyer project.
+- Migrations `202611150000`–`202611150011` are the current staging schema. `202611150012_admin_support_configuration.sql` is a draft that still needs isolated CI verification and staging approval. Review the SQL, RLS, triggers, grants, storage policies, and CI fixture before applying any migration to a buyer project.
 - Migration `202611150000` creates core tables and is for a fresh database only. Stop if tables or data already exist; do not try to make it fit by deleting records.
 - Use a staging backup/snapshot, verify the exact project reference, inspect pending migrations, run a dry-run, then obtain approval from the buyer's database owner before applying.
 - Configure Site URL and Auth redirects only in the buyer's corresponding environment. Use controlled inboxes to verify confirmation and reset emails.
 - Validate public/private Storage bucket rules and RLS using separate Client, Freelancer, and Admin test identities. Keep private documents and message attachments private.
 - Production migration and RLS approvals belong to the buyer's release process. CI uses a disposable local PostgreSQL database and never proves that a live environment is safe.
+- After the admin schema is approved and applied, the first owner administrator must be provisioned through the buyer-controlled Supabase SQL Editor or another reviewed trusted bootstrap. The app must not allow users to self-assign this role. Verify the target Auth user identity and UUID before insertion.
 
 ## Vercel configuration
 

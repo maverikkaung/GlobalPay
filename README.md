@@ -33,7 +33,7 @@ GitHub Actions runs lint, unit tests, build and isolated public/demo browser tes
 
 ## Database and environments
 
-Migrations are numbered `202611150000` through `202611150011`. Fresh databases require the base schema first; do not apply it to a database with existing marketplace tables. **Staging** (`techkarvo-staging`, `ntucgiieksrwebwvcmun`) was set up through migration 011 according to the project change history. **Production schema and migration state are not to be inferred from staging.** Any future migration requires target/schema review and separate approval before applying to staging; never run the CI fixture against a live project.
+Migrations are numbered `202611150000` through `202611150012`. Fresh databases require the base schema first; do not apply it to a database with existing marketplace tables. **Staging** (`techkarvo-staging`, `ntucgiieksrwebwvcmun`) was set up through migration 011 according to the project change history. Migration 012 is a draft for admin/support/catalog foundations, not yet verified in CI or applied to staging. **Production schema and migration state are not to be inferred from staging.** Any future migration requires target/schema review and separate approval before applying to staging; never run the CI fixture against a live project.
 
 RLS is the data authorization boundary; React route guards only control navigation. Review all migrations, storage policies and database tests before buyer deployment. Read [staging verification](docs/staging-verification.md) and [the buyer guide](docs/buyer-transfer-guide.md).
 

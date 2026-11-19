@@ -13,7 +13,7 @@ Audit baseline: branch `codex/marketplace-data-foundation`, commit `530138a` (20
 | Contracts and reviews | Active/completed/disputed status, participant access, two-way review flow | Contract tracking exists; there is no funds ledger, real escrow, formal dispute case workflow, provider reconciliation, or legally enforceable payment guarantee. |
 | Member safety | Block, mute and report submission with RLS-backed rules | User-side reporting exists. Owner moderation queue, case assignment, appeals, support SLAs, and audit dashboard are missing. |
 | Demo Mode | Local-only role switch, marketplace/social sample workflows, reset, responsive/theme Playwright coverage | Implemented and isolated from Supabase; no wallet/membership/ad rewards are represented as real value. |
-| Admin and ownership controls | No Admin route or Admin dashboard; unsupported role has no quick actions | Critical sale-readiness gap. Needs trusted admin identity/provisioning and RLS/server-side authorization, not a client-side role flag alone. |
+| Admin and ownership controls | No Admin route or Admin dashboard; unsupported role has no quick actions | Critical sale-readiness gap. Migration 012 is a draft intended to add a trusted admin registry/RPC foundation; neither CI nor staging verification is complete. UI and buyer bootstrap flow remain incomplete. |
 | Memberships | None | Free/Plus/Gold/Premium catalog, entitlements, renewal, expiry, tier settings, and buyer configuration are not implemented. No subscription sales should be enabled. |
 | KAV/USDT | Architecture document only | No wallet UI, ledger, balance, payment provider, sandbox adapter, or transfer integration exists. `1 USDT = 1 KAV` is a requested demo simulation rule only. |
 | Ads/rewards | None | No real ads, rewarded events, fraud checks, or reward ledger. A sandbox-only simulation can be built without a network provider. |
@@ -33,7 +33,7 @@ Audit baseline: branch `codex/marketplace-data-foundation`, commit `530138a` (20
 
 1. **Transfer and configuration foundation:** safe public-key build guard; complete source/environment/deployment/ownership docs; remove stale setup claims. No migrations.
 2. **Central buyer-owned product configuration:** feature flags, brand, membership catalog, commission display settings, demo rate and limits. Keep private financial enforcement server-side; migration approval required if persisted in Supabase.
-3. **Admin and support operations:** invite/provision trusted administrators, role authorization enforced in the database/server, reports queue, moderation actions, support cases and audit events. Design and review schema/RLS before requesting migration approval.
+3. **Admin and support operations:** review and verify migration 012 in isolated PostgreSQL, then request staging approval; build Admin route, buyer bootstrap guide, reports queue, moderation actions, support cases and audit views. Trusted admin role must be enforced in database/server.
 4. **Sandbox money model:** Demo Mode-only wallet transactions at fixed `1 USDT = 1 KAV`, milestones/fees/refunds/disputes, replay/idempotency, visible simulation labels and no network calls. No real provider credentials.
 5. **Membership and ad reward simulation:** editable tier catalog and entitlement simulation, deterministic demo events, limits and abuse testing. Do not activate billing or third-party ads.
 6. **Buyer operations and analytics:** simulated reporting dashboards, exportable diagnostics, incident/support runbooks, localization and performance/accessibility review.

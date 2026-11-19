@@ -5,7 +5,8 @@ begin
   foreach table_name in array array[
     'profiles', 'jobs', 'job_applications', 'conversations',
     'messages', 'notifications', 'portfolio_items', 'reviews',
-    'posts', 'post_likes', 'post_comments', 'connections'
+    'posts', 'post_likes', 'post_comments', 'connections', 'platform_admins',
+    'platform_settings', 'membership_tiers', 'support_cases', 'admin_audit_log'
   ] loop
     if not exists (
       select 1 from pg_class c
@@ -113,6 +114,33 @@ begin
     or not has_table_privilege('authenticated', 'public.freelancer_public_profiles', 'SELECT')
     or not has_table_privilege('authenticated', 'public.client_public_profiles', 'SELECT') then
     raise exception 'Public profile projections must be readable only by authenticated marketplace members';
+  end if;
+  if has_table_privilege('anon', 'public.platform_admins', 'SELECT')
+    or has_table_privilege('authenticated', 'public.platform_admins', 'SELECT')
+    or has_table_privilege('authenticated', 'public.admin_audit_log', 'INSERT')
+    or has_table_privilege('authenticated', 'public.admin_audit_log', 'UPDATE')
+    or has_table_privilege('authenticated', 'public.admin_audit_log', 'DELETE') then
+    raise exception 'Admin identities and audit writes must remain privileged';
+  end if;
+  if has_table_privilege('anon', 'public.support_cases', 'SELECT')
+    or has_table_privilege('anon', 'public.membership_tiers', 'SELECT')
+    or has_table_privilege('anon', 'public.platform_settings', 'SELECT') then
+    raise exception 'Anonymous users must not read support or product configuration';
+  end if;
+  if not has_column_privilege('authenticated', 'public.support_cases', 'subject', 'INSERT')
+    or has_column_privilege('authenticated', 'public.support_cases', 'status', 'INSERT')
+    or has_column_privilege('authenticated', 'public.support_cases', 'assigned_admin_id', 'INSERT') then
+    raise exception 'Members may open only constrained support requests';
+  end if;
+  if not has_function_privilege('authenticated', 'public.techkarvo_is_platform_admin()', 'EXECUTE')
+    or has_function_privilege('anon', 'public.techkarvo_is_platform_admin()', 'EXECUTE')
+    or not has_function_privilege('authenticated', 'public.techkarvo_admin_review_report(uuid,text,text)', 'EXECUTE')
+    or has_function_privilege('anon', 'public.techkarvo_admin_review_report(uuid,text,text)', 'EXECUTE') then
+    raise exception 'Admin functions must be callable only by authenticated members';
+  end if;
+  if exists (select 1 from public.membership_tiers where is_simulation_only is not true)
+    or (select count(*) from public.membership_tiers) <> 4 then
+    raise exception 'Membership catalog must be limited to the four simulation-only tiers';
   end if;
   if not exists (select 1 from storage.buckets where id = 'techkarvo-marketplace'
     and public = true and file_size_limit = 5242880

@@ -7,7 +7,7 @@
 - Region: Tokyo (`ap-northeast-1`)
 - Staging site: `https://techkarvo-staging.vercel.app`
 - Staging Vercel deployment branch: `codex/marketplace-data-foundation`
-- The project history records migrations `202611150000` through `202611150011` applied to this staging project. Production remains a separate system and is outside this runbook.
+- The project history records migrations `202611150000` through `202611150011` applied to this staging project. Migration `202611150012_admin_support_configuration.sql` is a draft not yet verified in disposable CI or applied to staging; it needs separate approval after review. Production remains a separate system and is outside this runbook.
 
 The values above identify the development environment only. Before each operation, confirm the current target in the Supabase/Vercel dashboard or authenticated CLI. Never infer a target from a local link file alone. No migration in this runbook is pre-approved for a future change.
 
