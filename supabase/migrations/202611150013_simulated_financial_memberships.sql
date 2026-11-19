@@ -361,7 +361,7 @@ begin
   insert into public.ledger_transactions(actor_id,transaction_type,idempotency_key,amount_kav,note)
     values(actor,'sandbox_withdrawal',p_idempotency_key,p_amount_kav,'Simulated withdrawal request; no payout occurs') returning id into txn;
   insert into public.ledger_entries(transaction_id,account_key,amount_kav) values
-    (txn,'user:'||actor::text||':available',-p_amount_kav),('sandbox:withdrawal',p_amount_kav);
+    (txn,'user:'||actor::text||':available',-p_amount_kav),(txn,'sandbox:withdrawal',p_amount_kav);
   return jsonb_build_object('transaction_id',txn,'amount_kav',p_amount_kav,'already_processed',false,'simulation_only',true);
 end;
 $$;
@@ -569,7 +569,7 @@ begin
   insert into public.ledger_transactions(actor_id,transaction_type,idempotency_key,amount_kav,note)
     values(actor,'sandbox_ad_reward','ad-reward:'||current_date::text||':'||(claim_count+1),reward,'Simulated ad reward; no advertisement network or funds') returning id into txn;
   insert into public.ledger_entries(transaction_id,account_key,amount_kav) values
-    (txn,'sandbox:ad_reward_pool',-reward),('user:'||actor::text||':available',reward);
+    (txn,'sandbox:ad_reward_pool',-reward),(txn,'user:'||actor::text||':available',reward);
   insert into public.sandbox_ad_reward_claims(user_id,claim_date,claim_number,transaction_id)
     values(actor,current_date,claim_count+1,txn);
   return jsonb_build_object('transaction_id',txn,'reward_kav',reward,'remaining_today',limit_per_day-claim_count-1,'simulation_only',true);
