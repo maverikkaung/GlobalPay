@@ -392,7 +392,9 @@ create or replace function public.techkarvo_consume_usage_credit()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare actor uuid; ent public.membership_entitlements%rowtype; event_key text;
 begin
-  actor := case when tg_table_name='jobs' then new.client_id else new.freelancer_id end;
+  if tg_table_name='jobs' then actor := new.client_id;
+  else actor := new.freelancer_id;
+  end if;
   perform pg_advisory_xact_lock(hashtextextended(actor::text,1));
   select * into ent from public.membership_entitlements where user_id=actor for update;
   if ent.user_id is null then raise exception 'Membership entitlement is not configured' using errcode='55000'; end if;
@@ -674,14 +676,5 @@ grant execute on function public.techkarvo_admin_upsert_membership_plan(text,tex
 grant execute on function public.techkarvo_admin_update_financial_config(boolean,integer,bigint,integer,bigint,bigint) to authenticated;
 grant execute on function public.techkarvo_admin_financial_summary() to authenticated;
 grant execute on function public.techkarvo_admin_financial_configuration() to authenticated;
-
-revoke all on function public.techkarvo_sandbox_wallet() from public, anon, authenticated;
-revoke all on function public.techkarvo_sandbox_deposit(bigint,text) from public, anon, authenticated;
-revoke all on function public.techkarvo_sandbox_withdraw(bigint,text) from public, anon, authenticated;
-revoke all on function public.techkarvo_sandbox_activate_plan(text) from public, anon, authenticated;
-grant execute on function public.techkarvo_sandbox_wallet() to authenticated;
-grant execute on function public.techkarvo_sandbox_deposit(bigint,text) to authenticated;
-grant execute on function public.techkarvo_sandbox_withdraw(bigint,text) to authenticated;
-grant execute on function public.techkarvo_sandbox_activate_plan(text) to authenticated;
 
 commit;
