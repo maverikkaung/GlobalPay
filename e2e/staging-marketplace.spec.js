@@ -78,12 +78,18 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await client.goto("/client-profile");
     await client.getByLabel("Profile photo").setInputFiles({ name: "qa-client-avatar.png", mimeType: "image/png", buffer: tinyPng });
     await client.getByLabel("Cover photo").setInputFiles({ name: "qa-client-cover.png", mimeType: "image/png", buffer: tinyPng });
+    await client.getByLabel("Country / City").fill("QA staging");
     await client.getByRole("button", { name: "Save profile" }).click();
     await expect(client.getByText("Your profile and photos have been saved.")).toBeVisible({ timeout: 30_000 });
 
     await freelancer.goto("/freelancer-profile");
     await freelancer.getByLabel("Profile photo").setInputFiles({ name: "qa-freelancer-avatar.png", mimeType: "image/png", buffer: tinyPng });
     await freelancer.getByLabel("Cover photo").setInputFiles({ name: "qa-freelancer-cover.png", mimeType: "image/png", buffer: tinyPng });
+    await freelancer.getByLabel("Country / City").fill("QA staging");
+    await freelancer.getByLabel("Professional Title").fill("QA Test Freelancer");
+    await freelancer.getByLabel("About Me").fill("Test profile for safe staging marketplace verification.");
+    await freelancer.getByLabel("Skills").fill("React, Playwright, accessibility");
+    await freelancer.getByLabel("Years of Experience").selectOption("Less than 1 year");
     await freelancer.getByRole("button", { name: "Save Profile" }).click();
     await expect(freelancer.getByText("Your profile and photos have been saved.")).toBeVisible({ timeout: 30_000 });
 
@@ -164,8 +170,15 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     const preview = client.getByRole("region", { name: "Recent notifications" });
     await expect(preview).toBeVisible();
     await expect(preview.getByText(/reaction on your post|comment on your post/i).first()).toBeVisible();
-    await preview.getByRole("button", { name: /reaction on your post|comment on your post/i }).first().click();
-    await expect.poll(async () => readUnreadCount(await notificationButton.getAttribute("aria-label")), { timeout: 30_000 }).toBeLessThanOrEqual(baselineNotifications + 1);
+    const unreadSocialNotification = preview.locator("button.notification-preview-item.unread")
+      .filter({ hasText: /reaction on your post|comment on your post/i }).first();
+    const openedNotificationTitle = (await unreadSocialNotification.locator("strong").textContent()).trim();
+    await unreadSocialNotification.click();
+    await expect(client).toHaveURL(/\/social\?post=/);
+    await client.goto("/notifications");
+    const openedNotification = client.locator("article.notification-card").filter({ hasText: openedNotificationTitle }).first();
+    await expect(openedNotification).toHaveClass(/read/);
+    await expect.poll(async () => readUnreadCount(await client.getByRole("button", { name: /^Notifications,/ }).getAttribute("aria-label")), { timeout: 30_000 }).toBeLessThanOrEqual(baselineNotifications + 1);
     const unreadMessagesBeforePersonalChat = readUnreadCount(await client.getByRole("link", { name: /^Messages,/ }).getAttribute("aria-label"));
 
     await client.goto("/social");

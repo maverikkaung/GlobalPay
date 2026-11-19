@@ -383,8 +383,8 @@ function Messages() {
             <p>Keep project and personal conversations in separate folders.</p>
           </div>
           <div className="message-folder-tabs" role="tablist" aria-label="Message folders">
-            <button type="button" role="tab" aria-selected={activeFolder === "job"} onClick={() => { setActiveFolder("job"); setSelectedId(conversations.find((item) => item.messageFolder === "job")?.id || ""); }}>Job Messages{folderUnread.job > 0 && <span>{folderUnread.job > 99 ? "99+" : folderUnread.job}</span>}</button>
-            <button type="button" role="tab" aria-selected={activeFolder === "personal"} onClick={() => { setActiveFolder("personal"); setSelectedId(conversations.find((item) => item.messageFolder === "personal")?.id || ""); }}>Personal Messages{folderUnread.personal > 0 && <span>{folderUnread.personal > 99 ? "99+" : folderUnread.personal}</span>}</button>
+            <button type="button" role="tab" aria-selected={activeFolder === "job"} disabled={loading} onClick={() => { setActiveFolder("job"); setSelectedId(conversations.find((item) => item.messageFolder === "job")?.id || ""); }}>Job Messages{folderUnread.job > 0 && <span>{folderUnread.job > 99 ? "99+" : folderUnread.job}</span>}</button>
+            <button type="button" role="tab" aria-selected={activeFolder === "personal"} disabled={loading} onClick={() => { setActiveFolder("personal"); setSelectedId(conversations.find((item) => item.messageFolder === "personal")?.id || ""); }}>Personal Messages{folderUnread.personal > 0 && <span>{folderUnread.personal > 99 ? "99+" : folderUnread.personal}</span>}</button>
           </div>
           {loading ? <p className="messages-empty">Loading conversations…</p> : folderConversations.length === 0 ? (
             <div className="messages-empty">
