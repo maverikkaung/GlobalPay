@@ -31,7 +31,6 @@ begin
   result := public.techkarvo_sandbox_milestone_action(milestone_id,'release','');
   if not (result->>'simulation_only')::boolean then raise exception 'Release must be simulation-only'; end if;
   if (public.techkarvo_sandbox_wallet()->>'available_kav')::bigint <> 100 then raise exception 'Client should have the remaining simulated balance'; end if;
-  if (select sum(amount_kav) from public.ledger_entries where account_key='platform:simulated_commission') <> 10 then raise exception 'Sample platform commission must match configured bps'; end if;
 
   milestone_id := public.techkarvo_sandbox_create_milestone(contract_id,'Revision round',20,'client-ms-create-002');
   perform public.techkarvo_sandbox_fund_milestone(milestone_id);
@@ -48,6 +47,8 @@ begin
   perform public.techkarvo_admin_update_financial_config(true,1000,1,1,1000,1000);
   perform public.techkarvo_admin_upsert_membership_plan('client','plus','Client Plus Sample','Editable sandbox plan',12,null,'["12 sample credits"]'::jsonb,true,1);
   if public.techkarvo_admin_financial_summary()->>'real_money_enabled'<>'false' then raise exception 'Admin analytics must declare that real money is disabled'; end if;
+  if (public.techkarvo_admin_financial_summary()->>'unbalanced_journals')::bigint<>0 then raise exception 'Admin reconciliation must report no unbalanced sandbox journals'; end if;
+  if (public.techkarvo_admin_financial_summary()->>'simulated_commission_kav')::bigint<>10 then raise exception 'Sample platform commission must match configured bps'; end if;
   if not exists(select 1 from public.admin_audit_log where action='sandbox.configuration.update') then raise exception 'Sandbox configuration change must be audited'; end if;
 end;
 $$;

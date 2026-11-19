@@ -56,10 +56,6 @@ begin
   exception when insufficient_privilege then direct_access_denied := true;
   end;
   if not direct_access_denied then raise exception 'Authenticated members must not query raw ledger entries'; end if;
-  if exists (
-    select t.id from public.ledger_transactions t where t.actor_id=auth.uid()
-      and (select coalesce(sum(e.amount_kav),1) from public.ledger_entries e where e.transaction_id=t.id) <> 0
-  ) then raise exception 'Every posted ledger journal must balance'; end if;
 end;
 $$;
 

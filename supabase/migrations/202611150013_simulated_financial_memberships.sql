@@ -630,6 +630,10 @@ begin
   if not public.techkarvo_is_platform_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
   select jsonb_build_object('simulated_transaction_count',count(*),'simulated_gross_kav',coalesce(sum(amount_kav),0),
     'open_disputes',(select count(*) from public.financial_disputes where status='open'),
+    'unbalanced_journals',(select count(*) from public.ledger_transactions t where
+      (select count(*) from public.ledger_entries e where e.transaction_id=t.id)<2 or
+      (select coalesce(sum(e.amount_kav),0) from public.ledger_entries e where e.transaction_id=t.id)<>0),
+    'simulated_commission_kav',coalesce((select sum(e.amount_kav) from public.ledger_entries e where e.account_key='platform:simulated_commission'),0),
     'outstanding_held_kav',coalesce((select sum(e.amount_kav) from public.ledger_entries e where e.account_key like 'user:%:held'),0),
     'real_money_enabled',false)
     into result from public.ledger_transactions;
