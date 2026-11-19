@@ -62,6 +62,7 @@ jobs:
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150010_contracts_blocks_safety.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150011_allow_shared_post_cleanup.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150012_admin_support_configuration.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150013_simulated_financial_memberships.sql
         env:
           PGPASSWORD: postgres
       - name: Assert marketplace RLS and write boundaries
@@ -82,5 +83,11 @@ jobs:
           PGPASSWORD: postgres
       - name: Exercise administrator, support, and moderation boundaries
         run: psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/admin_support_rls_workflows.sql
+        env:
+          PGPASSWORD: postgres
+      - name: Exercise financial sandbox and membership authorization
+        run: |
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/financial_sandbox_rls_workflows.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/financial_contract_rls_workflows.sql
         env:
           PGPASSWORD: postgres

@@ -3,7 +3,7 @@ import { supabase } from "./supabase.js";
 import { useAuth } from "./useAuth.js";
 import DashboardNav from "./DashboardNav.jsx";
 
-const sections = ["Overview", "Support", "Moderation", "Membership catalog", "Product settings", "Audit log"];
+const sections = ["Overview", "Support", "Moderation", "Membership catalog", "Financial sandbox", "Product settings", "Audit log"];
 
 function summarizeError(result) {
   if (!result?.error) return "";
@@ -22,12 +22,14 @@ function AdminDashboard() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [revision, setRevision] = useState(0);
-  const [data, setData] = useState({ summary: {}, support: [], reports: [], tiers: [], settings: [], audit: [] });
+  const [data, setData] = useState({ summary: {}, support: [], reports: [], tiers: [], settings: [], audit: [], financialPlans: [], financialDisputes: [], financialSummary: {} });
   const [reportDrafts, setReportDrafts] = useState({});
   const [settingKey, setSettingKey] = useState("brand.name");
   const [settingValue, setSettingValue] = useState('"TechKarvo"');
   const [isPublicSetting, setIsPublicSetting] = useState(true);
   const [tierDrafts, setTierDrafts] = useState({});
+  const [financialPlanDrafts, setFinancialPlanDrafts] = useState({});
+  const [financialConfig, setFinancialConfig] = useState(null);
 
   const loadAdminData = useCallback(async () => {
     setLoading(true);
@@ -47,13 +49,17 @@ function AdminDashboard() {
       return;
     }
     setAuthorized(true);
-    const [summary, support, reports, tiers, settings, audit] = await Promise.all([
+    const [summary, support, reports, tiers, settings, audit, financialPlans, financialDisputes, financialSummary, financialConfigResult] = await Promise.all([
       supabase.rpc("techkarvo_admin_marketplace_summary"),
       supabase.from("support_cases").select("id, requester_id, subject, description, category, status, priority, assigned_admin_id, created_at, updated_at").order("created_at", { ascending: false }).limit(100),
       supabase.from("user_reports").select("id, reporter_id, reported_user_id, category, details, status, created_at").order("created_at", { ascending: false }).limit(100),
       supabase.from("membership_tiers").select("slug, display_name, description, features, simulation_price_usdt, is_active, display_order, updated_at").order("display_order"),
       supabase.from("platform_settings").select("setting_key, setting_value, is_public, updated_at").order("setting_key").limit(100),
-      supabase.from("admin_audit_log").select("id, actor_id, action, resource_type, resource_id, details, created_at").order("created_at", { ascending: false }).limit(100)
+      supabase.from("admin_audit_log").select("id, actor_id, action, resource_type, resource_id, details, created_at").order("created_at", { ascending: false }).limit(100),
+      supabase.from("membership_plans").select("id, account_type, slug, display_name, description, included_usage_credits, simulated_price_usdt, features, is_active, display_order").order("account_type").order("display_order"),
+      supabase.from("financial_disputes").select("id, milestone_id, opened_by, reason, status, resolution_note, created_at").order("created_at", { ascending: false }).limit(100),
+      supabase.rpc("techkarvo_admin_financial_summary"),
+      supabase.rpc("techkarvo_admin_financial_configuration")
     ]);
     const failed = [summary, support, reports, tiers, settings, audit].find((item) => item.error);
     if (failed) setError(summarizeError(failed));
@@ -63,8 +69,12 @@ function AdminDashboard() {
       reports: reports.data || [],
       tiers: tiers.data || [],
       settings: settings.data || [],
-      audit: audit.data || []
+      audit: audit.data || [],
+      financialPlans: financialPlans.data || [],
+      financialDisputes: financialDisputes.data || [],
+      financialSummary: financialSummary.data || {}
     });
+    if (financialConfigResult.data?.simulation_only) setFinancialConfig(financialConfigResult.data);
     setLoading(false);
   }, []);
 
@@ -134,6 +144,38 @@ function AdminDashboard() {
     }), "Product setting saved and recorded in the audit log.");
   }
 
+  function saveFinancialPlan(plan) {
+    const draft = financialPlanDrafts[`${plan.account_type}:${plan.slug}`] || plan;
+    let features;
+    try { features = JSON.parse(typeof draft.features === "string" ? draft.features : JSON.stringify(draft.features)); }
+    catch { setError("Membership features must be valid JSON."); return; }
+    const price = draft.simulated_price_usdt === "" || draft.simulated_price_usdt == null ? null : Number(draft.simulated_price_usdt);
+    runAction(() => supabase.rpc("techkarvo_admin_upsert_membership_plan", {
+      p_account_type: plan.account_type, p_slug: plan.slug, p_display_name: String(draft.display_name).trim(),
+      p_description: String(draft.description || "").trim(), p_credits: Number(draft.included_usage_credits),
+      p_sample_price: price, p_features: features, p_active: Boolean(draft.is_active), p_display_order: Number(draft.display_order)
+    }), "Simulation plan saved and recorded in the audit log.");
+  }
+
+  function saveFinancialConfig(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const payload = {
+      p_sandbox_enabled: form.get("sandbox_enabled") === "on",
+      p_commission_bps: Number(form.get("commission_bps")), p_ad_reward_kav: Number(form.get("ad_reward_kav")),
+      p_ad_rewards_per_day: Number(form.get("ad_rewards_per_day")), p_max_deposit_usdt: Number(form.get("max_deposit_usdt")),
+      p_max_withdrawal_kav: Number(form.get("max_withdrawal_kav"))
+    };
+    runAction(() => supabase.rpc("techkarvo_admin_update_financial_config", payload), "Sandbox configuration saved and recorded in the audit log.");
+  }
+
+  function resolveSandboxDispute(item, resolution) {
+    const note = window.prompt(`Add an audit note for the simulated ${resolution} decision (5+ characters).`);
+    if (!note || note.trim().length < 5) return;
+    if (!window.confirm(`Confirm simulated ${resolution}? This never moves real funds.`)) return;
+    runAction(() => supabase.rpc("techkarvo_sandbox_resolve_dispute", { p_dispute_id: item.id, p_resolution: resolution, p_note: note.trim() }), "Dispute simulation resolved and added to the audit log.");
+  }
+
   if (loading) return <main className="route-loading" aria-live="polite">Verifying administrator access…</main>;
   if (setupUnavailable) return <main className="admin-setup-state"><DashboardNav user={user} /><section><span className="admin-eyebrow">OWNER TOOLS</span><h1>{error === "Admin tools are not configured in this database yet." ? "Admin tools are not enabled" : "Administrator access could not be checked"}</h1><p>{error || "The required admin database migration is not configured in this project."}</p>{error === "Admin tools are not configured in this database yet." ? <p>Have the project owner review and approve the admin/support migration before enabling this dashboard.</p> : <button className="admin-primary" type="button" onClick={() => setRevision((current) => current + 1)}>Try again</button>}</section></main>;
   if (!authorized) return <main className="admin-setup-state"><DashboardNav user={user} /><section><span className="admin-eyebrow">OWNER TOOLS</span><h1>Administrator access required</h1><p>This account has not been assigned trusted platform administrator access.</p><p>Administrators are provisioned through a buyer-controlled trusted database operation, never by changing a public profile role.</p></section></main>;
@@ -159,6 +201,13 @@ function AdminDashboard() {
         {section === "Moderation" && <div className="admin-record-list">{data.reports.map((item) => <article className="admin-card" key={item.id}><div className="admin-record-heading"><div><span className="admin-eyebrow">{item.category} · {item.status}</span><h3>Member report</h3></div><time>{new Date(item.created_at).toLocaleString()}</time></div><p>{item.details || "No additional details provided."}</p><p className="admin-id-line">Reporter: {item.reporter_id.slice(0, 8)} · Reported member: {item.reported_user_id.slice(0, 8)}</p><form onSubmit={(event) => { event.preventDefault(); reviewReport(item, event.currentTarget); }}><label>Decision<select name="status" defaultValue={item.status === "pending" ? "reviewing" : item.status}>{["reviewing", "resolved", "dismissed"].map((status) => <option key={status} value={status}>{status}</option>)}</select></label><label>Private moderator note<textarea name="note" maxLength={2000} rows={3} value={reportDrafts[item.id] || ""} onChange={(event) => setReportDrafts((current) => ({ ...current, [item.id]: event.target.value }))} /></label><button className="admin-primary" type="submit">Save moderation decision</button></form></article>)}{!data.reports.length && <p className="admin-empty">No member reports yet.</p>}</div>}
 
         {section === "Membership catalog" && <div className="admin-record-list">{data.tiers.map((tier) => { const draft = tierDrafts[tier.slug] || tier; return <article className="admin-card" key={tier.slug}><div className="admin-record-heading"><div><span className="admin-eyebrow">SIMULATION ONLY · {tier.slug}</span><h3>{tier.display_name}</h3></div><span>{tier.is_active ? "Visible in catalog" : "Disabled"}</span></div><div className="admin-form-grid"><label>Display name<input value={draft.display_name} maxLength={60} onChange={(event) => setTierDrafts((current) => ({ ...current, [tier.slug]: { ...draft, display_name: event.target.value } }))} /></label><label>Sample price (USDT)<input type="number" min="0" step="0.01" value={draft.simulation_price_usdt ?? ""} onChange={(event) => setTierDrafts((current) => ({ ...current, [tier.slug]: { ...draft, simulation_price_usdt: event.target.value } }))} placeholder="Not configured" /></label><label className="admin-wide">Description<input value={draft.description} maxLength={500} onChange={(event) => setTierDrafts((current) => ({ ...current, [tier.slug]: { ...draft, description: event.target.value } }))} /></label><label>Display order<input type="number" min="0" max="1000" value={draft.display_order} onChange={(event) => setTierDrafts((current) => ({ ...current, [tier.slug]: { ...draft, display_order: Number(event.target.value) } }))} /></label><label className="admin-checkbox"><input type="checkbox" checked={Boolean(draft.is_active)} onChange={(event) => setTierDrafts((current) => ({ ...current, [tier.slug]: { ...draft, is_active: event.target.checked } }))} />Show sample catalog entry</label><label className="admin-wide">Features as JSON list<textarea rows={3} value={typeof draft.features === "string" ? draft.features : JSON.stringify(draft.features, null, 2)} onChange={(event) => setTierDrafts((current) => ({ ...current, [tier.slug]: { ...draft, features: event.target.value } }))} /></label></div><button className="admin-primary" type="button" onClick={() => saveTier(tier)}>Save simulation-only tier</button></article>; })}</div>}
+
+        {section === "Financial sandbox" && <div className="admin-record-list">
+          <article className="admin-card"><h3>Financial simulation activity</h3><p>No real payments, funds, withdrawals, or advertisement network are enabled.</p><div className="admin-stat-grid">{[["Simulated entries", data.financialSummary.simulated_transaction_count], ["Simulated gross KAV", data.financialSummary.simulated_gross_kav], ["Open disputes", data.financialSummary.open_disputes], ["Held KAV (simulation)", data.financialSummary.outstanding_held_kav]].map(([label, value]) => <div className="financial-admin-stat" key={label}><span>{label}</span><strong>{Number(value || 0).toLocaleString()}</strong></div>)}</div></article>
+          <article className="admin-card"><h3>Client and Freelancer simulation plans</h3>{data.financialPlans.map((plan) => { const key = `${plan.account_type}:${plan.slug}`; const draft = financialPlanDrafts[key] || plan; return <div className="financial-admin-plan" key={key}><strong>{plan.account_type} · {plan.slug}</strong><div className="admin-form-grid"><label>Display name<input value={draft.display_name} maxLength={60} onChange={(event) => setFinancialPlanDrafts((current) => ({ ...current, [key]: { ...draft, display_name: event.target.value } }))} /></label><label>Usage credits<input type="number" min="1" max="100000" value={draft.included_usage_credits} onChange={(event) => setFinancialPlanDrafts((current) => ({ ...current, [key]: { ...draft, included_usage_credits: Number(event.target.value) } }))} /></label><label>Sample USDT price<input type="number" min="0" step="0.01" value={draft.simulated_price_usdt ?? ""} onChange={(event) => setFinancialPlanDrafts((current) => ({ ...current, [key]: { ...draft, simulated_price_usdt: event.target.value } }))} placeholder="Unconfigured" /></label><label>Description<input value={draft.description} maxLength={500} onChange={(event) => setFinancialPlanDrafts((current) => ({ ...current, [key]: { ...draft, description: event.target.value } }))} /></label><label className="admin-checkbox"><input type="checkbox" checked={Boolean(draft.is_active)} disabled={plan.slug === "free"} onChange={(event) => setFinancialPlanDrafts((current) => ({ ...current, [key]: { ...draft, is_active: event.target.checked } }))} />Visible as sample</label></div><button className="admin-primary" type="button" onClick={() => saveFinancialPlan(plan)}>Save role plan</button></div>; })}{!data.financialPlans.length && <p>The financial simulation migration is not installed in this database yet.</p>}</article>
+          {financialConfig && <article className="admin-card"><h3>Sandbox rules</h3><p>These controls apply only to the simulated ledger. There are no provider keys or real-money toggles.</p><form onSubmit={saveFinancialConfig}><label className="admin-checkbox"><input type="checkbox" name="sandbox_enabled" defaultChecked={financialConfig.sandbox_enabled} />Enable test workflows</label><label>Commission (basis points)<input name="commission_bps" type="number" min="0" max="9999" defaultValue={financialConfig.commission_bps} /></label><label>Reward KAV per claim<input name="ad_reward_kav" type="number" min="1" max="1000" defaultValue={financialConfig.ad_reward_kav} /></label><label>Daily sample reward limit<input name="ad_rewards_per_day" type="number" min="0" max="100" defaultValue={financialConfig.ad_rewards_per_day} /></label><label>Max sample deposit USDT<input name="max_deposit_usdt" type="number" min="1" max="1000000" defaultValue={financialConfig.max_deposit_usdt} /></label><label>Max sample withdrawal KAV<input name="max_withdrawal_kav" type="number" min="1" max="1000000" defaultValue={financialConfig.max_withdrawal_kav} /></label><button className="admin-primary" type="submit">Save simulation settings</button></form></article>}
+          <article className="admin-card"><h3>Simulated disputes</h3>{data.financialDisputes.filter((item) => item.status === "open").map((item) => <div className="financial-admin-dispute" key={item.id}><span>{item.reason}</span><time>{new Date(item.created_at).toLocaleString()}</time><div><button className="admin-primary" type="button" onClick={() => resolveSandboxDispute(item,"release")}>Resolve as sample release</button><button className="admin-primary" type="button" onClick={() => resolveSandboxDispute(item,"refund")}>Resolve as sample refund</button></div></div>)}{!data.financialDisputes.some((item) => item.status === "open") && <p>No open financial sandbox disputes.</p>}</article>
+        </div>}
 
         {section === "Product settings" && <article className="admin-card"><h3>Buyer-owned product configuration</h3><p>Only store non-secret presentation values here. Supabase keys, passwords, payment credentials, and private provider settings do not belong in product settings.</p><form onSubmit={saveSetting}><label>Setting key<input value={settingKey} onChange={(event) => setSettingKey(event.target.value)} pattern="[a-z][a-z0-9_.-]{1,79}" required /></label><label>JSON value<textarea rows={5} value={settingValue} onChange={(event) => setSettingValue(event.target.value)} required /></label><label className="admin-checkbox"><input type="checkbox" checked={isPublicSetting} onChange={(event) => setIsPublicSetting(event.target.checked)} />Members may read this setting</label><button className="admin-primary" type="submit">Save product setting</button></form><h3>Existing settings</h3>{data.settings.map((item) => <div className="admin-audit-row" key={item.setting_key}><strong>{item.setting_key}</strong><code>{JSON.stringify(item.setting_value)}</code><span>{item.is_public ? "Public" : "Admin only"}</span></div>)}</article>}
 

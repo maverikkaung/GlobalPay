@@ -142,6 +142,30 @@ begin
     or (select count(*) from public.membership_tiers) <> 4 then
     raise exception 'Membership catalog must be limited to the four simulation-only tiers';
   end if;
+  if not has_table_privilege('anon', 'public.ledger_entries', 'SELECT')
+      and not has_table_privilege('authenticated', 'public.ledger_entries', 'SELECT')
+      and not has_table_privilege('authenticated', 'public.ledger_transactions', 'SELECT')
+      and not has_table_privilege('authenticated', 'public.financial_sandbox_config', 'SELECT') then
+    null;
+  else
+    raise exception 'Ledger and sandbox configuration tables must not be directly readable';
+  end if;
+  if not has_function_privilege('authenticated', 'public.techkarvo_sandbox_wallet()', 'EXECUTE')
+      or not has_function_privilege('authenticated', 'public.techkarvo_sandbox_deposit(bigint,text)', 'EXECUTE')
+      or has_function_privilege('anon', 'public.techkarvo_sandbox_deposit(bigint,text)', 'EXECUTE')
+      or has_function_privilege('anon', 'public.techkarvo_sandbox_withdraw(bigint,text)', 'EXECUTE') then
+    raise exception 'Financial sandbox RPC grants must be authenticated-only';
+  end if;
+  if exists (select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
+      where n.nspname='public' and c.relname in ('membership_entitlements','membership_credit_events','ledger_accounts',
+      'ledger_transactions','ledger_entries','contract_milestones','financial_disputes','milestone_events','sandbox_ad_reward_claims')
+      and not c.relrowsecurity) then
+    raise exception 'Every private sandbox and ledger table must enforce RLS';
+  end if;
+  if exists (select 1 from information_schema.columns where table_schema='public'
+      and table_name in ('ledger_transactions','ledger_entries') and column_name in ('provider_key','wallet_address','payout_destination')) then
+    raise exception 'Sandbox ledger schema must not store real provider credentials or payout destinations';
+  end if;
   if not exists (select 1 from storage.buckets where id = 'techkarvo-marketplace'
     and public = true and file_size_limit = 5242880
     and allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']::text[]) then

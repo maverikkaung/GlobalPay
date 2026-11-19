@@ -1,10 +1,11 @@
 # KAV Wallet and USDT Sandbox Architecture
 
-**Status: simulated product specification only.** TechKarvo does not accept, custody, exchange, or transfer real money or crypto. There are no real deposits, withdrawals, escrow holds, or spendable balances. Demo Mode now has a local-only balanced sample ledger for sandbox funding, milestone holds/releases/refunds/disputes, and sample commission. It never writes these values to Supabase or calls a provider. The demo uses the fixed reference `1 USDT = 1 KAV` as a clearly labeled simulation rule. It is not a market price, reserve claim, redemption promise, or live conversion rate.
+**Status: simulation-only implementation prepared; staging activation pending separate approval.** TechKarvo does not accept, custody, exchange, or transfer real money or crypto. Migration `202611150013_simulated_financial_memberships.sql` prepares authenticated server-side sandbox RPCs, role-specific sample membership plans and usage limits, an immutable balanced KAV journal, simulated funding/withdrawal entries, milestone hold/release/refund/dispute transitions, commission, and bounded reward credits. Its source is covered by the disposable PostgreSQL CI workflow; it has **not** been applied to the seller's staging project and must not be presented as active there. Demo Mode remains local-only and separately isolated. Both use the fixed reference `1 USDT = 1 KAV` only as a labeled simulation rule. It is not a market price, reserve claim, redemption promise, or live conversion rate.
 
 ## $0 build boundary
 
-- Keep wallet and membership activity in isolated Demo Mode state until a buyer funds and reviews a production implementation. The current sample ledger is browser-local and is not accounting evidence.
+- Keep the persistent sandbox ledger disabled in any hosted environment until the database owner approves and applies the reviewed staging migration. A buyer must review the SQL, CI results, RLS, triggers, and RPC behavior before applying it to a buyer-owned project.
+- The sandbox journal is fictional product testing data, not accounting evidence, customer balances, deposits, payouts, or legally meaningful escrow. Every API response and UI action must retain the simulation warning.
 - Use deterministic fake transaction IDs, fake USDT amounts, and a conspicuous `SIMULATED — NO FUNDS MOVED` label. Never use wallet addresses, real provider credentials, or outbound payment requests in the demo.
 - Do not add cryptocurrency signing, custody, exchange, production webhooks, real payout paths, or a user-editable balance in Supabase.
 - A buyer may connect a sandbox provider after choosing a provider and setting up a separate sandbox project. No external service is required to build or test the current product.
@@ -46,10 +47,10 @@ No stage above should be connected to a real provider or real funds until separa
 - Refunds need a defined source, destination, reason, refundable maximum, provider support, and linked reversing/settlement entries; never delete transaction history.
 - Disputes freeze only the contested amount, preserve unaffected contract funds, capture evidence under an access-controlled retention policy, and provide reviewer decisions and appeals.
 - Withdrawals require verified identity and payout destination, jurisdiction eligibility, sanctions/risk controls where applicable, explicit confirmation, idempotency and reconciliation. Use a pending-withdrawal account and return funds on verified failure.
-- The authenticated marketplace has contract status tracking but no funds, real escrow, real dispute case operations, refunds, or withdrawals. Demo Mode only models these states locally.
+- The authenticated marketplace has contract status tracking but no funds, real escrow, real dispute case operations, refunds, or withdrawals. The candidate migration models state and ledgers with fictional KAV only. No provider settlement or chargeback can occur.
 
 ## Provider selection and buyer prerequisites
 
 The buyer must choose a regulated, jurisdiction-compatible provider after assessing marketplace/escrow support, countries, settlement, fees, disputes, refunds, webhook signing, reconciliation, identity requirements, support and data residency. Crypto support additionally needs custody, chain finality/reorg handling, key management, address screening, gas, sanctions and volatility controls.
 
-Before any real-value launch, obtain jurisdiction-specific legal advice on payment services, money transmission, escrow, consumer protection, marketplace liability, tax, privacy, sanctions, AML/KYC and crypto duties. Complete an independent ledger/security review, threat model, penetration test, recovery plan, reconciliation ownership and written approvals from product, security, legal/compliance, and finance.
+Before any real-value launch, obtain jurisdiction-specific legal advice on payment services, money transmission, escrow, consumer protection, marketplace liability, tax, privacy, sanctions, AML/KYC and crypto duties. Complete an independent ledger/security review, threat model, penetration test, recovery plan, reconciliation ownership and written approvals from product, security, legal/compliance, and finance. The current release does not meet these gates and intentionally contains no real payment-provider adapter.

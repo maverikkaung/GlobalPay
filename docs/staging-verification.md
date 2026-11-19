@@ -7,7 +7,7 @@
 - Region: Tokyo (`ap-northeast-1`)
 - Staging site: `https://techkarvo-staging.vercel.app`
 - Staging Vercel deployment branch: `codex/marketplace-data-foundation`
-- Migration history now records `202611150000` through `202611150012` on this staging project. Migration 012 was applied after exact project-reference, migration-history, schema, and single-migration dry-run checks. Post-apply checks confirmed RLS, grants, fixed search paths, seeded simulation-only catalog entries, and unchanged profile/job/application counts. No admin identity is provisioned yet. Production remains a separate system and is outside this runbook.
+- Migration history was verified through `202611150012` on this staging project. Migration 012 was applied after exact project-reference, migration-history, schema, and single-migration dry-run checks. Post-apply checks confirmed RLS, grants, fixed search paths, seeded simulation-only catalog entries, and unchanged marketplace data counts. A temporary staging QA Admin was granted only after its exact Auth UID and email-confirmed identity were verified; its authenticated UI tests and privilege/session revocation remain pending a browser session. Migration 013 is currently a branch-only candidate and has not been applied. Production remains a separate system and is outside this runbook.
 
 The values above identify the development environment only. Before each operation, confirm the current target in the Supabase/Vercel dashboard or authenticated CLI. Never infer a target from a local link file alone. No migration in this runbook is pre-approved for a future change.
 

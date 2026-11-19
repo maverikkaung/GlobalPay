@@ -903,6 +903,67 @@ html[data-theme="dark"] .connection-status--accepted { color: #8fe3b9; border-co
 .admin-audit-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--tk-border); }
 .admin-audit-row code { max-width: 100%; color: var(--tk-muted); overflow-wrap: anywhere; }
 .admin-id-line { font-size: 12px; }
+.financial-sandbox-page { min-height: 100vh; background: var(--tk-page); color: var(--tk-text); }
+.financial-sandbox-wrap { width: min(1160px, calc(100% - 36px)); margin: 24px auto 60px; }
+.financial-back { color: var(--tk-blue-soft); text-decoration: none; font-weight: 700; }
+.financial-heading { margin: 18px 0; }
+.financial-heading h1 { margin: 7px 0; color: var(--tk-text); font-size: clamp(28px, 4vw, 38px); }
+.financial-heading p, .financial-section > header > p { color: var(--tk-muted); line-height: 1.6; }
+.financial-simulation-banner { display: grid; gap: 5px; padding: 14px 17px; border: 1px solid #b78325; border-radius: 12px; background: color-mix(in srgb, #b78325 12%, var(--tk-card)); }
+.financial-simulation-banner strong { color: var(--tk-text); letter-spacing: .04em; }
+.financial-simulation-banner span { color: var(--tk-muted); }
+.financial-wallet-card, .financial-section { margin-top: 18px; padding: clamp(18px, 3vw, 26px); border: 1px solid var(--tk-border); border-radius: 16px; background: var(--tk-card); box-shadow: 0 8px 24px var(--tk-shadow); }
+.financial-wallet-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 420px); gap: 25px; align-items: center; }
+.financial-wallet-card > div:first-child > span, .financial-wallet-card p { color: var(--tk-muted); }
+.financial-wallet-card h2 { margin: 8px 0; color: var(--tk-text); font-size: clamp(32px, 5vw, 48px); }
+.financial-transfer { display: grid; gap: 9px; }
+.financial-transfer label, .financial-plan-card > span { color: var(--tk-muted); font-size: 13px; }
+.financial-transfer input { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid var(--tk-border); border-radius: 9px; background: var(--tk-input); color: var(--tk-text); font: inherit; }
+.financial-transfer > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.financial-transfer button, .financial-plan-card button { min-height: 40px; padding: 9px 12px; border: 0; border-radius: 8px; background: var(--tk-blue); color: white; font: inherit; font-weight: 700; cursor: pointer; }
+.financial-transfer button.secondary { border: 1px solid var(--tk-border); background: var(--tk-page-soft); color: var(--tk-text); }
+.financial-transfer button:disabled, .financial-plan-card button:disabled { opacity: .65; cursor: not-allowed; }
+.financial-reward-button, .financial-milestone-form button, .financial-milestone-actions button { min-height: 38px; padding: 8px 11px; border: 0; border-radius: 8px; background: var(--tk-blue); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.financial-milestone-form button:disabled, .financial-milestone-actions button:disabled { opacity: .65; cursor: not-allowed; }
+.financial-contract-card { margin-top: 14px; padding: 16px; border: 1px solid var(--tk-border); border-radius: 12px; background: var(--tk-page-soft); }
+.financial-contract-card h3 { margin: 0 0 12px; color: var(--tk-text); }
+.financial-milestone-form { display: grid; grid-template-columns: 1fr 180px auto; gap: 10px; align-items: end; margin-bottom: 12px; }
+.financial-milestone-form label { display: grid; gap: 5px; color: var(--tk-muted); font-size: 13px; }
+.financial-milestone-form input { min-height: 40px; padding: 8px 10px; border: 1px solid var(--tk-border); border-radius: 8px; background: var(--tk-input); color: var(--tk-text); font: inherit; }
+.financial-milestone-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid var(--tk-border); }
+.financial-milestone-row > div:first-child { display: grid; gap: 4px; }
+.financial-milestone-row strong { color: var(--tk-text); }
+.financial-milestone-row span { color: var(--tk-muted); font-size: 13px; }
+.financial-milestone-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.financial-milestone-actions button.secondary { border: 1px solid var(--tk-border); background: var(--tk-card); color: var(--tk-text); }
+.financial-section > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 14px; }
+.financial-section h2 { margin: 5px 0; color: var(--tk-text); }
+.financial-section > header > p { max-width: 450px; margin: 0; }
+.financial-plan-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.financial-plan-card { display: grid; align-content: start; gap: 10px; min-width: 0; padding: 16px; border: 1px solid var(--tk-border); border-radius: 12px; background: var(--tk-page-soft); }
+.financial-plan-card h3 { margin: 0; color: var(--tk-text); }
+.financial-plan-card p { margin: 0; color: var(--tk-muted); line-height: 1.5; }
+.financial-plan-card strong { color: var(--tk-text); }
+.financial-plan-card button { margin-top: auto; }
+.financial-entitlement, .financial-empty, .financial-loading { color: var(--tk-muted); }
+.financial-transaction-list { display: grid; }
+.financial-transaction-list article { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--tk-border); }
+.financial-transaction-list article > div { display: grid; gap: 3px; }
+.financial-transaction-list strong { color: var(--tk-text); text-transform: capitalize; }
+.financial-transaction-list span { color: var(--tk-muted); font-size: 12px; }
+.financial-admin-stat { display: grid; gap: 5px; padding: 12px; border: 1px solid var(--tk-border); border-radius: 10px; background: var(--tk-page-soft); }
+.financial-admin-stat span { color: var(--tk-muted); font-size: 13px; }
+.financial-admin-stat strong { color: var(--tk-text); font-size: 21px; }
+.financial-admin-plan { padding: 14px 0; border-top: 1px solid var(--tk-border); }
+.financial-admin-plan > strong { color: var(--tk-text); text-transform: capitalize; }
+.financial-admin-dispute { display: grid; gap: 9px; padding: 14px 0; border-top: 1px solid var(--tk-border); }
+.financial-admin-dispute > span { color: var(--tk-text); white-space: pre-wrap; }
+.financial-admin-dispute time { color: var(--tk-muted); font-size: 12px; }
+.financial-admin-dispute > div { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 850px) { .financial-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .financial-sandbox-wrap { width: min(100% - 24px, 560px); } .financial-wallet-card { grid-template-columns: 1fr; } .financial-section > header { flex-direction: column; } }
+@media (max-width: 650px) { .financial-milestone-form { grid-template-columns: 1fr; } .financial-milestone-row { align-items: flex-start; flex-direction: column; } .financial-milestone-actions { justify-content: flex-start; } }
+@media (max-width: 420px) { .financial-plan-grid { grid-template-columns: 1fr; } .financial-transfer > div { display: grid; } }
 .support-center-page .dashboard-welcome { display: grid; justify-items: start; gap: 8px; }
 .support-request-form { display: grid; grid-template-columns: minmax(150px, .45fr) minmax(0, 1fr); align-items: center; gap: 12px 16px; }
 .support-request-form label { color: var(--tk-text); font-weight: 650; }

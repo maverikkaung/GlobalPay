@@ -173,6 +173,7 @@ export default function DashboardNav({ user }) {
               <div className="profile-dropdown-heading"><strong>{user.name || "TechKarvo member"}</strong><span>{user.accountType}</span></div>
               {myProfilePath && <Link to={myProfilePath} onClick={() => setActiveMenu("")}>My Profile</Link>}
               <Link to="/account-settings" onClick={() => setActiveMenu("")}>Account Settings</Link>
+              <Link to="/financial-sandbox" onClick={() => setActiveMenu("")}>Membership &amp; KAV Sandbox</Link>
               <button type="button" className="theme-toggle-row" role="switch" aria-checked={theme === "dark"} onClick={toggleTheme}>
                 <span>{theme === "dark" ? "Dark mode" : "Light mode"}</span>
                 <span className="theme-switch-track" aria-hidden="true"><span /></span>
