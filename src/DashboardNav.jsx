@@ -40,6 +40,7 @@ export default function DashboardNav({ user }) {
   const [messageCount, setMessageCount] = useState(0);
   const [recent, setRecent] = useState([]);
   const [activeMenu, setActiveMenu] = useState("");
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const navRef = useRef(null);
   const userId = user?.id;
@@ -114,6 +115,14 @@ export default function DashboardNav({ user }) {
     navigate("/login");
   }
 
+  async function toggleQuickActions() {
+    const opening = activeMenu !== "quick";
+    setActiveMenu(opening ? "quick" : "");
+    if (!opening) return;
+    const result = await supabase.rpc("techkarvo_is_platform_admin");
+    setIsPlatformAdmin(!result.error && result.data === true);
+  }
+
   async function openNotification(item) {
     if (!userId || !item?.id) return;
     setActiveMenu("");
@@ -175,7 +184,7 @@ export default function DashboardNav({ user }) {
             <button className="dashboard-icon-link quick-actions-trigger" type="button" aria-label="Quick actions" title="Quick actions"
               data-menu-trigger
               aria-expanded={activeMenu === "quick"} aria-controls="quick-actions-menu"
-              onClick={() => setActiveMenu((open) => open === "quick" ? "" : "quick")}>
+              onClick={toggleQuickActions}>
               <Icon name="menu" />
             </button>
             {activeMenu === "quick" && <nav className="nav-dropdown quick-actions-menu" id="quick-actions-menu" aria-label={`${accountType} quick actions`}>
@@ -183,6 +192,7 @@ export default function DashboardNav({ user }) {
               {getQuickActions(accountType).map(([label, path]) => (
                 <Link key={path} to={path} onClick={() => setActiveMenu("")}>{label}</Link>
               ))}
+              {isPlatformAdmin && <Link to="/admin" onClick={() => setActiveMenu("")}>Admin Dashboard</Link>}
             </nav>}
           </div>
         </div>

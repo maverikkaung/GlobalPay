@@ -1,6 +1,6 @@
 # Admin/support migration 012 review notes
 
-**State:** draft pending disposable PostgreSQL CI and separate staging approval. Do not apply this migration to staging or production as part of code review.
+**State:** disposable PostgreSQL CI/security workflow passed; migration remains unapplied to staging pending separate approval. Do not apply this migration to staging or production as part of code review.
 
 ## Objects and access boundary
 

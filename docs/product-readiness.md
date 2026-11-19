@@ -1,6 +1,6 @@
 # TechKarvo product readiness audit
 
-Audit baseline: branch `codex/marketplace-data-foundation`, commit `530138a` (2026-11-19). This is a code/documentation review plus the staging and browser tests recorded for this development environment. A feature is not marked complete merely because a table or screen exists.
+Audit baseline: branch `codex/marketplace-data-foundation`, including migration 012 Admin UI changes (2026-11-19). This is a code/documentation review plus the staging and browser tests recorded for this development environment. A feature is not marked complete merely because a table or screen exists.
 
 ## Current implementation
 
@@ -13,7 +13,7 @@ Audit baseline: branch `codex/marketplace-data-foundation`, commit `530138a` (20
 | Contracts and reviews | Active/completed/disputed status, participant access, two-way review flow | Contract tracking exists; there is no funds ledger, real escrow, formal dispute case workflow, provider reconciliation, or legally enforceable payment guarantee. |
 | Member safety | Block, mute and report submission with RLS-backed rules | User-side reporting exists. Owner moderation queue, case assignment, appeals, support SLAs, and audit dashboard are missing. |
 | Demo Mode | Local-only role switch, marketplace/social sample workflows, reset, responsive/theme Playwright coverage | Implemented and isolated from Supabase; no wallet/membership/ad rewards are represented as real value. |
-| Admin and ownership controls | No Admin route or Admin dashboard; unsupported role has no quick actions | Critical sale-readiness gap. Migration 012 is a draft intended to add a trusted admin registry/RPC foundation; neither CI nor staging verification is complete. UI and buyer bootstrap flow remain incomplete. |
+| Admin and ownership controls | Trusted-admin-only Admin route and responsive dashboard UI; role check relies on trusted registry RPC, never profile role | Migration 012, RLS, and role workflows pass disposable CI/security tests. It is not applied to staging; real admin behavior and trusted buyer bootstrap remain unverified. |
 | Memberships | Demo Mode tier selector for Free/Plus/Gold/Premium | Local selection only; no persistent entitlements, renewal, expiry, pricing, billing, or paid benefits. |
 | KAV/USDT | Demo Mode-only local wallet and balanced sample ledger | Uses fixed `1 USDT = 1 KAV`, sandbox credits, milestone holds/releases/refunds/disputes and sample commission. Nothing persists outside local demo storage; no real provider, funds, or withdrawal exists. |
 | Ads/rewards | Demo Mode-only bounded reward simulation | Simulates up to five sample 1 KAV rewards per local demo role. No real ad network, view verification, or persistent fraud controls. |
@@ -22,7 +22,7 @@ Audit baseline: branch `codex/marketplace-data-foundation`, commit `530138a` (20
 
 ## Highest-risk weaknesses
 
-1. No owner Admin Dashboard or trusted admin authorization model. Do not expose a hidden route backed only by editable profile metadata.
+1. Admin operations are not enabled or live-tested in staging. Do not bootstrap an admin until migration 012 is separately approved and the exact Auth user is verified.
 2. No database-owned configuration model for branding, tier catalog, commissions, ad reward limits, or support workflow.
 3. No real financial system exists. Avoid wallet balances and payment claims; acceptance is not funding.
 4. Reports have no moderation response lifecycle or owner audit UI.
@@ -33,7 +33,7 @@ Audit baseline: branch `codex/marketplace-data-foundation`, commit `530138a` (20
 
 1. **Transfer and configuration foundation:** safe public-key build guard; complete source/environment/deployment/ownership docs; remove stale setup claims. No migrations.
 2. **Central buyer-owned product configuration:** feature flags, brand, membership catalog, commission display settings, demo rate and limits. Keep private financial enforcement server-side; migration approval required if persisted in Supabase.
-3. **Admin and support operations:** review and verify migration 012 in isolated PostgreSQL, then request staging approval; build Admin route, buyer bootstrap guide, reports queue, moderation actions, support cases and audit views. Trusted admin role must be enforced in database/server.
+3. **Admin and support operations:** migration 012 and the Admin route/dashboard pass isolated PostgreSQL security workflows and local checks. Request staging approval before applying; then provision a staging-only administrator through a trusted operation and verify actual queue/configuration workflows.
 4. **Sandbox money model:** implemented in Demo Mode with a fixed `1 USDT = 1 KAV`, balanced local sample entries, milestone holds/releases/refunds/disputes, commission, visible simulation labels, and no network calls. CI unit and browser regression coverage added. No real provider credentials.
 5. **Membership and ad reward simulation:** basic tier selection and bounded demo reward are implemented locally. Editable buyer catalog, entitlement lifecycle, deterministic anti-abuse controls, and Admin settings remain incomplete. Do not activate billing or third-party ads.
 6. **Buyer operations and analytics:** simulated reporting dashboards, exportable diagnostics, incident/support runbooks, localization and performance/accessibility review.

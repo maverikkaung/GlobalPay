@@ -7,7 +7,7 @@
 - Region: Tokyo (`ap-northeast-1`)
 - Staging site: `https://techkarvo-staging.vercel.app`
 - Staging Vercel deployment branch: `codex/marketplace-data-foundation`
-- The project history records migrations `202611150000` through `202611150011` applied to this staging project. Migration `202611150012_admin_support_configuration.sql` is a draft not yet verified in disposable CI or applied to staging; it needs separate approval after review. Production remains a separate system and is outside this runbook.
+- The project history records migrations `202611150000` through `202611150011` applied to this staging project. Migration `202611150012_admin_support_configuration.sql` and its Admin UI pass disposable CI/security checks, but the migration is not applied to staging and requires separate approval. Production remains a separate system and is outside this runbook.
 
 The values above identify the development environment only. Before each operation, confirm the current target in the Supabase/Vercel dashboard or authenticated CLI. Never infer a target from a local link file alone. No migration in this runbook is pre-approved for a future change.
 
@@ -43,6 +43,6 @@ Run against `https://techkarvo-staging.vercel.app` using separate browser contex
 6. Exercise image uploads, post creation/edit/delete, likes/comments, connections, notifications, block/unblock/mute/report, and active-contract safeguards.
 7. Complete a contract, submit both reviews, and verify participants/ratings and one-review constraints. Confirm no payment or escrow is implied by contract state.
 8. Test account settings, safe email/password flows, keyboard operation, dark/light themes, and desktop/tablet/mobile viewports.
-9. Run a separate Admin/support test only after a trusted admin model exists; the current product baseline does not have an Admin Dashboard or moderation queue.
+9. Run a separate Admin/support test only after migration 012 is separately approved/applied and a staging administrator is provisioned through a trusted operation. The UI alone grants no privileges.
 
 Record test results as pass/fail plus commit/deployment and sanitized error text. Never record emails, passwords, API keys, authorization headers, JWTs, recovery links, or raw network bodies.
