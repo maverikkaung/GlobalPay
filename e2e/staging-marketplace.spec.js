@@ -19,6 +19,13 @@ async function signIn(page, credentials, role) {
   await page.getByText(role === "Client" ? /CLIENT DASHBOARD/i : /FREELANCER DASHBOARD/i).waitFor({ timeout: 60_000 });
 }
 
+async function selectMessageFolder(page, folder) {
+  const tab = page.getByRole("tab", { name: folder === "job" ? /Job Messages/ : /Personal Messages/ });
+  await expect(tab).toBeEnabled({ timeout: 60_000 });
+  await tab.click();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+}
+
 function readUnreadCount(label) {
   const match = label.match(/,\s*(\d+) unread/i);
   return Number(match?.[1] || 0);
@@ -151,10 +158,10 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await client.getByRole("button", { name: "Send", exact: true }).click();
     await expect(client.getByText(jobMessage)).toBeVisible();
     await freelancer.goto("/messages");
-    await freelancer.getByRole("tab", { name: /Job Messages/ }).click();
+    await selectMessageFolder(freelancer, "job");
     await expect(freelancer.getByText(jobMessage)).toBeVisible({ timeout: 60_000 });
     await expect.poll(async () => client.getByText("Seen", { exact: true }).count(), { timeout: 30_000 }).toBeGreaterThan(0);
-    await freelancer.getByRole("tab", { name: /Personal Messages/ }).click();
+    await selectMessageFolder(freelancer, "personal");
     await expect(freelancer.getByText(jobMessage)).toHaveCount(0);
 
     // Public post with an image; likes/comments update notifications and owner edits/deletes their own QA post.
@@ -231,7 +238,7 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     const sentPersonalMessage = freelancer.locator(".message-bubble").filter({ hasText: personalMessage });
     await expect(sentPersonalMessage.locator(".message-shared-post")).toBeVisible();
     await client.goto("/messages");
-    await client.getByRole("tab", { name: /Personal Messages/ }).click();
+    await selectMessageFolder(client, "personal");
     await expect(client.getByText(personalMessage)).toBeVisible({ timeout: 60_000 });
     const receivedPersonalMessage = client.locator(".message-bubble").filter({ hasText: personalMessage });
     await expect(receivedPersonalMessage.locator(".message-shared-post")).toBeVisible();
@@ -241,12 +248,12 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     const postToDelete = client.locator("article.social-card").filter({ hasText: `${postBody} edited` }).first();
     await postToDelete.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(postToDelete).toHaveCount(0);
-    await freelancer.getByRole("tab", { name: /Personal Messages/ }).click();
+    await selectMessageFolder(freelancer, "personal");
     const messageBubble = freelancer.locator(".message-bubble").filter({ hasText: personalMessage });
     await messageBubble.getByRole("button", { name: "Delete for Everyone" }).click();
     await expect(freelancer.getByText("[Message removed]")).toBeVisible();
     await client.goto("/messages");
-    await client.getByRole("tab", { name: /Personal Messages/ }).click();
+    await selectMessageFolder(client, "personal");
     await expect(client.getByText("[Message removed]")).toBeVisible();
 
     // Active contract must prevent blocking; complete it, then verify block/unblock, mute and report.
@@ -264,7 +271,7 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await expect(client.getByText("Project marked complete.")).toBeVisible();
 
     await client.goto("/messages");
-    await client.getByRole("tab", { name: /Personal Messages/ }).click();
+    await selectMessageFolder(client, "personal");
     const personalSafety = client.locator(".member-safety-actions").first();
     await personalSafety.getByRole("button", { name: "Mute" }).click();
     await expect(personalSafety.getByText("Their posts are muted in your feed.")).toBeVisible();
@@ -280,11 +287,11 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await expect(personalSafety.getByText("Report sent to TechKarvo support for review.")).toBeVisible();
 
     await client.goto("/messages");
-    await client.getByRole("tab", { name: /Personal Messages/ }).click();
+    await selectMessageFolder(client, "personal");
     await client.getByRole("button", { name: "Delete for Me" }).click();
     await expect(client.getByText("No personal conversations yet")).toBeVisible();
     await freelancer.reload();
-    await freelancer.getByRole("tab", { name: /Personal Messages/ }).click();
+    await selectMessageFolder(freelancer, "personal");
     await expect(freelancer.getByRole("button", { name: /TechKarvo QA Client/ })).toBeVisible();
 
     // Account settings: private account info, verified password update, and safe email-change validation.
