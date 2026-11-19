@@ -31,7 +31,7 @@ The app accepts `VITE_SUPABASE_PUBLISHABLE_KEY`. `VITE_SUPABASE_ANON_KEY` remain
 ## Supabase setup and migration controls
 
 - Create separate buyer-owned development, staging, and production projects. Never reuse the seller's project or credentials.
-- Migrations `202611150000`–`202611150011` are the current staging schema. Migration `202611150012_admin_support_configuration.sql` and its Admin Dashboard UI have passed isolated CI/security checks, but it remains unapplied to staging pending separate approval. Review the SQL, RLS, grants, and CI fixture before applying it to a buyer project.
+- Migrations `202611150000`–`202611150012` are present in source. Migration 012 is applied only to the seller's staging project; buyers must review the SQL, RLS, grants, and CI fixture and obtain their own approval before applying to a buyer-owned project.
 - Migration `202611150000` creates core tables and is for a fresh database only. Stop if tables or data already exist; do not try to make it fit by deleting records.
 - Use a staging backup/snapshot, verify the exact project reference, inspect pending migrations, run a dry-run, then obtain approval from the buyer's database owner before applying.
 - Configure Site URL and Auth redirects only in the buyer's corresponding environment. Use controlled inboxes to verify confirmation and reset emails.
@@ -50,7 +50,7 @@ The app accepts `VITE_SUPABASE_PUBLISHABLE_KEY`. `VITE_SUPABASE_ANON_KEY` remain
 
 ## Product settings buyers should own
 
-The product should ultimately expose buyer-owned configuration for branding/logo/colors, public site name, category catalog, membership tier names/entitlements/prices, commission display/limits, demo-only conversion rate/reward limits, support contacts, enabled feature flags and localization. Until the configuration milestone is implemented, treat these as code-level settings and have the buyer request/review changes; do not claim an Admin UI exists.
+The Admin UI supports membership catalog and generic presentation settings; the buyer must verify which settings are consumed by the current UI. Branding, category controls, commission values, demo rate/reward limits, support contacts, and localization are not yet fully wired through a complete buyer configuration experience. Treat unwired items as code-level settings and review changes before deployment.
 
 Financial authorization, commissions, membership entitlements, and rewards must be enforced by trusted server/database logic, never by client settings alone. Price and commission changes require tests and an audit trail. Do not enable a paid tier or real charge as a deployment smoke test.
 
@@ -66,4 +66,4 @@ Financial authorization, commissions, membership entitlements, and rewards must 
 
 ## Known limitations at transfer baseline
 
-The Admin Dashboard UI and migration 012 admin/support schema are present in source; staging admin operations remain unavailable until migration approval, application, and trusted admin provisioning. There is no membership billing/persistent entitlements, ad/reward service, server-side KAV ledger, USDT provider adapter, real escrow, refund/withdrawal processor, complete dispute case management, or financial reporting. Demo Mode includes an isolated local-only sample ledger and membership/reward simulations; it does not call a provider or persist value to Supabase. Production infrastructure has not been audited or approved for a buyer. `1 USDT = 1 KAV` is a fixed demo reference only. These are product milestones, not hidden features.
+The Admin Dashboard UI, Customer Support form/history, and migration 012 admin/support schema are present. Migration 012 is applied only to the seller's staging project; no admin identity is provisioned. A buyer must review and apply migrations to a fresh buyer-owned project, then provision the buyer's own administrator through a trusted operation. There is no membership billing/persistent entitlements, ad/reward service, server-side KAV ledger, USDT provider adapter, real escrow, refund/withdrawal processor, complete dispute case management, or financial reporting. Demo Mode includes an isolated local-only sample ledger and membership/reward simulations; it does not call a provider or persist value to Supabase. Production infrastructure has not been audited or approved for a buyer. `1 USDT = 1 KAV` is a fixed demo reference only. These are product milestones, not hidden features.

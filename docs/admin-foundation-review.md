@@ -1,6 +1,6 @@
 # Admin/support migration 012 review notes
 
-**State:** disposable PostgreSQL CI/security workflow passed; migration remains unapplied to staging pending separate approval. Do not apply this migration to staging or production as part of code review.
+**State:** disposable PostgreSQL CI/security workflow passed. Applied only to staging project `ntucgiieksrwebwvcmun` after explicit approval on 2026-11-19. Do not apply this migration to production.
 
 ## Objects and access boundary
 
@@ -19,10 +19,10 @@ The migration creates new tables, indexes, functions, policies and four catalog 
 
 The script is transactional. A failure before `COMMIT` rolls back the transaction. After a successful commit, do not run `DROP TABLE` as a quick rollback: support and audit records may have been created. A safe operational rollback is to disable the Admin UI, revoke authenticated execute privileges on the admin RPC functions, disable non-Free catalog rows, and retain records for review. Any destructive schema rollback requires a separate backup, data-retention review, migration, and approval.
 
-## Required verification before staging approval
+## Staging verification
 
 1. CI applies migrations 000–012 to an empty disposable PostgreSQL fixture.
 2. Assertions verify RLS on all new tables, anon denial, no self-admin grant, insert-column constraints, no direct audit writes, and function grants.
 3. Role tests verify admin and non-admin behavior for settings, catalog, support queue, moderation queue, audit, and aggregate analytics.
-4. Review the deployment's initial administrator bootstrap. No user is auto-promoted. The buyer/staging owner must verify a specific Auth user UUID and add it through a trusted SQL Editor or reviewed backend operation after migration approval.
-5. Only after CI and security review pass should a separate approval be requested to apply this exact migration to staging reference `ntucgiieksrwebwvcmun`.
+4. The staging apply is recorded in migration history; read-only checks confirmed RLS on each new table, no authenticated table privileges on the admin registry, anonymous denial for the admin predicate, authenticated access to the predicate, fixed search paths on security-definer functions, and unchanged marketplace row counts.
+5. No user is auto-promoted. Verify a specific Auth user UUID and obtain separate approval before registering a staging administrator through a trusted SQL Editor or reviewed backend operation.

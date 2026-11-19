@@ -4,6 +4,9 @@ test("owner dashboard route stays behind authentication for public visitors", as
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
+  await page.goto("/support");
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
 });
 
 test("visitor can complete a sample client-to-freelancer hiring journey without Supabase", async ({ page }) => {

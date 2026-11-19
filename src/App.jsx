@@ -32,6 +32,7 @@ const Connections = lazy(() => import("./Connections.jsx"));
 const AccountSettings = lazy(() => import("./AccountSettings.jsx"));
 const DemoMode = lazy(() => import("./DemoMode.jsx"));
 const AdminDashboard = lazy(() => import("./AdminDashboard.jsx"));
+const SupportCenter = lazy(() => import("./SupportCenter.jsx"));
 
 
 function Home() {
@@ -426,6 +427,7 @@ function App() {
       <Route path="/social" element={<RequireAuth roles={["Client", "Freelancer"]}><SocialPage /></RequireAuth>} />
       <Route path="/connections" element={<RequireAuth roles={["Client", "Freelancer"]}><Connections /></RequireAuth>} />
       <Route path="/account-settings" element={<RequireAuth roles={["Client", "Freelancer"]}><AccountSettings /></RequireAuth>} />
+      <Route path="/support" element={<RequireAuth roles={["Client", "Freelancer"]}><SupportCenter /></RequireAuth>} />
       <Route path="/admin" element={<RequireAuth roles={["Client", "Freelancer"]}><AdminDashboard /></RequireAuth>} />
       <Route path="/notifications" element={<RequireAuth roles={["Client", "Freelancer"]}><Notifications /></RequireAuth>} />
       <Route path="/reviews" element={<RequireAuth roles={["Client", "Freelancer"]}><Reviews /></RequireAuth>} />

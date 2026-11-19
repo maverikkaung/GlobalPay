@@ -196,6 +196,12 @@ function AccountSettings() {
           : blocked.length ? <ul className="account-block-list">{blocked.map((row) => <li key={row.blocked_id}><span>{row.displayName}</span><button type="button" disabled={busy} onClick={() => unblock(row.blocked_id)}>Unblock</button></li>)}</ul>
             : <p>No blocked members.</p>}
       </section>
+
+      <section className="account-settings-card" aria-labelledby="support-heading">
+        <h2 id="support-heading">Help & support</h2>
+        <p>Open a private support request or review a request you have already submitted.</p>
+        <Link className="secondary-btn" to="/support">Go to Customer Support</Link>
+      </section>
     </main>
   </div>;
 }

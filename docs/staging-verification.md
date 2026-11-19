@@ -7,7 +7,7 @@
 - Region: Tokyo (`ap-northeast-1`)
 - Staging site: `https://techkarvo-staging.vercel.app`
 - Staging Vercel deployment branch: `codex/marketplace-data-foundation`
-- The project history records migrations `202611150000` through `202611150011` applied to this staging project. Migration `202611150012_admin_support_configuration.sql` and its Admin UI pass disposable CI/security checks, but the migration is not applied to staging and requires separate approval. Production remains a separate system and is outside this runbook.
+- Migration history now records `202611150000` through `202611150012` on this staging project. Migration 012 was applied after exact project-reference, migration-history, schema, and single-migration dry-run checks. Post-apply checks confirmed RLS, grants, fixed search paths, seeded simulation-only catalog entries, and unchanged profile/job/application counts. No admin identity is provisioned yet. Production remains a separate system and is outside this runbook.
 
 The values above identify the development environment only. Before each operation, confirm the current target in the Supabase/Vercel dashboard or authenticated CLI. Never infer a target from a local link file alone. No migration in this runbook is pre-approved for a future change.
 
@@ -43,6 +43,6 @@ Run against `https://techkarvo-staging.vercel.app` using separate browser contex
 6. Exercise image uploads, post creation/edit/delete, likes/comments, connections, notifications, block/unblock/mute/report, and active-contract safeguards.
 7. Complete a contract, submit both reviews, and verify participants/ratings and one-review constraints. Confirm no payment or escrow is implied by contract state.
 8. Test account settings, safe email/password flows, keyboard operation, dark/light themes, and desktop/tablet/mobile viewports.
-9. Run a separate Admin/support test only after migration 012 is separately approved/applied and a staging administrator is provisioned through a trusted operation. The UI alone grants no privileges.
+9. Test the Admin/support console only after a staging administrator is provisioned through a trusted operation. Migration 012 does not self-assign administrator access, and the UI alone grants no privileges. Customer Support page allows members to create and view their own requests under RLS.
 
 Record test results as pass/fail plus commit/deployment and sanitized error text. Never record emails, passwords, API keys, authorization headers, JWTs, recovery links, or raw network bodies.
