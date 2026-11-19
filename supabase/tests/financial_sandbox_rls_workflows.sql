@@ -78,7 +78,7 @@ begin
     values(job_id,owner_id,auth.uid(),'Sandbox Freelancer','Testing application usage credit');
   if (select credits_used from public.membership_entitlements where user_id=auth.uid())<>1 then raise exception 'Freelancer applications must consume server-enforced usage credits'; end if;
   begin
-    select * from public.membership_entitlements where user_id='a1111111-1111-4111-8111-111111111111';
+    perform 1 from public.membership_entitlements where user_id='a1111111-1111-4111-8111-111111111111';
   exception when insufficient_privilege then other_wallet_denied := true;
   end;
   if not other_wallet_denied and exists(select 1 from public.membership_entitlements where user_id='a1111111-1111-4111-8111-111111111111') then
