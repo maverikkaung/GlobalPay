@@ -10,12 +10,12 @@ insert into public.jobs(id,client_id,title,description,budget) values
  ('b4444444-4444-4444-8444-444444444444','b1111111-1111-4111-8111-111111111111','Sandbox contract','Test-only job description',200);
 insert into public.job_applications(id,job_id,client_id,freelancer_id,status)
  values('b5555555-5555-4555-8555-555555555555','b4444444-4444-4444-8444-444444444444','b1111111-1111-4111-8111-111111111111','b2222222-2222-4222-8222-222222222222','Pending');
-update public.job_applications set status='Accepted' where id='b5555555-5555-4555-8555-555555555555';
 reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','b1111111-1111-4111-8111-111111111111',true);
+update public.job_applications set status='Accepted' where id='b5555555-5555-4555-8555-555555555555';
 do $$
 declare contract_id uuid; milestone_id uuid; result jsonb;
 begin
