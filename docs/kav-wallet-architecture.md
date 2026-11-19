@@ -1,10 +1,10 @@
 # KAV Wallet and USDT Sandbox Architecture
 
-**Status: simulated product specification only.** TechKarvo does not accept, custody, exchange, or transfer real money or crypto. There are no deposits, withdrawals, real escrow holds, or spendable balances. The demo may display the fixed reference `1 USDT = 1 KAV` as a clearly labeled simulation rule. It is not a market price, reserve claim, redemption promise, or live conversion rate.
+**Status: simulated product specification only.** TechKarvo does not accept, custody, exchange, or transfer real money or crypto. There are no real deposits, withdrawals, escrow holds, or spendable balances. Demo Mode now has a local-only balanced sample ledger for sandbox funding, milestone holds/releases/refunds/disputes, and sample commission. It never writes these values to Supabase or calls a provider. The demo uses the fixed reference `1 USDT = 1 KAV` as a clearly labeled simulation rule. It is not a market price, reserve claim, redemption promise, or live conversion rate.
 
 ## $0 build boundary
 
-- Keep wallet and membership activity in isolated Demo Mode state until a buyer funds and reviews a production implementation.
+- Keep wallet and membership activity in isolated Demo Mode state until a buyer funds and reviews a production implementation. The current sample ledger is browser-local and is not accounting evidence.
 - Use deterministic fake transaction IDs, fake USDT amounts, and a conspicuous `SIMULATED — NO FUNDS MOVED` label. Never use wallet addresses, real provider credentials, or outbound payment requests in the demo.
 - Do not add cryptocurrency signing, custody, exchange, production webhooks, real payout paths, or a user-editable balance in Supabase.
 - A buyer may connect a sandbox provider after choosing a provider and setting up a separate sandbox project. No external service is required to build or test the current product.
@@ -46,7 +46,7 @@ No stage above should be connected to a real provider or real funds until separa
 - Refunds need a defined source, destination, reason, refundable maximum, provider support, and linked reversing/settlement entries; never delete transaction history.
 - Disputes freeze only the contested amount, preserve unaffected contract funds, capture evidence under an access-controlled retention policy, and provide reviewer decisions and appeals.
 - Withdrawals require verified identity and payout destination, jurisdiction eligibility, sanctions/risk controls where applicable, explicit confirmation, idempotency and reconciliation. Use a pending-withdrawal account and return funds on verified failure.
-- The current product has contract status tracking but no funds, escrow, real dispute case operations, refunds, or withdrawals.
+- The authenticated marketplace has contract status tracking but no funds, real escrow, real dispute case operations, refunds, or withdrawals. Demo Mode only models these states locally.
 
 ## Provider selection and buyer prerequisites
 

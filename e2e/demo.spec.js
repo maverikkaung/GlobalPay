@@ -75,6 +75,44 @@ test("visitor can complete a sample client-to-freelancer hiring journey without 
   await expect(page.getByText(newTitle, { exact: true })).toHaveCount(0);
 });
 
+test("demo wallet, milestone escrow, membership and ad rewards stay simulated and resettable", async ({ page }) => {
+  const supabaseRequests = [];
+  page.on("request", (request) => {
+    if (/supabase\.(co|in)\//i.test(request.url())) supabaseRequests.push(request.url().split("/").slice(0, 3).join("/"));
+  });
+  await page.goto("/demo");
+  await expect(page.getByText("This is a local-only demo. Your actions never reach Supabase.")).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Demo sections" });
+  await nav.getByRole("button", { name: "Membership & Rewards" }).click();
+  await page.getByRole("button", { name: "Gold", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Selected tier: gold" })).toBeVisible();
+  await page.getByRole("button", { name: /Simulate \+1 KAV reward/ }).click();
+  await expect(page.getByRole("button", { name: /Simulate \+1 KAV reward · 1\/5/ })).toBeVisible();
+
+  await nav.getByRole("button", { name: "KAV Wallet Sandbox" }).click();
+  await page.getByRole("button", { name: "Simulate 100 USDT credit" }).click();
+  await expect(page.getByTestId("demo-wallet-balance")).toHaveText("1,301");
+  await expect(page.getByText("SIMULATED — NO FUNDS MOVED")).toBeVisible();
+
+  await page.getByRole("button", { name: "Demo as Client" }).click();
+  await nav.getByRole("button", { name: "KAV Wallet Sandbox" }).click();
+  await page.getByRole("button", { name: "Fund sample milestone" }).click();
+  await expect(page.getByText("funded", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Open sample dispute" }).click();
+  await expect(page.getByText("disputed", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Resolve sample dispute: release" }).click();
+  await expect(page.getByText("released", { exact: true })).toBeVisible();
+
+  const keys = await page.evaluate(() => Object.keys(localStorage));
+  expect(keys).toContain("techkarvo-demo-v1");
+  expect(keys.some((key) => key.includes("auth-token"))).toBe(false);
+  expect(supabaseRequests).toEqual([]);
+  await page.getByRole("button", { name: "Reset Demo" }).click();
+  await nav.getByRole("button", { name: "KAV Wallet Sandbox" }).click();
+  await expect(page.getByTestId("demo-wallet-balance")).toHaveText("1,200");
+  await expect(page.getByText("unfunded", { exact: true })).toBeVisible();
+});
+
 test("theme preference persists, keyboard controls work, and layouts fit mobile and tablet", async ({ page }) => {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));

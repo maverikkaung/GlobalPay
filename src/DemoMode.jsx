@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "./useTheme.js";
 import { readDemoState, resetDemoState, writeDemoState } from "./demo-state.js";
+import { disputeDemoMilestone, fundDemoMilestone, refundDemoMilestone, releaseDemoMilestone, selectDemoMembership, simulateDemoAdReward, simulateDemoUsdtFunding } from "./demo-financials.js";
 
 const people = {
   client: { id: "demo-client", name: "Aye Thandar", title: "Product Lead · Wayfarer", location: "Yangon, Myanmar", initials: "AT", bio: "Building thoughtful travel tools for people who want to explore more." },
@@ -19,6 +20,7 @@ function DemoMode() {
   const [commentDrafts, setCommentDrafts] = useState({});
   const [messageDraft, setMessageDraft] = useState("");
   const [reviewDraft, setReviewDraft] = useState("");
+  const [sandboxAmount, setSandboxAmount] = useState("100");
   const { theme, toggleTheme } = useTheme();
   const isClient = data.role === "client";
   const activePerson = people[data.role];
@@ -56,8 +58,12 @@ function DemoMode() {
       if (status !== "Accepted") return { ...current, applications };
       const app = applications.find((application) => application.id === applicationId);
       const job = current.jobs.find((item) => item.id === app.jobId);
+      if (!job) return { ...current, applications };
       const jobs = current.jobs.map((item) => item.id === job.id ? { ...item, status: "in_progress" } : item);
-      return { ...current, applications, jobs };
+      const hasMilestone = current.financials.milestones.some((item) => item.jobId === job.id);
+      const amountKav = Math.max(1, Math.round(app.budget || job.budget));
+      const financials = hasMilestone ? current.financials : { ...current.financials, milestones: [{ id: `demo-milestone-${job.id}`, jobId: job.id, title: "Project delivery", amountKav, status: "unfunded" }, ...current.financials.milestones] };
+      return { ...current, applications, jobs, financials };
     });
     setNotice(status === "Accepted" ? "Freelancer hired. The sample project is now active." : "Application declined in the demo.");
   }
@@ -89,6 +95,11 @@ function DemoMode() {
     update((current) => ({ ...current, reviews: [...current.reviews, { id: `demo-review-${Date.now()}`, jobId, reviewerId: activePerson.id, body: reviewDraft.trim(), rating: 5 }] }));
     setReviewDraft(""); setNotice("Your five-star sample review is saved in the demo only.");
   }
+  function applyFinancialAction(action) {
+    const result = action(data.financials);
+    if (result.ok) update((current) => ({ ...current, financials: result.state }));
+    setNotice(result.message);
+  }
 
   const applicants = data.applications.filter((application) => data.jobs.some((job) => job.id === application.jobId && job.clientId === people.client.id));
   const myApplications = data.applications.filter((application) => application.freelancerId === people.freelancer.id);
@@ -111,14 +122,14 @@ function DemoMode() {
         </div>
         <div className="demo-member"><span className="demo-avatar">{activePerson.initials}</span><div><strong>{activePerson.name}</strong><span>{activePerson.title}</span></div></div>
         <nav className="demo-nav" aria-label="Demo sections">
-          {[ ["overview", "Overview"], ["jobs", isClient ? "My Jobs & Applicants" : "Job Feed & Applications"], ["feed", "Daily Feed"], ["messages", "Messages"], ["contracts", "Contracts & Reviews"] ].map(([id, label]) => <button key={id} type="button" className={section === id ? "active" : ""} onClick={() => setSection(id)}>{label}</button>)}
+          {[ ["overview", "Overview"], ["jobs", isClient ? "My Jobs & Applicants" : "Job Feed & Applications"], ["feed", "Daily Feed"], ["messages", "Messages"], ["contracts", "Contracts & Reviews"], ["wallet", "KAV Wallet Sandbox"], ["membership", "Membership & Rewards"] ].map(([id, label]) => <button key={id} type="button" className={section === id ? "active" : ""} onClick={() => setSection(id)}>{label}</button>)}
         </nav>
         <p className="demo-isolation-note">This is a local-only demo. Your actions never reach Supabase.</p>
       </aside>
 
       <section className="demo-content" aria-live="polite">
         {notice && <p className="demo-notice" role="status">{notice}</p>}
-        <header className="demo-page-heading"><div><span className="demo-eyebrow">{isClient ? "CLIENT WORKSPACE" : "FREELANCER WORKSPACE"}</span><h1>{section === "overview" ? `Welcome, ${activePerson.name.split(" ")[0]}` : section === "jobs" ? (isClient ? "Your projects & applicants" : "Find your next project") : section === "feed" ? "Daily Feed" : section === "messages" ? "Messages" : "Contracts & reviews"}</h1><p>{section === "overview" ? "Explore a realistic marketplace with sample activity." : "A safe, interactive preview with no account required."}</p></div><div className="demo-location">{activePerson.location}</div></header>
+        <header className="demo-page-heading"><div><span className="demo-eyebrow">{isClient ? "CLIENT WORKSPACE" : "FREELANCER WORKSPACE"}</span><h1>{section === "overview" ? `Welcome, ${activePerson.name.split(" ")[0]}` : section === "jobs" ? (isClient ? "Your projects & applicants" : "Find your next project") : section === "feed" ? "Daily Feed" : section === "messages" ? "Messages" : section === "contracts" ? "Contracts & reviews" : section === "wallet" ? "KAV Wallet Sandbox" : "Membership & Rewards"}</h1><p>{section === "overview" ? "Explore a realistic marketplace with sample activity." : "A safe, interactive preview with no account required."}</p></div><div className="demo-location">{activePerson.location}</div></header>
 
         {section === "overview" && <div className="demo-overview-grid">
           <article className="demo-card demo-profile-card"><span className="demo-avatar demo-avatar-large">{activePerson.initials}</span><span className="demo-eyebrow">PUBLIC PROFILE PREVIEW</span><h2>{activePerson.name}</h2><strong>{activePerson.title}</strong><p>{activePerson.bio}</p><div className="demo-skills"><span>{isClient ? "Product Strategy" : "React"}</span><span>{isClient ? "Travel" : "Accessibility"}</span><span>{isClient ? "Remote team" : "UI/UX Design"}</span></div><button type="button" onClick={() => setSection("feed")}>See professional updates</button></article>
@@ -142,6 +153,20 @@ function DemoMode() {
         {section === "messages" && <div className="demo-card demo-messages"><div><span className="demo-eyebrow">SAMPLE CONVERSATION</span><h2>{otherPerson.name}</h2><p>{otherPerson.title} · project discussion</p></div><div className="demo-message-list" aria-label="Sample conversation">{data.messages.map((message) => <div className={`demo-message ${message.senderId === activePerson.id ? "mine" : "theirs"}`} key={message.id}><span>{message.senderId === people.client.id ? people.client.name : people.freelancer.name}</span><p>{message.body}</p><time>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {message.senderId === activePerson.id ? "Seen" : "Read"}</time></div>)}</div><form className="demo-message-form" onSubmit={sendMessage}><label className="visually-hidden" htmlFor="demo-message-draft">Write a message</label><input id="demo-message-draft" value={messageDraft} onChange={(event) => setMessageDraft(event.target.value)} maxLength={500} placeholder="Write a message…" /><button className="demo-primary" type="submit" disabled={!messageDraft.trim()}>Send</button></form><p className="demo-isolation-note">Messages here are sample content and are not sent to another person.</p></div>}
 
         {section === "contracts" && <div className="demo-stack">{data.jobs.filter((job) => job.status !== "open").map((job) => <article className="demo-card demo-contract" key={job.id}><span className="demo-eyebrow">{job.status === "completed" ? "COMPLETED" : "ACTIVE CONTRACT"}</span><h2>{job.title}</h2><p>{people.client.name} · {people.freelancer.name} · ${job.budget.toLocaleString()}</p><p>This is a sample hiring record. Accepting work does not reserve or transfer money.</p>{isClient && job.status === "in_progress" && <button className="demo-primary" type="button" onClick={() => completeProject(job.id)}>Mark project complete</button>}{job.status === "completed" && <form className="demo-review-form" onSubmit={(event) => submitReview(event, job.id)}><label htmlFor={`demo-review-${job.id}`}>Leave a 5-star sample review</label><input id={`demo-review-${job.id}`} value={reviewDraft} onChange={(event) => setReviewDraft(event.target.value)} maxLength={300} placeholder="Share feedback about working together" /><button className="demo-primary" type="submit" disabled={!reviewDraft.trim()}>Submit review</button></form>}{data.reviews.filter((review) => review.jobId === job.id).map((review) => <p className="demo-review" key={review.id}>★★★★★ · {review.reviewerId === people.client.id ? people.client.name : people.freelancer.name}: {review.body}</p>)}</article>)}{data.jobs.every((job) => job.status === "open") && <p className="demo-empty">A contract appears here after a client hires a freelancer.</p>}</div>}
+
+        {section === "wallet" && <div className="demo-stack demo-finance-stack">
+          <div className="demo-simulation-banner" role="note"><strong>SIMULATED — NO FUNDS MOVED</strong><span>Local sample data only. This demo sends no requests to a wallet, blockchain, or payment provider.</span></div>
+          <article className="demo-card demo-wallet-overview"><div><span className="demo-eyebrow">{activePerson.name} · SAMPLE WALLET</span><h2><span data-testid="demo-wallet-balance">{data.financials.balances[isClient ? "clientAvailable" : "freelancerAvailable"].toLocaleString()}</span> KAV</h2><p>Available sample balance · 1 USDT = 1 KAV fixed demo rule</p></div><form onSubmit={(event) => { event.preventDefault(); applyFinancialAction((state) => simulateDemoUsdtFunding(state, data.role, Number(sandboxAmount))); }}><label htmlFor="demo-usdt-amount">Sandbox amount (USDT)</label><input id="demo-usdt-amount" type="number" min="1" max="1000" step="1" value={sandboxAmount} onChange={(event) => setSandboxAmount(event.target.value)} /><button className="demo-primary" type="submit">Simulate {sandboxAmount || 0} USDT credit</button></form></article>
+          <article className="demo-card"><span className="demo-eyebrow">MILESTONES & SAMPLE ESCROW</span><h2>Contract funding simulation</h2><p>Hiring does not fund a contract. A milestone hold exists only in this browser demo.</p>{data.financials.milestones.length ? <div className="demo-milestone-list">{data.financials.milestones.map((milestone) => { const job = data.jobs.find((item) => item.id === milestone.jobId); return <div className="demo-milestone-row" key={milestone.id}><div><strong>{milestone.title}</strong><span>{job?.title || "Sample project"}</span><span>{milestone.amountKav.toLocaleString()} KAV · <b>{milestone.status.replaceAll("_", " ")}</b></span></div><div className="demo-inline-actions">{isClient && milestone.status === "unfunded" && <button className="demo-primary" type="button" onClick={() => applyFinancialAction((state) => fundDemoMilestone(state, milestone.id))}>Fund sample milestone</button>}{isClient && milestone.status === "funded" && <><button className="demo-primary" type="button" onClick={() => applyFinancialAction((state) => releaseDemoMilestone(state, milestone.id))}>Release sample funds</button><button type="button" onClick={() => applyFinancialAction((state) => refundDemoMilestone(state, milestone.id))}>Refund sample hold</button></>}{milestone.status === "funded" && <button type="button" onClick={() => applyFinancialAction((state) => disputeDemoMilestone(state, milestone.id))}>Open sample dispute</button>}{milestone.status === "disputed" && <><button className="demo-primary" type="button" onClick={() => applyFinancialAction((state) => releaseDemoMilestone(state, milestone.id))}>Resolve sample dispute: release</button><button type="button" onClick={() => applyFinancialAction((state) => refundDemoMilestone(state, milestone.id))}>Resolve sample dispute: refund</button></>}</div></div>; })}</div> : <p className="demo-empty">Hire a sample applicant to create a milestone for this simulation.</p>}</article>
+          <article className="demo-card"><span className="demo-eyebrow">SAMPLE COMMISSION</span><h2>10% demo rate</h2><p>Applied only to a simulated milestone release. This is not a real TechKarvo commission setting.</p></article>
+          <article className="demo-card"><span className="demo-eyebrow">SIMULATED LEDGER</span><h2>Recent sample entries</h2><div className="demo-ledger-list">{data.financials.transactions.slice(0, 12).map((entry) => <div className="demo-ledger-row" key={entry.id}><span>{entry.type.replaceAll("_", " ")}<small>{entry.note}</small></span><strong>{entry.amountKav.toLocaleString()} KAV</strong></div>)}</div></article>
+        </div>}
+
+        {section === "membership" && <div className="demo-stack">
+          <div className="demo-simulation-banner" role="note"><strong>DEMO MEMBERSHIPS</strong><span>Tier selection is local-only. No subscription, payment, premium benefit, or entitlement is activated.</span></div>
+          <article className="demo-card"><span className="demo-eyebrow">{activePerson.name} · SAMPLE MEMBERSHIP</span><h2>Selected tier: {data.financials.membership[data.role]}</h2><p>Switch among sample catalog labels to preview the future buyer-configurable membership experience.</p><div className="demo-tier-grid">{[["free", "Free"], ["plus", "Plus"], ["gold", "Gold"], ["premium", "Premium"]].map(([tier, label]) => <button key={tier} type="button" className={data.financials.membership[data.role] === tier ? "demo-primary" : ""} aria-pressed={data.financials.membership[data.role] === tier} onClick={() => applyFinancialAction((state) => selectDemoMembership(state, data.role, tier))}>{label}{data.financials.membership[data.role] === tier ? " · Selected" : ""}</button>)}</div></article>
+          <article className="demo-card"><span className="demo-eyebrow">ADVERTISEMENT REWARD SANDBOX</span><h2>Sample ad reward</h2><p>Simulate a 1 KAV sample reward. No ad view is recorded and no advertising network is contacted.</p><button className="demo-primary" type="button" disabled={data.financials.adRewards[data.role] >= 5} onClick={() => applyFinancialAction((state) => simulateDemoAdReward(state, data.role))}>Simulate +1 KAV reward · {data.financials.adRewards[data.role]}/5</button></article>
+        </div>}
       </section>
     </div>
   </main>;

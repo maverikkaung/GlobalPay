@@ -14,9 +14,9 @@ Audit baseline: branch `codex/marketplace-data-foundation`, commit `530138a` (20
 | Member safety | Block, mute and report submission with RLS-backed rules | User-side reporting exists. Owner moderation queue, case assignment, appeals, support SLAs, and audit dashboard are missing. |
 | Demo Mode | Local-only role switch, marketplace/social sample workflows, reset, responsive/theme Playwright coverage | Implemented and isolated from Supabase; no wallet/membership/ad rewards are represented as real value. |
 | Admin and ownership controls | No Admin route or Admin dashboard; unsupported role has no quick actions | Critical sale-readiness gap. Migration 012 is a draft intended to add a trusted admin registry/RPC foundation; neither CI nor staging verification is complete. UI and buyer bootstrap flow remain incomplete. |
-| Memberships | None | Free/Plus/Gold/Premium catalog, entitlements, renewal, expiry, tier settings, and buyer configuration are not implemented. No subscription sales should be enabled. |
-| KAV/USDT | Architecture document only | No wallet UI, ledger, balance, payment provider, sandbox adapter, or transfer integration exists. `1 USDT = 1 KAV` is a requested demo simulation rule only. |
-| Ads/rewards | None | No real ads, rewarded events, fraud checks, or reward ledger. A sandbox-only simulation can be built without a network provider. |
+| Memberships | Demo Mode tier selector for Free/Plus/Gold/Premium | Local selection only; no persistent entitlements, renewal, expiry, pricing, billing, or paid benefits. |
+| KAV/USDT | Demo Mode-only local wallet and balanced sample ledger | Uses fixed `1 USDT = 1 KAV`, sandbox credits, milestone holds/releases/refunds/disputes and sample commission. Nothing persists outside local demo storage; no real provider, funds, or withdrawal exists. |
+| Ads/rewards | Demo Mode-only bounded reward simulation | Simulates up to five sample 1 KAV rewards per local demo role. No real ad network, view verification, or persistent fraud controls. |
 | Financial reports | None | No actual financial activity exists; reporting should wait for a reviewed ledger. Demo analytics must be labeled simulated. |
 | Configuration/transferability | Vite public Supabase config, Vercel rewrites, CI, migration/test suite | Existing Supabase key name is supported; build now rejects privileged keys. Buyer guide and configuration templates are being added. Provider/brand/pricing settings need a centralized buyer-owned configuration milestone. |
 
@@ -34,8 +34,8 @@ Audit baseline: branch `codex/marketplace-data-foundation`, commit `530138a` (20
 1. **Transfer and configuration foundation:** safe public-key build guard; complete source/environment/deployment/ownership docs; remove stale setup claims. No migrations.
 2. **Central buyer-owned product configuration:** feature flags, brand, membership catalog, commission display settings, demo rate and limits. Keep private financial enforcement server-side; migration approval required if persisted in Supabase.
 3. **Admin and support operations:** review and verify migration 012 in isolated PostgreSQL, then request staging approval; build Admin route, buyer bootstrap guide, reports queue, moderation actions, support cases and audit views. Trusted admin role must be enforced in database/server.
-4. **Sandbox money model:** Demo Mode-only wallet transactions at fixed `1 USDT = 1 KAV`, milestones/fees/refunds/disputes, replay/idempotency, visible simulation labels and no network calls. No real provider credentials.
-5. **Membership and ad reward simulation:** editable tier catalog and entitlement simulation, deterministic demo events, limits and abuse testing. Do not activate billing or third-party ads.
+4. **Sandbox money model:** implemented in Demo Mode with a fixed `1 USDT = 1 KAV`, balanced local sample entries, milestone holds/releases/refunds/disputes, commission, visible simulation labels, and no network calls. CI unit and browser regression coverage added. No real provider credentials.
+5. **Membership and ad reward simulation:** basic tier selection and bounded demo reward are implemented locally. Editable buyer catalog, entitlement lifecycle, deterministic anti-abuse controls, and Admin settings remain incomplete. Do not activate billing or third-party ads.
 6. **Buyer operations and analytics:** simulated reporting dashboards, exportable diagnostics, incident/support runbooks, localization and performance/accessibility review.
 7. **Release hardening:** isolated buyer-owned staging project, full Client/Freelancer/Admin Playwright coverage, security review, CI, deployment rehearsal and transfer checklist.
 

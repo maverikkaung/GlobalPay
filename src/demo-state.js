@@ -1,3 +1,5 @@
+import { createDemoFinancials } from "./demo-financials.js";
+
 export const DEMO_STORAGE_KEY = "techkarvo-demo-v1";
 
 export function createDemoState() {
@@ -20,8 +22,42 @@ export function createDemoState() {
       { id: "demo-message-1", senderId: "demo-client", body: "Hi Maya, your dashboard experience looks like a strong fit. Are you available next week?", createdAt: "2026-11-18T08:30:00.000Z" },
       { id: "demo-message-2", senderId: "demo-freelancer", body: "Thanks! I am available Monday and can share a short implementation plan before we start.", createdAt: "2026-11-18T08:45:00.000Z" }
     ],
-    reviews: []
+    reviews: [],
+    financials: createDemoFinancials()
   };
+}
+
+function normalizeDemoFinancials(value, seed) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return seed;
+  const balances = {};
+  for (const key of Object.keys(seed.balances)) {
+    const amount = value.balances?.[key];
+    balances[key] = Number.isFinite(amount) && amount >= 0 && amount <= 1_000_000_000 ? amount : seed.balances[key];
+  }
+  const milestones = Array.isArray(value.milestones) ? value.milestones.flatMap((item) => {
+    if (!item || typeof item.id !== "string" || typeof item.jobId !== "string" || typeof item.title !== "string"
+      || !Number.isInteger(item.amountKav) || item.amountKav < 1
+      || !["unfunded", "funded", "disputed", "released", "refunded"].includes(item.status)) return [];
+    return [{ id: item.id.slice(0, 120), jobId: item.jobId.slice(0, 120), title: item.title.slice(0, 120), amountKav: Math.min(item.amountKav, 1_000_000_000), status: item.status }];
+  }) : seed.milestones;
+  const transactions = Array.isArray(value.transactions) ? value.transactions.flatMap((entry) => {
+    if (!entry || typeof entry.id !== "string" || typeof entry.type !== "string" || !Number.isFinite(entry.amountKav) || !Array.isArray(entry.lines)) return [];
+    const lines = entry.lines.filter((line) => line && typeof line.account === "string" && Number.isFinite(line.deltaKav))
+      .slice(0, 10).map((line) => ({ account: line.account.slice(0, 100), deltaKav: line.deltaKav }));
+    if (!lines.length || lines.reduce((total, line) => total + line.deltaKav, 0) !== 0) return [];
+    return [{ id: entry.id.slice(0, 120), type: entry.type.slice(0, 60), amountKav: Math.min(Math.abs(entry.amountKav), 1_000_000_000),
+      currency: "KAV", simulated: true, note: typeof entry.note === "string" ? entry.note.slice(0, 300) : "Sample-only transaction",
+      createdAt: typeof entry.createdAt === "string" ? entry.createdAt : "", lines }];
+  }).slice(0, 300) : seed.transactions;
+  const membership = Object.fromEntries(Object.keys(seed.membership).map((role) => [
+    role, ["free", "plus", "gold", "premium"].includes(value.membership?.[role]) ? value.membership[role] : seed.membership[role]
+  ]));
+  const adRewards = Object.fromEntries(Object.keys(seed.adRewards).map((role) => [
+    role, Number.isInteger(value.adRewards?.[role]) && value.adRewards[role] >= 0 && value.adRewards[role] <= 5 ? value.adRewards[role] : seed.adRewards[role]
+  ]));
+  const commissionBps = Number.isInteger(value.commissionBps) && value.commissionBps >= 0 && value.commissionBps <= 10_000
+    ? value.commissionBps : seed.commissionBps;
+  return { ...seed, ...value, balances, milestones, transactions, membership, adRewards, commissionBps };
 }
 
 export function readDemoState(storage) {
@@ -33,12 +69,14 @@ export function readDemoState(storage) {
     const seed = createDemoState();
     if (!parsed || !["client", "freelancer"].includes(parsed.role)) return seed;
     return {
-      ...seed, ...parsed,
+      ...seed,
+      ...parsed,
       jobs: Array.isArray(parsed.jobs) ? parsed.jobs : seed.jobs,
       applications: Array.isArray(parsed.applications) ? parsed.applications : seed.applications,
       posts: Array.isArray(parsed.posts) ? parsed.posts : seed.posts,
       messages: Array.isArray(parsed.messages) ? parsed.messages : seed.messages,
-      reviews: Array.isArray(parsed.reviews) ? parsed.reviews : seed.reviews
+      reviews: Array.isArray(parsed.reviews) ? parsed.reviews : seed.reviews,
+      financials: normalizeDemoFinancials(parsed.financials, seed.financials)
     };
   } catch { return createDemoState(); }
 }
