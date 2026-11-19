@@ -644,12 +644,15 @@ begin
     or p_display_name is null or length(btrim(p_display_name)) not between 1 and 60
     or p_description is null or length(p_description)>500 or p_credits not between 1 and 100000
     or (p_sample_price is not null and (p_sample_price<=0 or p_sample_price>=1000000000 or trunc(p_sample_price)<>p_sample_price or p_sample_price::text in ('NaN','Infinity','-Infinity')))
-    or (p_slug='free' and p_sample_price is not null) or p_features is null or jsonb_typeof(p_features) is distinct from 'array'
-    or case when jsonb_typeof(p_features)='array' then (jsonb_array_length(p_features)>30 or exists (
-      select 1 from jsonb_array_elements(p_features) feature(value)
-      where jsonb_typeof(feature.value)<>'string' or length(btrim(feature.value#>>'{}')) not between 1 and 240
-    )) else true end
+    or (p_slug='free' and p_sample_price is not null)
     or p_active is null or p_display_order not between 0 and 1000 then raise exception 'Invalid role-specific sample membership plan' using errcode='22023'; end if;
+  if p_features is null or jsonb_typeof(p_features) is distinct from 'array' then
+    raise exception 'Membership benefits must be a JSON list' using errcode='22023';
+  end if;
+  if jsonb_array_length(p_features)>30 or exists (
+    select 1 from jsonb_array_elements(p_features) feature(value)
+    where jsonb_typeof(feature.value)<>'string' or length(btrim(feature.value#>>'{}')) not between 1 and 240
+  ) then raise exception 'Membership benefits must contain up to 30 short text values' using errcode='22023'; end if;
   if p_slug='free' and not p_active then raise exception 'The Free sample plan must remain available' using errcode='23514'; end if;
   insert into public.membership_plans(account_type,slug,display_name,description,included_usage_credits,simulated_price_usdt,features,is_active,display_order,updated_by,updated_at)
     values(p_account_type,p_slug,p_display_name,btrim(p_description),p_credits,p_sample_price,p_features,p_active,p_display_order,actor,now())

@@ -59,6 +59,11 @@ begin
     raise exception 'Fractional sample USDT prices must be rejected when KAV ledger uses whole units';
   exception when invalid_parameter_value then null;
   end;
+  begin
+    perform public.techkarvo_admin_upsert_membership_plan('client','plus','Client Plus Sample','Editable sandbox plan',12,10,'["valid",1]'::jsonb,true,1);
+    raise exception 'Membership benefits must reject non-text values';
+  exception when invalid_parameter_value then null;
+  end;
   if public.techkarvo_admin_financial_summary()->>'real_money_enabled'<>'false' then raise exception 'Admin analytics must declare that real money is disabled'; end if;
   if (public.techkarvo_admin_financial_summary()->>'unbalanced_journals')::bigint<>0 then raise exception 'Admin reconciliation must report no unbalanced sandbox journals'; end if;
   if (public.techkarvo_admin_financial_summary()->>'simulated_commission_kav')::bigint<>10 then raise exception 'Sample platform commission must match configured bps'; end if;
