@@ -3,7 +3,8 @@ begin;
 insert into auth.users(id,raw_user_meta_data) values
  ('b1111111-1111-4111-8111-111111111111','{"full_name":"Flow Client","account_type":"client"}'),
  ('b2222222-2222-4222-8222-222222222222','{"full_name":"Flow Freelancer","account_type":"freelancer"}'),
- ('b3333333-3333-4333-8333-333333333333','{"full_name":"Flow Admin","account_type":"client"}');
+ ('b3333333-3333-4333-8333-333333333333','{"full_name":"Flow Admin","account_type":"client"}'),
+ ('b6666666-6666-4666-8666-666666666666','{"full_name":"Unrelated Member","account_type":"client"}');
 set local role service_role;
 insert into public.platform_admins(user_id) values('b3333333-3333-4333-8333-333333333333');
 insert into public.jobs(id,client_id,title,description,budget) values
@@ -72,8 +73,12 @@ begin
   exception when insufficient_privilege then denied := true;
   end;
   if not denied then raise exception 'Non-admin must not access financial admin reports'; end if;
+  if (select count(*) from public.contract_milestones where created_by='b1111111-1111-4111-8111-111111111111')<>2 then
+    raise exception 'Freelancer must read milestones for a contract they participate in';
+  end if;
+  perform set_config('request.jwt.claim.sub','b6666666-6666-4666-8666-666666666666',true);
   if exists(select 1 from public.contract_milestones where created_by='b1111111-1111-4111-8111-111111111111') then
-    raise exception 'Freelancer must not read client-created milestone rows';
+    raise exception 'Unrelated members must not read another contract''s milestones';
   end if;
 end;
 $$;
