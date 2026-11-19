@@ -27,7 +27,7 @@ create table public.membership_plans (
   display_name text not null check (length(btrim(display_name)) between 1 and 60),
   description text not null default '' check (length(description) <= 500),
   included_usage_credits integer not null check (included_usage_credits between 0 and 100000),
-  simulated_price_usdt numeric check (simulated_price_usdt is null or (simulated_price_usdt >= 0 and simulated_price_usdt < 1000000000 and simulated_price_usdt::text not in ('NaN','Infinity','-Infinity'))),
+  simulated_price_usdt numeric check (simulated_price_usdt is null or (simulated_price_usdt > 0 and simulated_price_usdt < 1000000000 and trunc(simulated_price_usdt)=simulated_price_usdt and simulated_price_usdt::text not in ('NaN','Infinity','-Infinity'))),
   features jsonb not null default '[]'::jsonb check (jsonb_typeof(features) = 'array'),
   is_active boolean not null default false,
   is_simulation_only boolean not null default true check (is_simulation_only),
@@ -35,7 +35,8 @@ create table public.membership_plans (
   updated_by uuid references public.profiles(id) on delete set null,
   updated_at timestamptz not null default now(),
   unique (account_type, slug),
-  check (octet_length(features::text) <= 16384)
+  check (octet_length(features::text) <= 16384),
+  check (slug <> 'free' or simulated_price_usdt is null)
 );
 insert into public.membership_plans(account_type,slug,display_name,description,included_usage_credits,simulated_price_usdt,features,is_active,display_order)
 values
@@ -90,7 +91,7 @@ create table public.membership_credit_events (
   id bigint generated always as identity primary key,
   user_id uuid not null references public.profiles(id) on delete restrict,
   actor_id uuid references public.profiles(id) on delete set null,
-  event_type text not null check (event_type in ('cycle_grant','plan_activation','job_post','job_application','admin_adjustment')),
+  event_type text not null check (event_type in ('cycle_grant','cycle_renewal','cycle_downgrade','plan_activation','job_post','job_application','admin_adjustment')),
   delta integer not null check (delta <> 0 and delta between -100000 and 100000),
   idempotency_key text not null check (length(idempotency_key) between 1 and 160),
   reference_id text not null default '' check (length(reference_id) <= 120),
@@ -122,7 +123,7 @@ grant all on public.ledger_accounts to service_role;
 create table public.ledger_transactions (
   id uuid primary key default gen_random_uuid(),
   actor_id uuid not null references public.profiles(id) on delete restrict,
-  transaction_type text not null check (transaction_type in ('sandbox_deposit','sandbox_withdrawal','sandbox_milestone_hold','sandbox_milestone_release','sandbox_milestone_refund','sandbox_ad_reward')),
+  transaction_type text not null check (transaction_type in ('sandbox_deposit','sandbox_withdrawal','sandbox_membership_purchase','sandbox_membership_renewal','sandbox_milestone_hold','sandbox_milestone_release','sandbox_milestone_refund','sandbox_ad_reward')),
   idempotency_key text not null check (length(idempotency_key) between 8 and 160),
   amount_kav bigint not null check (amount_kav > 0 and amount_kav <= 1000000000),
   reference_type text not null default '' check (length(reference_type) <= 60),
@@ -369,28 +370,59 @@ $$;
 create or replace function public.techkarvo_sandbox_activate_plan(p_slug text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare actor uuid := (select auth.uid()); account_kind text; plan_row public.membership_plans%rowtype; event_id bigint;
+  existing_event public.membership_credit_events%rowtype; balance bigint; txn uuid; amount_kav bigint; cycle_key text;
 begin
   if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
   select account_type into account_kind from public.profiles where id=actor;
+  if account_kind is null then raise exception 'A supported marketplace profile is required' using errcode='42501'; end if;
   select * into plan_row from public.membership_plans where account_type=account_kind and slug=p_slug and is_active and is_simulation_only;
   if plan_row.id is null then raise exception 'This simulation plan is unavailable for this account type' using errcode='22023'; end if;
   perform pg_advisory_xact_lock(hashtextextended(actor::text,1));
+  perform pg_advisory_xact_lock(hashtextextended(actor::text,0));
+  cycle_key := date_trunc('month',now())::date::text;
+  select * into existing_event from public.membership_credit_events
+    where user_id=actor and idempotency_key='plan-selection:'||cycle_key;
+  if existing_event.id is not null then
+    if existing_event.reference_id=plan_row.id::text then
+      return jsonb_build_object('plan',plan_row.slug,'credits',plan_row.included_usage_credits,
+        'already_processed',true,'simulation_only',true);
+    end if;
+    raise exception 'Only one simulated membership purchase or selection is allowed per cycle' using errcode='23514';
+  end if;
+  if plan_row.slug <> 'free' then
+    if plan_row.simulated_price_usdt is null then
+      raise exception 'Set a sample whole-USDT price before purchasing this simulation plan' using errcode='22023';
+    end if;
+    amount_kav := plan_row.simulated_price_usdt::bigint;
+    perform public.techkarvo_ensure_wallet_accounts(actor);
+    select coalesce(sum(amount_kav),0) into balance from public.ledger_entries
+      where account_key='user:'||actor::text||':available';
+    if balance < amount_kav then raise exception 'Insufficient simulated KAV balance for this plan' using errcode='23514'; end if;
+    insert into public.ledger_transactions(actor_id,transaction_type,idempotency_key,amount_kav,reference_type,reference_id,note)
+      values(actor,'sandbox_membership_purchase','membership-purchase:'||cycle_key,amount_kav,
+        'membership',plan_row.id::text,'Simulated membership purchase; no real payment') returning id into txn;
+    insert into public.ledger_entries(transaction_id,account_key,amount_kav) values
+      (txn,'user:'||actor::text||':available',-amount_kav),(txn,'sandbox:clearing',amount_kav);
+  end if;
   insert into public.membership_credit_events(user_id,actor_id,event_type,delta,idempotency_key,reference_id)
     values(actor,actor,'plan_activation',plan_row.included_usage_credits,
-      'activation-cycle:'||date_trunc('month',now())::date,plan_row.id::text)
+      'plan-selection:'||cycle_key,plan_row.id::text)
     on conflict(user_id,idempotency_key) do nothing returning id into event_id;
-  if event_id is null then raise exception 'Only one simulated membership selection is allowed per cycle' using errcode='23514'; end if;
+  if event_id is null then raise exception 'Membership selection already processed' using errcode='23514'; end if;
   insert into public.membership_entitlements(user_id,plan_id,period_started_at,period_ends_at,period_credit_limit,credits_used)
     values(actor,plan_row.id,date_trunc('month',now()),date_trunc('month',now())+interval '1 month',plan_row.included_usage_credits,0)
     on conflict(user_id) do update set plan_id=excluded.plan_id,period_started_at=excluded.period_started_at,
       period_ends_at=excluded.period_ends_at,period_credit_limit=excluded.period_credit_limit,credits_used=0,updated_at=now();
-  return jsonb_build_object('plan',plan_row.slug,'credits',plan_row.included_usage_credits,'simulation_only',true);
+  return jsonb_build_object('plan',plan_row.slug,'credits',plan_row.included_usage_credits,
+    'transaction_id',txn,'amount_kav',amount_kav,'simulation_only',true);
 end;
 $$;
 
 create or replace function public.techkarvo_consume_usage_credit()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare actor uuid; ent public.membership_entitlements%rowtype; event_key text;
+  selected_plan public.membership_plans%rowtype; free_plan public.membership_plans%rowtype;
+  balance bigint; txn uuid; renewal_price bigint; renewal_event text; original_plan_id uuid;
 begin
   if tg_table_name='jobs' then actor := new.client_id;
   else actor := new.freelancer_id;
@@ -399,11 +431,36 @@ begin
   select * into ent from public.membership_entitlements where user_id=actor for update;
   if ent.user_id is null then raise exception 'Membership entitlement is not configured' using errcode='55000'; end if;
   if ent.period_ends_at <= now() then
-    update public.membership_entitlements set period_started_at=date_trunc('month',now()),
-      period_ends_at=date_trunc('month',now())+interval '1 month',credits_used=0,updated_at=now()
+    original_plan_id := ent.plan_id;
+    select * into selected_plan from public.membership_plans where id=ent.plan_id;
+    select * into free_plan from public.membership_plans
+      where account_type=selected_plan.account_type and slug='free' and is_active;
+    if free_plan.id is null then raise exception 'No active Free fallback plan is configured' using errcode='55000'; end if;
+    if selected_plan.slug <> 'free' and selected_plan.is_active and selected_plan.simulated_price_usdt is not null then
+      renewal_price := selected_plan.simulated_price_usdt::bigint;
+      perform pg_advisory_xact_lock(hashtextextended(actor::text,0));
+      perform public.techkarvo_ensure_wallet_accounts(actor);
+      select coalesce(sum(amount_kav),0) into balance from public.ledger_entries
+        where account_key='user:'||actor::text||':available';
+      if balance >= renewal_price then
+        insert into public.ledger_transactions(actor_id,transaction_type,idempotency_key,amount_kav,reference_type,reference_id,note)
+          values(actor,'sandbox_membership_renewal','membership-renewal:'||date_trunc('month',now())::date,
+            renewal_price,'membership',selected_plan.id::text,'Simulated membership renewal; no real payment') returning id into txn;
+        insert into public.ledger_entries(transaction_id,account_key,amount_kav) values
+          (txn,'user:'||actor::text||':available',-renewal_price),(txn,'sandbox:clearing',renewal_price);
+      else
+        selected_plan := free_plan;
+      end if;
+    else
+      selected_plan := free_plan;
+    end if;
+    update public.membership_entitlements set plan_id=selected_plan.id,
+      period_started_at=date_trunc('month',now()),period_ends_at=date_trunc('month',now())+interval '1 month',
+      period_credit_limit=selected_plan.included_usage_credits,credits_used=0,updated_at=now()
       where user_id=actor returning * into ent;
+    renewal_event := case when selected_plan.id=free_plan.id and original_plan_id<>free_plan.id then 'cycle_downgrade' else 'cycle_renewal' end;
     insert into public.membership_credit_events(user_id,event_type,delta,idempotency_key,reference_id)
-      values(actor,'cycle_grant',ent.period_credit_limit,'cycle:'||date_trunc('month',now())::date,'');
+      values(actor,renewal_event,ent.period_credit_limit,'cycle:'||date_trunc('month',now())::date,selected_plan.id::text);
   end if;
   if ent.credits_used >= ent.period_credit_limit then raise exception 'No usage credits remain in this simulated membership cycle' using errcode='23514'; end if;
   update public.membership_entitlements set credits_used=credits_used+1,updated_at=now() where user_id=actor;
@@ -586,7 +643,12 @@ begin
   if p_account_type not in ('client','freelancer') or p_slug not in ('free','plus','gold','premium')
     or p_display_name is null or length(btrim(p_display_name)) not between 1 and 60
     or p_description is null or length(p_description)>500 or p_credits not between 1 and 100000
-    or (p_sample_price is not null and (p_sample_price<0 or p_sample_price>=1000000000 or p_sample_price::text in ('NaN','Infinity','-Infinity'))) or jsonb_typeof(p_features)<>'array'
+    or (p_sample_price is not null and (p_sample_price<=0 or p_sample_price>=1000000000 or trunc(p_sample_price)<>p_sample_price or p_sample_price::text in ('NaN','Infinity','-Infinity')))
+    or (p_slug='free' and p_sample_price is not null) or p_features is null or jsonb_typeof(p_features) is distinct from 'array'
+    or case when jsonb_typeof(p_features)='array' then (jsonb_array_length(p_features)>30 or exists (
+      select 1 from jsonb_array_elements(p_features) feature(value)
+      where jsonb_typeof(feature.value)<>'string' or length(btrim(feature.value#>>'{}')) not between 1 and 240
+    )) else true end
     or p_active is null or p_display_order not between 0 and 1000 then raise exception 'Invalid role-specific sample membership plan' using errcode='22023'; end if;
   if p_slug='free' and not p_active then raise exception 'The Free sample plan must remain available' using errcode='23514'; end if;
   insert into public.membership_plans(account_type,slug,display_name,description,included_usage_credits,simulated_price_usdt,features,is_active,display_order,updated_by,updated_at)

@@ -9,12 +9,12 @@ The implementation uses fictional integer KAV values with a fixed display refere
 ## Data and authorization
 
 - User ledger accounts are created only inside a fixed-search-path definer RPC. Authenticated users cannot query raw accounts, transactions, journal entries, reward claims, or private financial configuration.
-- Client-callable RPCs derive identity from `auth.uid()`, validate role/contract participation, enforce numeric limits and idempotency, and label results as simulation only.
+- Client-callable RPCs derive identity from `auth.uid()`, validate role/contract participation, enforce numeric limits and idempotency, and label results as simulation only. Paid sample plans require a configured whole-USDT price, debit the same whole-number KAV amount at the 1:1 reference rate, and renew once at the next calendar cycle; an underfunded renewal safely falls back to the role's Free plan.
 - Every committed journal transaction must contain at least two non-zero KAV entries whose signed values sum to zero. Posted transactions and journal entries reject updates and deletes.
 - Milestone state changes are participant-scoped. Only the client can place a sample hold or release/refund; the freelancer may submit work; either participant may open a dispute. Only a platform administrator may resolve a dispute, and the decision creates an admin audit entry.
 - Membership plan selections are role-specific and can be changed once per cycle to prevent repeated selection from resetting usage credits. Job and application inserts consume monthly credits in a trigger; failed inserts roll back the credit event with the job/application transaction.
 - Reward claims are bounded per user per day and written to the same balanced journal. No ad provider is integrated.
-- Admin configuration and role plan edits are range-checked and audit logged. The public UI contains no secret configuration field.
+- Admin configuration and role plan edits are range-checked and audit logged. Benefits are limited to a small JSON string list. Plan prices remain unconfigured by default because no owner pricing schedule was provided; paid simulation plans cannot be selected until a buyer configures a positive whole-number price. The public UI contains no secret configuration field.
 
 ## Validation
 
@@ -28,4 +28,4 @@ The migration is additive, but use of the new sandbox will create ledger and aud
 
 ## Deliberate non-goals
 
-No real deposits, withdrawals, custody, stablecoin conversion, provider webhooks, spendable balances, money movement, paid membership charges, ad-network payouts, or legally binding escrow are implemented. A buyer must independently complete legal/compliance review, provider selection, KYC/AML policy, custody and key management design, reconciliation, dispute operations, incident response, independent security review, and explicit product/finance approvals before any real-value feature is designed or activated.
+No real deposits, withdrawals, custody, stablecoin conversion, provider webhooks, spendable real-world balances, money movement, real membership charges, ad-network payouts, or legally binding escrow are implemented. Membership purchase and renewal are simulated KAV journal entries only. A buyer must independently complete legal/compliance review, provider selection, KYC/AML policy, custody and key management design, reconciliation, dispute operations, incident response, independent security review, and explicit product/finance approvals before any real-value feature is designed or activated.

@@ -46,7 +46,19 @@ begin
   if exists(select 1 from public.contracts where id=contract_id and status<>'active') then raise exception 'Contract should resume once its only dispute is resolved'; end if;
   if not exists(select 1 from public.admin_audit_log where action='sandbox.dispute.resolve') then raise exception 'Admin financial decision must be audited'; end if;
   perform public.techkarvo_admin_update_financial_config(true,1000,1,1,1000,1000);
-  perform public.techkarvo_admin_upsert_membership_plan('client','plus','Client Plus Sample','Editable sandbox plan',12,null,'["12 sample credits"]'::jsonb,true,1);
+  perform public.techkarvo_admin_upsert_membership_plan('client','plus','Client Plus Sample','Editable sandbox plan',12,10,'["12 sample credits","Priority listing"]'::jsonb,true,1);
+  if not exists(select 1 from public.membership_plans where account_type='client' and slug='plus'
+    and simulated_price_usdt=10 and features='["12 sample credits","Priority listing"]'::jsonb) then
+    raise exception 'Admin-configured sample price and benefits must persist to the role-specific plan';
+  end if;
+  if not exists(select 1 from public.admin_audit_log where action='sandbox.membership_plan.update') then
+    raise exception 'Membership catalog edits must be audit logged';
+  end if;
+  begin
+    perform public.techkarvo_admin_upsert_membership_plan('client','plus','Client Plus Sample','Editable sandbox plan',12,10.5,'["invalid fractional unit"]'::jsonb,true,1);
+    raise exception 'Fractional sample USDT prices must be rejected when KAV ledger uses whole units';
+  exception when invalid_parameter_value then null;
+  end;
   if public.techkarvo_admin_financial_summary()->>'real_money_enabled'<>'false' then raise exception 'Admin analytics must declare that real money is disabled'; end if;
   if (public.techkarvo_admin_financial_summary()->>'unbalanced_journals')::bigint<>0 then raise exception 'Admin reconciliation must report no unbalanced sandbox journals'; end if;
   if (public.techkarvo_admin_financial_summary()->>'simulated_commission_kav')::bigint<>10 then raise exception 'Sample platform commission must match configured bps'; end if;
@@ -73,6 +85,12 @@ begin
   exception when insufficient_privilege then denied := true;
   end;
   if not denied then raise exception 'Non-admin must not access financial admin reports'; end if;
+  denied := false;
+  begin
+    perform public.techkarvo_admin_upsert_membership_plan('freelancer','plus','Unauthorized','Must reject',20,10,'[]'::jsonb,true,1);
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'Non-admin must not edit the financial membership catalog'; end if;
   if (select count(*) from public.contract_milestones where created_by='b1111111-1111-4111-8111-111111111111')<>2 then
     raise exception 'Freelancer must read milestones for a contract they participate in';
   end if;

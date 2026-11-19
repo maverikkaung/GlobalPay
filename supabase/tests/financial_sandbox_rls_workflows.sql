@@ -2,7 +2,17 @@
 begin;
 insert into auth.users(id,raw_user_meta_data) values
   ('a1111111-1111-4111-8111-111111111111','{"full_name":"Sandbox Client","account_type":"client"}'),
-  ('a2222222-2222-4222-8222-222222222222','{"full_name":"Sandbox Freelancer","account_type":"freelancer"}');
+  ('a2222222-2222-4222-8222-222222222222','{"full_name":"Sandbox Freelancer","account_type":"freelancer"}'),
+  ('a3333333-3333-4333-8333-333333333333','{"full_name":"Renewal Fallback Client","account_type":"client"}');
+
+update public.membership_plans set simulated_price_usdt=10
+  where account_type='client' and slug='plus';
+update public.membership_plans set simulated_price_usdt=12
+  where account_type='freelancer' and slug='plus';
+update public.membership_entitlements set plan_id=(select id from public.membership_plans where account_type='client' and slug='plus'),
+  period_started_at=date_trunc('month',now())-interval '1 month',
+  period_ends_at=now()-interval '1 second',period_credit_limit=10,credits_used=0
+  where user_id='a3333333-3333-4333-8333-333333333333';
 
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
@@ -45,7 +55,19 @@ begin
   perform public.techkarvo_sandbox_withdraw(5,'withdraw-client-0001');
   wallet := public.techkarvo_sandbox_wallet();
   if (wallet->>'available_kav')::bigint <> 20 then raise exception 'Simulated withdrawal should journal a balanced debit'; end if;
+  begin
+    perform public.techkarvo_sandbox_withdraw(21,'withdraw-client-overspend');
+    raise exception 'An overdraft must be rejected';
+  exception when check_violation then null;
+  end;
+  if (public.techkarvo_sandbox_wallet()->>'available_kav')::bigint<>20 then raise exception 'Rejected overspending must not change the wallet balance'; end if;
   perform public.techkarvo_sandbox_activate_plan('plus');
+  wallet := public.techkarvo_sandbox_wallet();
+  if (wallet->>'available_kav')::bigint <> 10 then raise exception 'Configured membership purchase must debit simulated KAV at 1:1'; end if;
+  if (select count(*) from jsonb_array_elements(wallet->'transactions') as tx(value)
+      where value->>'transaction_type'='sandbox_membership_purchase')<>1 then
+    raise exception 'Paid plan selection must create one simulated membership purchase journal';
+  end if;
   begin
     perform public.techkarvo_sandbox_activate_plan('premium');
   exception when check_violation then second_activation_denied := true;
@@ -56,6 +78,54 @@ begin
   exception when insufficient_privilege then direct_access_denied := true;
   end;
   if not direct_access_denied then raise exception 'Authenticated members must not query raw ledger entries'; end if;
+end;
+$$;
+
+reset role;
+update public.membership_entitlements set period_ends_at=now()-interval '1 second'
+  where user_id='a1111111-1111-4111-8111-111111111111';
+set local role authenticated;
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','a1111111-1111-4111-8111-111111111111',true);
+insert into public.jobs(id,client_id,title,description,budget) values
+  ('a3555555-5555-4555-8555-555555555555',auth.uid(),'Paid plan renewal','Simulated renewal fixture',10);
+do $$
+declare wallet jsonb;
+begin
+  if (select slug from public.membership_entitlements e join public.membership_plans p on p.id=e.plan_id where e.user_id=auth.uid())<>'plus' then
+    raise exception 'A configured and funded plan must renew at cycle rollover';
+  end if;
+  wallet := public.techkarvo_sandbox_wallet();
+  if (select count(*) from jsonb_array_elements(wallet->'transactions') as tx(value)
+      where value->>'transaction_type'='sandbox_membership_renewal')<>1 then
+    raise exception 'Paid membership renewal must create one balanced simulated KAV journal';
+  end if;
+  if (wallet->>'available_kav')::bigint<>0 then
+    raise exception 'Renewal must debit the configured sample price exactly once';
+  end if;
+end;
+$$;
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','a3333333-3333-4333-8333-333333333333',true);
+insert into public.jobs(id,client_id,title,description,budget) values
+  ('a3666666-6666-4666-8666-666666666666',auth.uid(),'Unfunded renewal','Must fall back to Free',10);
+do $$
+declare wallet jsonb;
+begin
+  if (select slug from public.membership_entitlements e join public.membership_plans p on p.id=e.plan_id where e.user_id=auth.uid())<>'free' then
+    raise exception 'An underfunded renewal must downgrade safely to Free';
+  end if;
+  if (select credits_used from public.membership_entitlements where user_id=auth.uid())<>1 then
+    raise exception 'A Free fallback must still consume exactly one usage credit';
+  end if;
+  wallet := public.techkarvo_sandbox_wallet();
+  if exists(select 1 from jsonb_array_elements(wallet->'transactions') as tx(value)
+      where value->>'transaction_type'='sandbox_membership_renewal') then
+    raise exception 'An unfunded renewal must not overdraw or post a renewal debit';
+  end if;
 end;
 $$;
 
