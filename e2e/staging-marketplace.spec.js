@@ -125,6 +125,19 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
 
     await client.goto("/job-applicants");
     const applicant = client.locator(".applicant-card").filter({ hasText: jobTitle });
+    await expect(applicant).toBeVisible({ timeout: 60_000 });
+    const applicantSearch = client.getByRole("searchbox", { name: "Search applicants" });
+    const applicantJobFilter = client.getByRole("combobox", { name: "Job", exact: true });
+    await applicantSearch.fill(jobTitle);
+    await applicantJobFilter.selectOption({ index: 1 }, { timeout: 15_000 });
+    const applicantJobValue = await applicantJobFilter.evaluate((select) => select.value);
+    expect(applicantJobValue).not.toBe("all");
+    await expect(applicantJobFilter).toHaveValue(applicantJobValue);
+    await client.getByRole("combobox", { name: "Status", exact: true }).selectOption("Pending");
+    await expect(client.locator(".applicant-card")).toHaveCount(1);
+    await applicantJobFilter.selectOption("all", { timeout: 15_000 });
+    await client.getByRole("combobox", { name: "Status", exact: true }).selectOption("all");
+    await applicantSearch.fill("");
     await expect(applicant).toBeVisible();
     await applicant.getByRole("button", { name: "Accept" }).click();
     await expect(applicant.getByText("Accepted")).toBeVisible();
@@ -151,7 +164,6 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await client.locator(".social-image-picker input[type=file]").setInputFiles({ name: "qa-feed-image.png", mimeType: "image/png", buffer: tinyPng });
     await expect(client.locator(".social-composer-preview")).toBeVisible();
     const notificationButton = client.getByRole("button", { name: /^Notifications,/ });
-    const baselineNotifications = readUnreadCount(await notificationButton.getAttribute("aria-label"));
     await client.getByRole("button", { name: "Publish", exact: true }).click();
     await expect(client.getByText("Your professional post is live.")).toBeVisible();
     const ownPost = client.locator("article.social-card").filter({ hasText: postBody }).first();
@@ -160,25 +172,30 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await freelancer.goto("/social");
     const otherPost = freelancer.locator("article.social-card").filter({ hasText: postBody }).first();
     await expect(otherPost).toBeVisible();
+    const socialActionStartedAt = Date.now() - 1000;
     await otherPost.getByRole("button", { name: "Like" }).click();
     await otherPost.getByRole("button", { name: "Comment", exact: true }).first().click();
     await otherPost.getByLabel("Write a comment").fill("QA staging notification and comment check.");
     await otherPost.getByRole("button", { name: "Comment", exact: true }).last().click();
     await expect(otherPost.getByText("QA staging notification and comment check.")).toBeVisible();
-    await expect.poll(async () => readUnreadCount(await notificationButton.getAttribute("aria-label")), { timeout: 30_000 }).toBeGreaterThan(baselineNotifications);
     await notificationButton.click();
     const preview = client.getByRole("region", { name: "Recent notifications" });
     await expect(preview).toBeVisible();
-    await expect(preview.getByText(/reaction on your post|comment on your post/i).first()).toBeVisible();
+    const socialNotificationItems = preview.locator("button.notification-preview-item").filter({ hasText: /reaction on your post|comment on your post/i });
+    await expect.poll(async () => socialNotificationItems.evaluateAll((items, startedAt) => items.some((item) => {
+      const createdAt = Date.parse(item.querySelector("time")?.dateTime || "");
+      return item.classList.contains("unread") && createdAt >= startedAt;
+    }), socialActionStartedAt), { timeout: 30_000 }).toBe(true);
     const unreadSocialNotification = preview.locator("button.notification-preview-item.unread")
       .filter({ hasText: /reaction on your post|comment on your post/i }).first();
     const openedNotificationTitle = (await unreadSocialNotification.locator("strong").textContent()).trim();
+    const unreadBeforeMarking = readUnreadCount(await notificationButton.getAttribute("aria-label"));
     await unreadSocialNotification.click();
     await expect(client).toHaveURL(/\/social\?post=/);
     await client.goto("/notifications");
     const openedNotification = client.locator("article.notification-card").filter({ hasText: openedNotificationTitle }).first();
     await expect(openedNotification).toHaveClass(/read/);
-    await expect.poll(async () => readUnreadCount(await client.getByRole("button", { name: /^Notifications,/ }).getAttribute("aria-label")), { timeout: 30_000 }).toBeLessThanOrEqual(baselineNotifications + 1);
+    await expect.poll(async () => readUnreadCount(await client.getByRole("button", { name: /^Notifications,/ }).getAttribute("aria-label")), { timeout: 30_000 }).toBe(unreadBeforeMarking - 1);
     const unreadMessagesBeforePersonalChat = readUnreadCount(await client.getByRole("link", { name: /^Messages,/ }).getAttribute("aria-label"));
 
     await client.goto("/social");
@@ -211,12 +228,20 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     const personalMessage = `QA personal message ${Date.now()}`;
     await freelancer.locator("#message-body").fill(personalMessage);
     await freelancer.getByRole("button", { name: "Share in conversation" }).click();
-    await expect(freelancer.locator(".message-shared-post")).toBeVisible();
+    const sentPersonalMessage = freelancer.locator(".message-bubble").filter({ hasText: personalMessage });
+    await expect(sentPersonalMessage.locator(".message-shared-post")).toBeVisible();
     await client.goto("/messages");
     await client.getByRole("tab", { name: /Personal Messages/ }).click();
     await expect(client.getByText(personalMessage)).toBeVisible({ timeout: 60_000 });
+    const receivedPersonalMessage = client.locator(".message-bubble").filter({ hasText: personalMessage });
+    await expect(receivedPersonalMessage.locator(".message-shared-post")).toBeVisible();
     await expect.poll(async () => readUnreadCount(await client.getByRole("link", { name: /^Messages,/ }).getAttribute("aria-label")), { timeout: 30_000 }).toBeLessThanOrEqual(unreadMessagesBeforePersonalChat);
     await expect.poll(async () => freelancer.getByText("Seen", { exact: true }).count(), { timeout: 30_000 }).toBeGreaterThan(0);
+    await client.goto("/social");
+    const postToDelete = client.locator("article.social-card").filter({ hasText: `${postBody} edited` }).first();
+    await postToDelete.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(postToDelete).toHaveCount(0);
+    await freelancer.getByRole("tab", { name: /Personal Messages/ }).click();
     const messageBubble = freelancer.locator(".message-bubble").filter({ hasText: personalMessage });
     await messageBubble.getByRole("button", { name: "Delete for Everyone" }).click();
     await expect(freelancer.getByText("[Message removed]")).toBeVisible();
@@ -290,4 +315,26 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await clientContext.close();
     await freelancerContext.close();
   }
+});
+
+test("staging Client applicant job, status, and search filters work on existing QA records", async ({ page }) => {
+  test.skip(!credentialsAvailable, "Set staging-only QA account variables to run authenticated staging browser coverage.");
+  await signIn(page, clientCredentials, "Client");
+  await page.goto("/job-applicants");
+  const firstApplicant = page.locator(".applicant-card").first();
+  await expect(firstApplicant).toBeVisible({ timeout: 60_000 });
+  const jobTitle = (await firstApplicant.locator(".applicant-job-summary strong").textContent()).trim();
+  const status = (await firstApplicant.locator(".applicant-status").textContent()).trim();
+  const search = page.getByRole("searchbox", { name: "Search applicants" });
+  await search.fill(jobTitle);
+  const jobFilter = page.getByRole("combobox", { name: "Job", exact: true });
+  await jobFilter.selectOption({ index: 1 }, { timeout: 15_000 });
+  const value = await jobFilter.evaluate((select) => select.value);
+  expect(value).not.toBe("all");
+  await expect(jobFilter).toHaveValue(value);
+  await page.getByRole("combobox", { name: "Status", exact: true }).selectOption(status, { timeout: 15_000 });
+  await expect(page.locator(".applicant-card")).toHaveCount(1);
+  await page.getByRole("combobox", { name: "Sort by", exact: true }).selectOption("oldest", { timeout: 15_000 });
+  await expect(firstApplicant).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2)).toBe(true);
 });

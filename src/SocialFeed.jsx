@@ -311,7 +311,9 @@ export function SocialFeed({ user }) {
     if (!window.confirm("Delete this professional post and its comments?")) return;
     setBusyId(item.id); setError("");
     try {
-      const result = await supabase.from("posts").delete().eq("id", item.id).eq("author_id", userId);
+      // Request the deleted row back so RLS-filtered/no-op deletes cannot be
+      // reported as successful by PostgREST's default empty 204 response.
+      const result = await supabase.from("posts").delete().eq("id", item.id).eq("author_id", userId).select("id").single();
       if (result.error) throw result.error;
       if (item.image_path) await supabase.storage.from(MARKETPLACE_MEDIA_BUCKET).remove([item.image_path]);
       await loadFeed(); setNotice("Your post was deleted.");

@@ -18,6 +18,8 @@ export default defineConfig({
   use: {
     ...devices["Desktop Chrome"],
     baseURL: externalBaseURL || "http://127.0.0.1:5173",
+    actionTimeout: 15_000,
+    navigationTimeout: 60_000,
     launchOptions: executablePath ? { executablePath } : {},
     trace: "retain-on-failure"
   },
