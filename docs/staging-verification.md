@@ -1,48 +1,48 @@
-# TechKarvo staging setup and verification
+# TechKarvo staging verification and migration runbook
 
-This plan is for the dedicated Supabase project `techkarvo-staging` (reference `ntucgiieksrwebwvcmun`). The project was verified Healthy in Tokyo and the dashboard reported no migrations applied. No database migration or Auth setting has been changed. Do not point these steps at production.
+## Current development staging reference
 
-## Prerequisites
+- Supabase project: `techkarvo-staging`
+- Project reference: `ntucgiieksrwebwvcmun`
+- Region: Tokyo (`ap-northeast-1`)
+- Staging site: `https://techkarvo-staging.vercel.app`
+- Staging Vercel deployment branch: `codex/marketplace-data-foundation`
+- The project history records migrations `202611150000` through `202611150011` applied to this staging project. Production remains a separate system and is outside this runbook.
 
-- A dedicated Supabase staging project with no production data and a known project reference.
-- An authorized operator with access to that staging project's SQL editor or Supabase CLI, plus permission to inspect schema, Auth configuration, and logs.
-- A staging-only deployment target (preferably a Vercel Preview environment) configured with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for staging. Never put a service-role key or database password in a `VITE_` variable.
-- Two controlled test email inboxes, one for a Client and one for a Freelancer. Keep credentials in the password manager; do not put passwords or keys in tickets, chat, or test output.
-- A migration window and an approved rollback/recovery owner. Take a staging-only backup/snapshot before applying schema changes.
+The values above identify the development environment only. Before each operation, confirm the current target in the Supabase/Vercel dashboard or authenticated CLI. Never infer a target from a local link file alone. No migration in this runbook is pre-approved for a future change.
 
-## Prepare the staging database
+## Future staging migration procedure
 
-1. Confirm the project reference and dashboard hostname identify staging. Record the target in the change log without recording credentials.
-2. Inspect the current schema and migration history. A fresh project must use `202611150000_marketplace_base_schema.sql` before the eight follow-up migrations. The base migration intentionally fails if the three core tables already exist, so do not use it on a legacy database. The GitHub fixture provides Auth compatibility primitives only; CI creates the application tables by applying the base migration and verifies its constraints, indexes, grants, and RLS.
-3. Confirm the target contains no production data. Capture a staging backup/snapshot and verify the recovery procedure.
-4. Review the ordered migrations `202611150000_marketplace_base_schema.sql`, then `202611150001_...sql` through `202611150008_...sql`, including the policies, triggers, grants, backfills, and preservation behavior. The base migration creates the core schema for an empty project; follow-up migrations add marketplace fields and features. Do not use the fresh-project base migration on a legacy database.
-5. On a machine authenticated only to the staging project, inspect the migration plan (`supabase db push --dry-run` when supported by the installed CLI). Confirm the linked reference is `ntucgiieksrwebwvcmun` (or re-verify the intended staging ref), review every pending migration, and stop if the target or schema is uncertain. A dry-run is review only; it does not authorize an apply.
-6. After a separately approved staging change window, apply migrations to staging only. Confirm the migration history, run `supabase/tests/migration_assertions.sql` and `supabase/tests/marketplace_rls_workflows.sql` where compatible, inspect database logs, and verify the app can read/write each expected table under authenticated user roles. Never use a service-role key from the browser.
-7. Keep this staged schema and test data isolated. Do not apply the migrations to production without a separate explicit approval.
+1. Confirm project name and reference are exactly `techkarvo-staging` / `ntucgiieksrwebwvcmun`; stop on mismatch.
+2. Inspect schema, migration history, row counts and data categories. Stop if unplanned objects, records, or migration conflicts appear.
+3. Review the entire proposed SQL: table/column constraints, foreign keys, grants, RLS, functions/triggers, storage rules, indexes, data updates, and rollback/recovery limits.
+4. Run the complete migration sequence against the disposable PostgreSQL fixture in CI. Verify fresh database assertions, RLS workflows, and expected rollback/recovery behavior.
+5. Take a staging-only backup and perform a dry-run. Capture a list of only the intended pending migrations.
+6. Request separate explicit approval naming the migration and staging reference. Approval is for staging only and does not authorize production or future migrations.
+7. Apply only the approved migration(s). Verify `supabase_migrations.schema_migrations`, schema/grants/RLS, logs, and authenticated Client/Freelancer journeys. Stop if results differ from review.
 
-## Configure staging Auth and preview
+Never run migrations against production without separate explicit approval. The CI PostgreSQL service is disposable and is not a staging or production backup.
 
-In the staging Supabase project's Auth settings, configure the staging preview origin as the Site URL and add only the required staging callback/redirect URLs (including the app's login, signup confirmation, and password-reset return routes). Confirm email confirmation behavior and SMTP delivery using the controlled test inboxes. Do not change production Auth settings.
+## Staging identity and environment
 
-Add the staging URL and anon/publishable key to the Vercel Preview environment only, then redeploy the preview. Verify the built page loads the staging host and that the browser sends no service-role credential. A public anon key is expected in browser requests; do not copy it into this document or logs.
+- Use the staging Supabase URL and a public publishable key only in browser configuration. The Vite public variable is `VITE_SUPABASE_PUBLISHABLE_KEY`; `VITE_SUPABASE_ANON_KEY` is retained for compatibility.
+- Never put a Supabase secret/service-role key, database password, payment provider secret, or private signing key into any `VITE_` variable, source file, test fixture, trace, screenshot, log, or report.
+- Configure staging-only Auth Site URL and redirect URLs. Use separate controlled Client/Freelancer inboxes and never share passwords or session tokens in chat.
+- Keep uploads in their intended bucket: public profile/post images may use reviewed public-image policies; private messages/documents must use private storage and participant-authorized access.
+- Staging test accounts and data are disposable only with owner confirmation. Do not delete or modify other accounts/data as part of cleanup.
 
-## Authentication and two-role journey
+## Two-role workflow verification
 
-Use the preview deployment and the two staging-only inboxes. Record pass/fail, timestamp, browser, and sanitized error text; never record passwords, tokens, full request headers, or session data.
+Run against `https://techkarvo-staging.vercel.app` using separate browser contexts and staging-only test users. Do not enable trace/video recording for authenticated tests unless every artifact is proven to exclude auth state and headers.
 
-1. Sign up the Client and Freelancer accounts with the correct account types; complete email confirmation if enabled.
-2. Log in and log out as each role. Check refresh/session restoration, expired-session handling, and the password-reset email/link flow.
-3. Confirm each role lands on its own dashboard and is redirected away from the other role's protected routes.
-4. As Client, create a job, edit it if supported, and confirm it appears in discovery and the client dashboard. Check validation for required fields and invalid budget values.
-5. As Freelancer, search/filter jobs, open the job detail, submit an application, and confirm duplicate submission is rejected. Verify the application appears in the freelancer dashboard and client applicant list.
-6. As Client, review the applicant and accept or reject an application. Confirm status changes appear on both dashboards. Verify a job with application history remains available according to the preservation rules.
-7. As the matched parties, exchange messages, check unread/read notification state, and verify messaging access ends under the configured closed-application rules.
-8. Complete the supported work lifecycle and submit a review from each side. Verify rating visibility, one-review constraints, and that unrelated users cannot read private review records.
-9. Exercise profile editing and freelancer portfolio add/edit/delete, including URL validation and empty/long input boundaries.
-10. In a second browser session, test privacy boundaries: a user must not edit another user's profile, job, application, message, portfolio, or review, nor enumerate private records. Confirm expected denials in RLS/database responses.
-11. Check the full journey at desktop and narrow mobile widths, keyboard-only navigation, visible focus, form labels/errors, loading/empty/error states, and no horizontal overflow.
-12. After sign-off, remove only the staging test records/accounts if approved. Preserve evidence of migration verification and the exact commit/deployment tested.
+1. Verify signup, login/logout, role-specific routes, session recovery, password reset, email-confirmation behavior, and buyer-configured Auth redirects.
+2. As Client, create a text-only job and check validation, editability, discovery, and the client dashboard.
+3. As Freelancer, search/filter, apply, reject duplicate applications, and verify application status and withdrawal behavior.
+4. As Client, review applicants and accept/reject. Confirm applicant/application history and contract transitions remain consistent.
+5. Exercise job and personal message separation, unread counts, read receipts, realtime delivery/poll fallback, shared-post previews, Delete for Me and authorized Delete for Everyone.
+6. Exercise image uploads, post creation/edit/delete, likes/comments, connections, notifications, block/unblock/mute/report, and active-contract safeguards.
+7. Complete a contract, submit both reviews, and verify participants/ratings and one-review constraints. Confirm no payment or escrow is implied by contract state.
+8. Test account settings, safe email/password flows, keyboard operation, dark/light themes, and desktop/tablet/mobile viewports.
+9. Run a separate Admin/support test only after a trusted admin model exists; the current product baseline does not have an Admin Dashboard or moderation queue.
 
-## What is needed to run this plan
-
-Provide or create the dedicated staging project and identify its project reference; grant an authorized operator access to that staging project; configure the staging-only Preview variables and Auth redirects; and supply controlled access to two test inboxes. No secret needs to be sent in chat. Before anyone applies migrations, approve the staging migration window and confirm the staging target/schema review. Production authentication and the client/freelancer end-to-end journey remain unverified until this staging walkthrough (and a separate real production auth smoke test) passes.
+Record test results as pass/fail plus commit/deployment and sanitized error text. Never record emails, passwords, API keys, authorization headers, JWTs, recovery links, or raw network bodies.

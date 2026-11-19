@@ -1,40 +1,42 @@
 # TechKarvo
 
-TechKarvo is a React marketplace for clients to post freelance projects and for freelancers to apply, share work, and communicate with clients.
+TechKarvo is a transferable React/Supabase freelance marketplace for Clients and Freelancers. The repository includes job discovery and applications, profiles/portfolio, a professional social feed, messaging, notifications, contracts/reviews, member safety controls, and an isolated local-only Demo Mode.
+
+**Build-to-sell status:** this is an active software project, not an operating financial business. It does not accept funds or provide real escrow, payouts, crypto exchange, or paid memberships. Wallet and membership behavior is specification/demo-only. See [current readiness](docs/product-readiness.md) and the [buyer transfer guide](docs/buyer-transfer-guide.md).
 
 ## Stack
 
-- React 19 and Vite 8
-- React Router 7
-- Supabase Auth, Postgres, and Row Level Security
-- Vercel static hosting with SPA route rewrites
+- React 19, Vite 8, React Router 7
+- Supabase Auth, Postgres, Storage, and Row Level Security
+- Vercel static hosting with SPA rewrites and baseline security headers
+- Node.js 22+, npm, ESLint, Node test runner, and Playwright
 
-## Local development
+## Local setup
 
-Use Node.js 22 or newer.
+1. Install Node.js 22 or newer.
+2. Run `npm ci`.
+3. Copy `.env.example` to `.env` and set the URL and **publishable** key for a project you control.
+4. Run `npm run dev`.
 
-1. Install dependencies with `npm ci`.
-2. Copy `.env.example` to `.env` and set the Supabase project URL and public anon key.
-3. Start the app with `npm run dev`.
-
-The browser client must use only the Supabase anon/publishable key. Never put a service-role key or database password in a `VITE_` variable.
+`VITE_SUPABASE_PUBLISHABLE_KEY` is preferred. `VITE_SUPABASE_ANON_KEY` remains a compatibility alias for existing Vercel configuration. Only a publishable/anon key belongs in browser configuration. The Vite build rejects a modern secret key or legacy `service_role` JWT in those public variables. Never put a database password, Supabase secret key, or provider credential in any `VITE_` variable.
 
 ## Quality checks
 
-- `npm run lint`
-- `npm test`
-- `npm run build`
+```text
+npm run lint
+npm test
+npm run build
+npm run test:e2e
+```
 
-GitHub Actions runs these checks for pushes and pull requests. A separate job applies the SQL migrations to a disposable PostgreSQL fixture, verifies RLS and table/column privileges, and exercises client/freelancer marketplace workflows. This CI database is isolated from the connected Supabase project.
+GitHub Actions runs lint, unit tests, build and isolated public/demo browser tests. Its separate PostgreSQL job applies the ordered migrations to a disposable CI database and exercises schema, RLS, and Client/Freelancer workflows. CI does not connect to Supabase staging or production.
 
-## Supabase schema
+## Database and environments
 
-Database changes are versioned in `supabase/migrations/`. Fresh projects start with `202611150000_marketplace_base_schema.sql`, followed by the eight marketplace security and feature migrations. The base migration intentionally fails if core tables already exist; legacy projects require schema review before choosing a migration path. Later migrations add profile fields and RLS boundaries, messaging, notifications, portfolios, reviews, and least-privilege grants. Applying migrations changes the connected database; verify the target and obtain approval before applying them to any shared environment. They have not been applied to the connected TechKarvo projects.
+Migrations are numbered `202611150000` through `202611150011`. Fresh databases require the base schema first; do not apply it to a database with existing marketplace tables. **Staging** (`techkarvo-staging`, `ntucgiieksrwebwvcmun`) was set up through migration 011 according to the project change history. **Production schema and migration state are not to be inferred from staging.** Any future migration requires target/schema review and separate approval before applying to staging; never run the CI fixture against a live project.
 
-The application relies on RLS for authorization. Client-side route checks are for navigation only and are not a security boundary.
+RLS is the data authorization boundary; React route guards only control navigation. Review all migrations, storage policies and database tests before buyer deployment. Read [staging verification](docs/staging-verification.md) and [the buyer guide](docs/buyer-transfer-guide.md).
 
-See [the staging verification plan](docs/staging-verification.md) for the isolated database, Auth, and two-role journey setup. It is a runbook only; no live database has been changed.
+## Deployment and transfer
 
-## Vercel
-
-The GitHub repository is connected to the Vercel project. GitHub reports a successful Vercel deployment check for the current project branch. The deployment dashboard requires Vercel sign-in, so the public deployment URL and rendered production page have not been independently verified here. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the Vercel project’s Preview and Production environment settings. `vercel.json` routes client-side paths back to `index.html` and sets baseline browser security headers.
+The staging deployment is `https://techkarvo-staging.vercel.app`, tied to the feature branch. Production is outside this development goal. New owners must use their own GitHub, Supabase, Vercel, domain, support, and payment-provider accounts and rotate all project credentials during transfer. Follow the buyer guide; no domain, hosting upgrade, paid API, provider, or subscription is required for the $0 demo/software build.

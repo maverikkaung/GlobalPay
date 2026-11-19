@@ -1,11 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseBrowserConfig } from "./supabase-config.js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
+const config = getSupabaseBrowserConfig(import.meta.env);
+const supabaseUrl = config.url;
+const supabaseKey = config.key;
+export const isSupabaseConfigured = config.configured;
 
 if (!isSupabaseConfigured) {
-  console.error("TechKarvo is missing its public Supabase URL or anonymous key.");
+  console.error(config.reason === "privileged-key"
+    ? "TechKarvo rejected a privileged Supabase key in browser configuration. Use a publishable key."
+    : "TechKarvo is missing a valid public Supabase URL or publishable key.");
 }
 
 export const supabase = createClient(

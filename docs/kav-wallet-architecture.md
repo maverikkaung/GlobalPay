@@ -1,58 +1,55 @@
-# KAV Wallet — Future Architecture Specification
+# KAV Wallet and USDT Sandbox Architecture
 
-**Status:** Design only. No wallet, deposits, withdrawals, crypto payments, exchange, or spendable balance is enabled in TechKarvo. The reference accounting unit is `1 KAV = 1 USD`; this is a design convention, not a promise of redemption or a live exchange rate.
+**Status: simulated product specification only.** TechKarvo does not accept, custody, exchange, or transfer real money or crypto. There are no deposits, withdrawals, real escrow holds, or spendable balances. The demo may display the fixed reference `1 USDT = 1 KAV` as a clearly labeled simulation rule. It is not a market price, reserve claim, redemption promise, or live conversion rate.
 
-## Service boundaries
+## $0 build boundary
 
-- Keep marketplace identity and contracts separate from financial custody and payment processing.
-- A future wallet must be a separately reviewed service with a ledger API, a provider adapter, reconciliation jobs, an immutable audit trail, and explicit operational controls.
-- Browser clients must never receive provider secrets, signing keys, custodial keys, privileged database credentials, or permission to write ledger entries directly.
+- Keep wallet and membership activity in isolated Demo Mode state until a buyer funds and reviews a production implementation.
+- Use deterministic fake transaction IDs, fake USDT amounts, and a conspicuous `SIMULATED — NO FUNDS MOVED` label. Never use wallet addresses, real provider credentials, or outbound payment requests in the demo.
+- Do not add cryptocurrency signing, custody, exchange, production webhooks, real payout paths, or a user-editable balance in Supabase.
+- A buyer may connect a sandbox provider after choosing a provider and setting up a separate sandbox project. No external service is required to build or test the current product.
+
+## Future service boundaries
+
+- Keep marketplace identity/contracts separate from financial custody and payment processing.
+- A future wallet requires a trusted server-side ledger API, provider adapter, reconciliation workers, immutable audit events, incident response and explicit operational controls.
+- Browser clients must never receive provider secrets, signing keys, privileged database credentials, or permission to write ledger entries directly.
 - Contract status alone must never imply payment, escrow, or funds availability.
 
-## Double-entry ledger
+## Double-entry ledger requirements
 
-- Use append-only journal entries. Every posted transaction must have at least two lines, all in one currency, whose signed amounts sum to zero.
-- Store integer minor units (for USD, cents) rather than floating point. The KAV display conversion is a versioned accounting rule; rounding is explicit and never silently discards value.
+- Use append-only journal entries. Every posted transaction has at least two lines, all in one currency, whose signed amounts sum to zero.
+- Store integer minor units and explicit asset/currency identifiers. Treat the demo conversion of `1 USDT = 1 KAV` as a configurable simulation constant, never as a hard-coded live peg.
 - Separate accounts by owner and purpose: platform clearing, user available, user held, funding pending, provider payable, refund payable, withdrawal pending, fees, and loss/dispute reserve.
-- A unique idempotency key and external provider reference prevent duplicate funding, release, refund, or payout entries.
-- Posted entries cannot be edited or deleted. Corrections use a linked reversing transaction with actor, reason, original transaction ID, and timestamp.
-- Enforce account ownership, currency, state transitions, balanced journals, and idempotency in trusted server/database logic. Reconcile per-account and global totals continuously.
+- Enforce unique idempotency keys and external provider references. Posted entries cannot be edited/deleted; corrections use linked reversing entries with actor, reason, original transaction ID, and timestamp.
+- Enforce ownership, currency, state transitions, balanced journals, and idempotency in trusted server/database logic. Reconcile account and global totals continuously.
 
-## Funding verification
+## Sandbox funding and escrow lifecycle
 
-- Accept funding only from an approved payment provider after server-verified, signed webhook events and provider-side status confirmation.
-- Treat browser return URLs as display hints only. They are never proof of settlement.
-- Record pending, settled, failed, reversed, and chargeback states separately. Do not credit spendable funds before settlement criteria are met.
-- Verify webhook signatures, timestamps, replay protection, event ordering, amount, currency, payer, and destination. Store a minimal immutable provider event reference and sanitized evidence.
-- Run scheduled provider-to-ledger reconciliation, alert on unmatched transactions, and provide an audited manual exception workflow with dual control.
+1. Create a sandbox funding intent on the trusted backend with an idempotency key and expected asset/amount.
+2. Treat the browser return URL as display-only; only a sandbox provider's verified signature and server-side status may advance the simulated state.
+3. Normalize events to `pending`, `settled`, `failed`, `reversed`, and `chargeback`; test duplicate, replayed, delayed, out-of-order, mismatched amount/currency, and invalid signature cases.
+4. Model milestone funding, hold, release, refund, dispute freeze, and resolution as balanced ledger operations. Release requires contract milestone approval or a recorded dispute decision.
+5. Reconcile provider sandbox reports against ledger totals and keep an audited support exception path.
 
-## Contract holds, release, refunds, and disputes
+No stage above should be connected to a real provider or real funds until separate buyer authorization and legal/security readiness.
 
-- Create a hold only when a signed/approved contract milestone, amount, currency, funding source, and both parties are recorded and funds are verified as settled.
-- Move value from available to held with a balanced journal transaction. A hold is not a transfer to the freelancer and not proof of work completion.
-- Release requires the agreed approval rule or a documented dispute resolution. Each release is idempotent and linked to the contract and milestone.
-- Refunds require a defined source, destination, reason, maximum refundable amount, and provider support. Refunds reverse or settle prior entries; they do not delete history.
-- Disputes freeze only the contested amount, preserve unaffected contract funds, capture evidence references under an access-controlled retention policy, and record reviewer decisions and appeal paths.
-- Reconcile contract totals against held, released, refunded, and disputed balances. Never infer a payment from job-application acceptance.
+## Membership and advertisement reward simulations
 
-## Withdrawals
+- Represent Free, Plus, Gold, and Premium as versioned catalog entries controlled by buyer configuration. The demo can simulate entitlement changes and expiry; the production app currently has no membership billing or entitlement enforcement.
+- Keep tier names, prices, features, limits, and eligibility in configuration. Do not place pricing or commissions in client-only code as an authorization control.
+- Advertisement rewards must be sandbox events with per-user limits, deduplication, eligibility checks, and an audit record. Never reward views/clicks from a real ad network until the buyer has a compliant provider integration.
+- Do not create paid subscription prompts, real advertisements, or paid benefits in the current $0 build.
 
-- Require verified identity, verified payout destination, current account security checks, eligibility and sanctions screening where legally required, risk review, and explicit user confirmation.
-- Use a withdrawal state machine (requested, screening, approved, submitted, settled, failed, cancelled). Do not debit a user's available balance permanently until payout handling is defined; reserve funds in a pending-withdrawal account and return them on a verified failure.
-- Apply idempotency, velocity/amount limits, dual-control overrides, provider reconciliation, user notifications, and audited support resolution.
-- Never expose bank details, wallet addresses, identity documents, or provider responses in public profile APIs or client logs.
+## Refunds, disputes, and withdrawals
 
-## Possible provider and crypto integrations
+- Refunds need a defined source, destination, reason, refundable maximum, provider support, and linked reversing/settlement entries; never delete transaction history.
+- Disputes freeze only the contested amount, preserve unaffected contract funds, capture evidence under an access-controlled retention policy, and provide reviewer decisions and appeals.
+- Withdrawals require verified identity and payout destination, jurisdiction eligibility, sanctions/risk controls where applicable, explicit confirmation, idempotency and reconciliation. Use a pending-withdrawal account and return funds on verified failure.
+- The current product has contract status tracking but no funds, escrow, real dispute case operations, refunds, or withdrawals.
 
-- Evaluate regulated card/bank providers for fiat funding and payouts based on supported jurisdictions, marketplace/escrow products, dispute handling, webhooks, settlement timing, fees, and compliance coverage.
-- For crypto, evaluate a regulated, jurisdiction-compatible custody/payment provider before considering direct on-chain support. A provider adapter should isolate chain-specific confirmations, custody, signing, gas, address screening, sanctions controls, volatility, and reorg handling.
-- Do not implement a token, exchange, stable-value promise, direct key custody, bridge, or user-to-user transfer until legal, custody, consumer-protection, tax, and licensing analysis is complete.
-- Keep provider-specific transaction state outside the product domain model; normalize it through a versioned adapter and reconciled ledger events.
+## Provider selection and buyer prerequisites
 
-## Compliance, privacy, and operations prerequisites
+The buyer must choose a regulated, jurisdiction-compatible provider after assessing marketplace/escrow support, countries, settlement, fees, disputes, refunds, webhook signing, reconciliation, identity requirements, support and data residency. Crypto support additionally needs custody, chain finality/reorg handling, key management, address screening, gas, sanctions and volatility controls.
 
-- Obtain legal analysis for every launch country covering money transmission/payment services, escrow rules, consumer protection, marketplace liability, taxation/reporting, privacy, sanctions, AML, and crypto-specific obligations.
-- Determine whether KYC/AML, customer due diligence, sanctions screening, suspicious-activity escalation, transaction monitoring, records retention, and regulatory reporting apply. Select qualified providers and define the responsible regulated entity before launch.
-- Define data minimization, retention/deletion rules, access logs, encryption/key management, incident response, fraud controls, appeals, customer support, and financial reconciliation ownership.
-- Complete threat modeling, penetration testing, independent ledger review, disaster recovery, operational runbooks, and jurisdiction-specific approval before enabling any value movement.
-- Require separate product, security, legal/compliance, and finance approvals before any wallet or payment feature is activated.
+Before any real-value launch, obtain jurisdiction-specific legal advice on payment services, money transmission, escrow, consumer protection, marketplace liability, tax, privacy, sanctions, AML/KYC and crypto duties. Complete an independent ledger/security review, threat model, penetration test, recovery plan, reconciliation ownership and written approvals from product, security, legal/compliance, and finance.
