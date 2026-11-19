@@ -395,8 +395,8 @@ begin
     end if;
     amount_kav := plan_row.simulated_price_usdt::bigint;
     perform public.techkarvo_ensure_wallet_accounts(actor);
-    select coalesce(sum(amount_kav),0) into balance from public.ledger_entries
-      where account_key='user:'||actor::text||':available';
+    select coalesce(sum(e.amount_kav),0) into balance from public.ledger_entries e
+      where e.account_key='user:'||actor::text||':available';
     if balance < amount_kav then raise exception 'Insufficient simulated KAV balance for this plan' using errcode='23514'; end if;
     insert into public.ledger_transactions(actor_id,transaction_type,idempotency_key,amount_kav,reference_type,reference_id,note)
       values(actor,'sandbox_membership_purchase','membership-purchase:'||cycle_key,amount_kav,
