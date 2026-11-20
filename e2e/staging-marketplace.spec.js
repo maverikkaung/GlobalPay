@@ -393,6 +393,10 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     } else {
       expect(currentProjectStatus).toBe("completed");
     }
+    const otherActiveWork = (await client.locator(".my-project-card").evaluateAll((cards) => cards.map((card) => ({
+      title: card.querySelector("h3")?.textContent?.trim() || "",
+      status: card.querySelector(".project-work-status")?.textContent?.trim() || ""
+    })))).some((project) => project.title !== jobTitle && /active contract|project in progress/i.test(project.status));
 
     await client.goto("/messages");
     await selectMessageFolder(client, "personal");
@@ -402,9 +406,16 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await personalSafety.getByRole("button", { name: "Unmute" }).click();
     await expect(personalSafety.getByText("Member unmuted.")).toBeVisible();
     await personalSafety.getByRole("button", { name: "Block" }).click();
-    await expect(personalSafety.getByText("Member blocked.")).toBeVisible();
-    await personalSafety.getByRole("button", { name: "Unblock" }).click();
-    await expect(personalSafety.getByText("Member unblocked.")).toBeVisible();
+    if (otherActiveWork) {
+      await expect(personalSafety.getByRole("alert")).toHaveText(
+        "This member cannot be blocked while an active contract or accepted open job exists."
+      );
+      await expect(personalSafety.getByRole("button", { name: "Block" })).toBeVisible();
+    } else {
+      await expect(personalSafety.getByText("Member blocked.")).toBeVisible();
+      await personalSafety.getByRole("button", { name: "Unblock" }).click();
+      await expect(personalSafety.getByText("Member unblocked.")).toBeVisible();
+    }
     await personalSafety.getByRole("button", { name: "Report" }).click();
     await personalSafety.getByLabel("Details (optional)").fill("Automated staging QA report test; not a real incident.");
     await personalSafety.getByRole("button", { name: "Send report" }).click();

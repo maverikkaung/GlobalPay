@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import DashboardNav from "./DashboardNav.jsx";
+import { getMarketplaceWriteError } from "./marketplace-write-errors.js";
 
 function ApplyForm() {
   const navigate = useNavigate();
@@ -153,7 +154,7 @@ function ApplyForm() {
           setFormError("You've already applied for this job. View your application in My Applications.");
           return;
         }
-        setFormError("We couldn't submit your application. Please try again.");
+        setFormError(getMarketplaceWriteError(result.error, "We couldn't submit your application", "application"));
         console.error("Application submission failed:", result.error.message);
         return;
       }

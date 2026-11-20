@@ -41,7 +41,13 @@ export default function MemberSafetyActions({ user, memberId, memberName, applic
     const result = blocked
       ? await supabase.from("user_blocks").delete().eq("blocker_id", user.id).eq("blocked_id", memberId)
       : await supabase.from("user_blocks").insert({ blocker_id: user.id, blocked_id: memberId });
-    if (result.error) setError(getRequestErrorMessage(blocked ? "Unable to unblock this member" : "Unable to block this member", result.error));
+    if (result.error) {
+      if (!blocked && result.error.code === "42501") {
+        setError("This member cannot be blocked while an active contract or accepted open job exists.");
+      } else {
+        setError(getRequestErrorMessage(blocked ? "Unable to unblock this member" : "Unable to block this member", result.error));
+      }
+    }
     else {
       const next = !blocked; setBlocked(next); onBlockedChange?.(next);
       setNotice(next ? "Member blocked. Job-related conversations remain available." : "Member unblocked.");

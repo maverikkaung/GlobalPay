@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { JOB_CATEGORIES } from "./marketplace.js";
 import DashboardNav from "./DashboardNav.jsx";
+import { getMarketplaceWriteError } from "./marketplace-write-errors.js";
 
 function PostJob() {
   const navigate = useNavigate();
@@ -71,7 +72,7 @@ function PostJob() {
       });
       if (result.error) {
         console.error("Job posting failed:", result.error.message);
-        setError("We couldn't publish your project. Please check your connection and try again.");
+        setError(getMarketplaceWriteError(result.error, "We couldn't publish your project", "job-posting"));
         return;
       }
       setPublished(true);
