@@ -11,6 +11,9 @@ insert into public.jobs(id,client_id,title,description,budget) values
  ('b4444444-4444-4444-8444-444444444444','b1111111-1111-4111-8111-111111111111','Sandbox contract','Test-only job description',200);
 insert into public.job_applications(id,job_id,client_id,freelancer_id,status)
  values('b5555555-5555-4555-8555-555555555555','b4444444-4444-4444-8444-444444444444','b1111111-1111-4111-8111-111111111111','b2222222-2222-4222-8222-222222222222','Pending');
+update public.membership_entitlements set plan_id=(select id from public.membership_plans where account_type='freelancer' and slug='gold'),
+  period_credit_limit=80,period_ends_at=now()+interval '1 month'
+  where user_id='b2222222-2222-4222-8222-222222222222';
 reset role;
 
 set local role authenticated;
@@ -23,15 +26,15 @@ begin
   select id into contract_id from public.contracts where application_id='b5555555-5555-4555-8555-555555555555';
   if contract_id is null then raise exception 'Hiring an application must create a contract'; end if;
   perform public.techkarvo_sandbox_deposit(200,'client-contract-seed-001');
-  milestone_id := public.techkarvo_sandbox_create_milestone(contract_id,'Design delivery',100,'client-ms-create-001');
+  milestone_id := public.techkarvo_sandbox_create_milestone(contract_id,'Design delivery',100.25,'client-ms-create-001');
   perform public.techkarvo_sandbox_fund_milestone(milestone_id);
-  if (public.techkarvo_sandbox_wallet()->>'held_kav')::bigint <> 100 then raise exception 'Client funding should transfer sample value to a held account'; end if;
+  if (public.techkarvo_sandbox_wallet()->>'held_kav')::numeric <> 100.25 then raise exception 'Client funding should preserve two-decimal KAV values in the held account'; end if;
   perform set_config('request.jwt.claim.sub','b2222222-2222-4222-8222-222222222222',true);
   perform public.techkarvo_sandbox_milestone_action(milestone_id,'submit','');
   perform set_config('request.jwt.claim.sub','b1111111-1111-4111-8111-111111111111',true);
   result := public.techkarvo_sandbox_milestone_action(milestone_id,'release','');
   if not (result->>'simulation_only')::boolean then raise exception 'Release must be simulation-only'; end if;
-  if (public.techkarvo_sandbox_wallet()->>'available_kav')::bigint <> 100 then raise exception 'Client should have the remaining simulated balance'; end if;
+  if (public.techkarvo_sandbox_wallet()->>'available_kav')::numeric <> 97.74 then raise exception 'Client should pay the exact rounded plan-specific service fee at funding'; end if;
 
   milestone_id := public.techkarvo_sandbox_create_milestone(contract_id,'Revision round',20,'client-ms-create-002');
   perform public.techkarvo_sandbox_fund_milestone(milestone_id);
@@ -45,28 +48,29 @@ begin
   end if;
   if exists(select 1 from public.contracts where id=contract_id and status<>'active') then raise exception 'Contract should resume once its only dispute is resolved'; end if;
   if not exists(select 1 from public.admin_audit_log where action='sandbox.dispute.resolve') then raise exception 'Admin financial decision must be audited'; end if;
-  perform public.techkarvo_admin_update_financial_config(true,1000,1,1,1000,1000);
-  perform public.techkarvo_admin_upsert_membership_plan('client','plus','Client Plus Sample','Editable sandbox plan',12,10,'["12 sample credits","Priority listing"]'::jsonb,true,1);
+  perform public.techkarvo_admin_update_financial_config(true,1,1,1000,1000);
+  perform public.techkarvo_admin_upsert_membership_plan('client','plus','Client Plus Sample','Editable sandbox plan',12,10,200,
+    '["12 sample credits","Priority listing"]'::jsonb,'{"advanced_search":true,"ad_rewards":true}'::jsonb,true,1);
   if not exists(select 1 from public.membership_plans where account_type='client' and slug='plus'
-    and simulated_price_usdt=10 and features='["12 sample credits","Priority listing"]'::jsonb) then
+    and simulated_price_usdt=10 and fee_bps=200 and features='["12 sample credits","Priority listing"]'::jsonb) then
     raise exception 'Admin-configured sample price and benefits must persist to the role-specific plan';
   end if;
   if not exists(select 1 from public.admin_audit_log where action='sandbox.membership_plan.update') then
     raise exception 'Membership catalog edits must be audit logged';
   end if;
+  perform public.techkarvo_admin_upsert_membership_plan('client','plus','Client Plus Sample','Editable sandbox plan',12,10.50,200,
+    '["fractional cent price"]'::jsonb,'{"advanced_search":true}'::jsonb,true,1);
+  if not exists(select 1 from public.membership_plans where account_type='client' and slug='plus' and simulated_price_usdt=10.50) then
+    raise exception 'Fractional KAV prices to two decimal places must be accepted';
+  end if;
   begin
-    perform public.techkarvo_admin_upsert_membership_plan('client','plus','Client Plus Sample','Editable sandbox plan',12,10.5,'["invalid fractional unit"]'::jsonb,true,1);
-    raise exception 'Fractional sample USDT prices must be rejected when KAV ledger uses whole units';
-  exception when invalid_parameter_value then null;
-  end;
-  begin
-    perform public.techkarvo_admin_upsert_membership_plan('client','plus','Client Plus Sample','Editable sandbox plan',12,10,'["valid",1]'::jsonb,true,1);
+    perform public.techkarvo_admin_upsert_membership_plan('client','plus','Client Plus Sample','Editable sandbox plan',12,10,200,'["valid",1]'::jsonb,'{}'::jsonb,true,1);
     raise exception 'Membership benefits must reject non-text values';
   exception when invalid_parameter_value then null;
   end;
   if public.techkarvo_admin_financial_summary()->>'real_money_enabled'<>'false' then raise exception 'Admin analytics must declare that real money is disabled'; end if;
   if (public.techkarvo_admin_financial_summary()->>'unbalanced_journals')::bigint<>0 then raise exception 'Admin reconciliation must report no unbalanced sandbox journals'; end if;
-  if (public.techkarvo_admin_financial_summary()->>'simulated_commission_kav')::bigint<>10 then raise exception 'Sample platform commission must match configured bps'; end if;
+  if (round((public.techkarvo_admin_financial_summary()->>'simulated_commission_kav')::numeric,2)<>8.03) then raise exception 'Client and freelancer plan-specific commission fees must be recorded at two-decimal precision'; end if;
   if not exists(select 1 from public.admin_audit_log where action='sandbox.configuration.update') then raise exception 'Sandbox configuration change must be audited'; end if;
 end;
 $$;
@@ -79,11 +83,29 @@ declare reward jsonb; denied boolean := false;
 begin
   reward := public.techkarvo_sandbox_claim_ad_reward();
   if not (reward->>'simulation_only')::boolean then raise exception 'Ad reward must be simulated'; end if;
+  if (public.techkarvo_sandbox_wallet()->>'reward_kav')::numeric <> 1
+    or (public.techkarvo_sandbox_wallet()->>'available_kav')::numeric <> 92.23 then
+    raise exception 'Ad rewards must be kept separate from withdrawable KAV';
+  end if;
+  begin
+    perform public.techkarvo_sandbox_withdraw(94.24,'withdraw-reward-isolation');
+    raise exception 'Reward credits must not be withdrawable';
+  exception when check_violation then null;
+  end;
   begin
     perform public.techkarvo_sandbox_claim_ad_reward();
   exception when check_violation then denied := true;
   end;
   if not denied then raise exception 'Daily sandbox advertisement rewards must respect the configured limit'; end if;
+  if not public.techkarvo_has_membership_feature('advanced_search') then raise exception 'Eligible plan must expose advanced search entitlement to authenticated server checks'; end if;
+  if not public.techkarvo_has_membership_feature('profile_boost') or not public.techkarvo_has_membership_feature('analytics') then raise exception 'Gold freelancer benefits must be available'; end if;
+  perform public.techkarvo_set_profile_boost(true);
+  if not exists(select 1 from public.freelancer_public_profiles where id=auth.uid() and is_profile_boosted) then raise exception 'Eligible profile boost should be publicly visible through the safe profile projection'; end if;
+  insert into public.support_cases(requester_id,subject,description,category)
+    values(auth.uid(),'Priority support request','Priority support plan benefit test','technical');
+  if (select priority from public.support_cases where requester_id=auth.uid() and subject='Priority support request')<>'urgent' then
+    raise exception 'Eligible paid plan must receive server-assigned priority support';
+  end if;
   denied := false;
   begin
     perform public.techkarvo_admin_financial_summary();
@@ -92,7 +114,7 @@ begin
   if not denied then raise exception 'Non-admin must not access financial admin reports'; end if;
   denied := false;
   begin
-    perform public.techkarvo_admin_upsert_membership_plan('freelancer','plus','Unauthorized','Must reject',20,10,'[]'::jsonb,true,1);
+    perform public.techkarvo_admin_upsert_membership_plan('freelancer','plus','Unauthorized','Must reject',20,10,800,'[]'::jsonb,'{}'::jsonb,true,1);
   exception when insufficient_privilege then denied := true;
   end;
   if not denied then raise exception 'Non-admin must not edit the financial membership catalog'; end if;

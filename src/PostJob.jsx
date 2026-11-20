@@ -18,6 +18,22 @@ function PostJob() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [published, setPublished] = useState(false);
+  const [featured, setFeatured] = useState(false);
+  const [featureCheck, setFeatureCheck] = useState(false);
+
+  async function checkFeaturedAccess(checked) {
+    if (!checked) { setFeatured(false); return; }
+    setFeatureCheck(true);
+    const result = await supabase.rpc("techkarvo_has_membership_feature", { p_feature: "featured_jobs" });
+    setFeatureCheck(false);
+    if (result.error || result.data !== true) {
+      setError("Featured job placement requires an eligible active membership.");
+      setFeatured(false);
+      return;
+    }
+    setError("");
+    setFeatured(true);
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -50,7 +66,8 @@ function PostJob() {
         budget: Number(budget),
         currency: "USD",
         payment_type: paymentType,
-        status: "open"
+        status: "open",
+        is_featured: featured
       });
       if (result.error) {
         console.error("Job posting failed:", result.error.message);
@@ -120,6 +137,11 @@ function PostJob() {
             <option value="">Select Category</option>
             {JOB_CATEGORIES.map((jobCategory) => <option key={jobCategory} value={jobCategory}>{jobCategory}</option>)}
           </select>
+
+          <label className="admin-checkbox" htmlFor="post-job-featured">
+            <input id="post-job-featured" type="checkbox" checked={featured} disabled={loading || featureCheck} onChange={(event) => checkFeaturedAccess(event.target.checked)} />
+            Feature this job (eligible membership required)
+          </label>
 
           <label htmlFor="post-job-description">Job Description</label>
           <textarea

@@ -945,6 +945,15 @@ html[data-theme="dark"] .connection-status--accepted { color: #8fe3b9; border-co
 .financial-plan-card p { margin: 0; color: var(--tk-muted); line-height: 1.5; }
 .financial-plan-card strong { color: var(--tk-text); }
 .financial-plan-card button { margin-top: auto; }
+.financial-renewal-toggle { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; color: var(--tk-text); line-height: 1.5; }
+.financial-renewal-toggle input { margin-top: 4px; accent-color: var(--tk-blue); }
+.financial-analytics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 14px 0 0; }
+.financial-analytics > div { padding: 12px; border: 1px solid var(--tk-border); border-radius: 10px; background: var(--tk-page-soft); }
+.financial-analytics dt { color: var(--tk-muted); text-transform: capitalize; }
+.financial-analytics dd { margin: 5px 0 0; color: var(--tk-text); font-size: 1.25rem; font-weight: 700; }
+.jobs-results-controls[aria-label="Advanced job filters"] { flex-wrap: wrap; justify-content: flex-start; padding: 12px; border: 1px solid var(--tk-border); border-radius: 10px; color: var(--tk-text); }
+.jobs-results-controls[aria-label="Advanced job filters"] input { width: min(180px, 100%); min-height: 38px; padding: 7px 9px; border: 1px solid var(--tk-border); border-radius: 8px; background: var(--tk-input); color: var(--tk-text); font: inherit; }
+.job-type.job-featured { border-color: var(--tk-blue); color: var(--tk-blue); font-weight: 800; }
 .financial-entitlement, .financial-empty, .financial-loading { color: var(--tk-muted); }
 .financial-transaction-list { display: grid; }
 .financial-transaction-list article { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--tk-border); }

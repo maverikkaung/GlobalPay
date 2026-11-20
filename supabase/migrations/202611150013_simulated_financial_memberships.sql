@@ -4,14 +4,16 @@
 -- transfer path. Do not apply to a hosted project without separate approval.
 begin;
 
+alter table public.profiles add column profile_boost_until timestamptz;
+alter table public.jobs add column is_featured boolean not null default false;
+
 create table public.financial_sandbox_config (
   singleton boolean primary key default true check (singleton),
   sandbox_enabled boolean not null default true,
-  commission_bps integer not null default 1000 check (commission_bps between 0 and 9999),
-  ad_reward_kav bigint not null default 1 check (ad_reward_kav between 1 and 1000),
+  ad_reward_kav numeric(14,2) not null default 1 check (ad_reward_kav between 0.01 and 1000),
   ad_rewards_per_day integer not null default 5 check (ad_rewards_per_day between 0 and 100),
-  max_deposit_usdt bigint not null default 1000 check (max_deposit_usdt between 1 and 1000000),
-  max_withdrawal_kav bigint not null default 1000 check (max_withdrawal_kav between 1 and 1000000),
+  max_deposit_usdt numeric(14,2) not null default 1000 check (max_deposit_usdt between 0.01 and 1000000),
+  max_withdrawal_kav numeric(14,2) not null default 1000 check (max_withdrawal_kav between 0.01 and 1000000),
   updated_by uuid references public.profiles(id) on delete set null,
   updated_at timestamptz not null default now()
 );
@@ -27,7 +29,9 @@ create table public.membership_plans (
   display_name text not null check (length(btrim(display_name)) between 1 and 60),
   description text not null default '' check (length(description) <= 500),
   included_usage_credits integer not null check (included_usage_credits between 0 and 100000),
-  simulated_price_usdt numeric check (simulated_price_usdt is null or (simulated_price_usdt > 0 and simulated_price_usdt < 1000000000 and trunc(simulated_price_usdt)=simulated_price_usdt and simulated_price_usdt::text not in ('NaN','Infinity','-Infinity'))),
+  fee_bps integer not null check (fee_bps between 0 and 9999),
+  entitlements jsonb not null default '{}'::jsonb check (jsonb_typeof(entitlements)='object' and octet_length(entitlements::text)<=2048),
+  simulated_price_usdt numeric(14,2) not null check (simulated_price_usdt >= 0 and simulated_price_usdt < 1000000000 and simulated_price_usdt::text not in ('NaN','Infinity','-Infinity')),
   features jsonb not null default '[]'::jsonb check (jsonb_typeof(features) = 'array'),
   is_active boolean not null default false,
   is_simulation_only boolean not null default true check (is_simulation_only),
@@ -36,18 +40,131 @@ create table public.membership_plans (
   updated_at timestamptz not null default now(),
   unique (account_type, slug),
   check (octet_length(features::text) <= 16384),
-  check (slug <> 'free' or simulated_price_usdt is null)
+  check ((slug = 'free' and simulated_price_usdt = 0) or (slug <> 'free' and simulated_price_usdt > 0))
 );
-insert into public.membership_plans(account_type,slug,display_name,description,included_usage_credits,simulated_price_usdt,features,is_active,display_order)
+create or replace view public.freelancer_public_profiles
+with (security_barrier = true)
+as
+select id, full_name, account_type, country, professional_title, bio,
+  skills, experience, portfolio_url, avatar_path, cover_path,
+  (profile_boost_until > now()) as is_profile_boosted
+from public.profiles
+where account_type = 'freelancer';
+insert into public.membership_plans(account_type,slug,display_name,description,included_usage_credits,fee_bps,simulated_price_usdt,features,entitlements,is_active,display_order)
 values
- ('client','free','Free Client','Sample monthly job-post credits; no payment required.',3,null,'["3 job posts per cycle"]',true,0),
- ('client','plus','Plus Client','Sandbox plan. Configure sample pricing before buyer deployment.',10,null,'["10 job posts per cycle"]',true,1),
- ('client','gold','Gold Client','Sandbox plan. Configure sample pricing before buyer deployment.',30,null,'["30 job posts per cycle"]',true,2),
- ('client','premium','Premium Client','Sandbox plan. Configure sample pricing before buyer deployment.',100,null,'["100 job posts per cycle"]',true,3),
- ('freelancer','free','Free Freelancer','Sample monthly application credits; no payment required.',5,null,'["5 applications per cycle"]',true,0),
- ('freelancer','plus','Plus Freelancer','Sandbox plan. Configure sample pricing before buyer deployment.',20,null,'["20 applications per cycle"]',true,1),
- ('freelancer','gold','Gold Freelancer','Sandbox plan. Configure sample pricing before buyer deployment.',50,null,'["50 applications per cycle"]',true,2),
- ('freelancer','premium','Premium Freelancer','Sandbox plan. Configure sample pricing before buyer deployment.',100,null,'["100 applications per cycle"]',true,3);
+ ('client','free','Free Client','Monthly job-post allowance; simulation only.',2,200,0,'["2 job posts per month"]','{"profile_boost":false,"featured_jobs":false,"advanced_search":false,"analytics":false,"priority_support":false,"ad_rewards":false}',true,0),
+ ('client','plus','Plus Client','Monthly job-post allowance; simulation only.',10,200,9.99,'["10 job posts per month","Advanced search"]','{"profile_boost":false,"featured_jobs":false,"advanced_search":true,"analytics":false,"priority_support":false,"ad_rewards":true}',true,1),
+ ('client','gold','Gold Client','Monthly job-post allowance; simulation only.',30,150,19.99,'["30 job posts per month","Advanced search","Priority support"]','{"profile_boost":false,"featured_jobs":true,"advanced_search":true,"analytics":true,"priority_support":true,"ad_rewards":true}',true,2),
+ ('client','premium','Premium Client','Monthly job-post allowance; simulation only.',100,100,39.99,'["100 job posts per month","Featured jobs","Advanced search","Analytics","Priority support"]','{"profile_boost":false,"featured_jobs":true,"advanced_search":true,"analytics":true,"priority_support":true,"ad_rewards":true}',true,3),
+ ('freelancer','free','Free Freelancer','Monthly application allowance; simulation only.',5,1000,0,'["5 applications per month"]','{"profile_boost":false,"featured_jobs":false,"advanced_search":false,"analytics":false,"priority_support":false,"ad_rewards":false}',true,0),
+ ('freelancer','plus','Plus Freelancer','Monthly application allowance; simulation only.',30,800,4.99,'["30 applications per month","Advanced job search"]','{"profile_boost":false,"featured_jobs":false,"advanced_search":true,"analytics":false,"priority_support":false,"ad_rewards":true}',true,1),
+ ('freelancer','gold','Gold Freelancer','Monthly application allowance; simulation only.',80,600,9.99,'["80 applications per month","Profile boost","Advanced job search","Analytics","Priority support"]','{"profile_boost":true,"featured_jobs":false,"advanced_search":true,"analytics":true,"priority_support":true,"ad_rewards":true}',true,2),
+ ('freelancer','premium','Premium Freelancer','Monthly application allowance; simulation only.',200,500,19.99,'["200 applications per month","Profile boost","Advanced job search","Analytics","Priority support"]','{"profile_boost":true,"featured_jobs":false,"advanced_search":true,"analytics":true,"priority_support":true,"ad_rewards":true}',true,3);
+
+create or replace function public.techkarvo_has_membership_feature(p_feature text)
+returns boolean language plpgsql stable security definer set search_path = '' as $$
+declare actor uuid := (select auth.uid()); allowed boolean;
+begin
+  if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
+  if p_feature not in ('profile_boost','featured_jobs','advanced_search','analytics','priority_support','ad_rewards') then raise exception 'Unsupported membership benefit' using errcode='22023'; end if;
+  select coalesce((p.entitlements->>p_feature)::boolean,false) into allowed
+    from public.membership_entitlements e join public.membership_plans p on p.id=e.plan_id
+    where e.user_id=actor and e.period_ends_at>now() and p.is_active;
+  return coalesce(allowed,false);
+end;
+$$;
+revoke all on function public.techkarvo_has_membership_feature(text) from public, anon, authenticated;
+grant execute on function public.techkarvo_has_membership_feature(text) to authenticated;
+
+create or replace function public.techkarvo_set_profile_boost(p_enabled boolean)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare actor uuid := (select auth.uid()); ends_at timestamptz;
+begin
+  if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
+  if p_enabled is null then raise exception 'Choose whether to enable profile boost' using errcode='22023'; end if;
+  if p_enabled and not public.techkarvo_has_membership_feature('profile_boost') then raise exception 'Profile boost requires an active eligible membership' using errcode='42501'; end if;
+  ends_at := case when p_enabled then now()+interval '30 days' else null end;
+  update public.profiles set profile_boost_until=ends_at where id=actor;
+  if not found then raise exception 'Marketplace profile not found' using errcode='P0002'; end if;
+  return jsonb_build_object('profile_boost_until',ends_at,'simulation_only',true);
+end;
+$$;
+revoke all on function public.techkarvo_set_profile_boost(boolean) from public, anon, authenticated;
+grant execute on function public.techkarvo_set_profile_boost(boolean) to authenticated;
+
+create or replace function public.techkarvo_enforce_feature_entitlements()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare has_access boolean;
+begin
+  if tg_table_name='jobs' then
+    if new.is_featured then
+      select coalesce((p.entitlements->>'featured_jobs')::boolean,false) into has_access
+        from public.membership_entitlements e join public.membership_plans p on p.id=e.plan_id
+        where e.user_id=new.client_id and e.period_ends_at>now() and p.is_active;
+      if not coalesce(has_access,false) then raise exception 'Featured job benefit requires an active eligible membership' using errcode='42501'; end if;
+    end if;
+    return new;
+  elsif tg_table_name='profiles' then
+    if tg_op='UPDATE' and new.profile_boost_until is distinct from old.profile_boost_until
+      and new.profile_boost_until is not null and new.profile_boost_until>now() then
+      select coalesce((p.entitlements->>'profile_boost')::boolean,false) into has_access
+        from public.membership_entitlements e join public.membership_plans p on p.id=e.plan_id
+        where e.user_id=new.id and e.period_ends_at>now() and p.is_active;
+      if not coalesce(has_access,false) then raise exception 'Profile boost requires an active eligible membership' using errcode='42501'; end if;
+      if new.profile_boost_until>now()+interval '30 days' then raise exception 'Profile boost can be extended up to 30 days at a time' using errcode='22023'; end if;
+    end if;
+    return new;
+  else
+    select coalesce((p.entitlements->>'priority_support')::boolean,false) into has_access
+      from public.membership_entitlements e join public.membership_plans p on p.id=e.plan_id
+      where e.user_id=new.requester_id and e.period_ends_at>now() and p.is_active;
+    if tg_op='INSERT' and coalesce(has_access,false) then new.priority:='urgent'; end if;
+    if new.priority='urgent' and not coalesce(has_access,false) then raise exception 'Priority support requires an eligible active membership' using errcode='42501'; end if;
+    return new;
+  end if;
+end;
+$$;
+revoke all on function public.techkarvo_enforce_feature_entitlements() from public, anon, authenticated;
+grant insert (priority) on public.support_cases to authenticated;
+drop policy "Members can open their own support case" on public.support_cases;
+create policy "Members can open their own support case"
+  on public.support_cases for insert to authenticated
+  with check (requester_id=(select auth.uid()) and status='open' and priority in ('normal','urgent') and assigned_admin_id is null);
+drop policy "Support case insert boundary" on public.support_cases;
+create policy "Support case insert boundary"
+  on public.support_cases as restrictive for insert to authenticated
+  with check (requester_id=(select auth.uid()) and status='open' and priority in ('normal','urgent') and assigned_admin_id is null);
+create trigger zz_techkarvo_job_feature_entitlements before insert or update of is_featured on public.jobs
+  for each row execute function public.techkarvo_enforce_feature_entitlements();
+create trigger zz_techkarvo_profile_boost_entitlements before update of profile_boost_until on public.profiles
+  for each row execute function public.techkarvo_enforce_feature_entitlements();
+create trigger zz_techkarvo_support_priority_entitlements before insert or update of priority on public.support_cases
+  for each row execute function public.techkarvo_enforce_feature_entitlements();
+
+create or replace function public.techkarvo_user_analytics()
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare actor uuid := (select auth.uid()); role_name text; allowed boolean; result jsonb;
+begin
+  if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
+  select p.account_type into role_name from public.profiles p where p.id=actor;
+  select coalesce((mp.entitlements->>'analytics')::boolean,false) into allowed from public.membership_entitlements e
+    join public.membership_plans mp on mp.id=e.plan_id where e.user_id=actor and e.period_ends_at>now() and mp.is_active;
+  if not coalesce(allowed,false) then raise exception 'Analytics requires an active eligible membership' using errcode='42501'; end if;
+  if role_name='client' then
+    select jsonb_build_object('open_jobs',count(*) filter(where j.status='open'),'total_jobs',count(*),
+      'applications_received',(select count(*) from public.job_applications a where a.client_id=actor),
+      'active_contracts',(select count(*) from public.contracts c where c.client_id=actor and c.status='active'))
+      into result from public.jobs j where j.client_id=actor;
+  elsif role_name='freelancer' then
+    select jsonb_build_object('applications_sent',count(*),'accepted_applications',count(*) filter(where a.status='Accepted'),
+      'active_contracts',(select count(*) from public.contracts c where c.freelancer_id=actor and c.status='active'))
+      into result from public.job_applications a where a.freelancer_id=actor;
+  else raise exception 'A marketplace profile is required' using errcode='42501'; end if;
+  return coalesce(result,'{}'::jsonb);
+end;
+$$;
+revoke all on function public.techkarvo_user_analytics() from public, anon, authenticated;
+grant execute on function public.techkarvo_user_analytics() to authenticated;
 alter table public.membership_plans enable row level security;
 revoke all on public.membership_plans from public, anon, authenticated;
 grant select on public.membership_plans to authenticated;
@@ -70,6 +187,7 @@ create table public.membership_entitlements (
   period_ends_at timestamptz not null,
   period_credit_limit integer not null check (period_credit_limit between 0 and 100000),
   credits_used integer not null default 0 check (credits_used between 0 and 100000),
+  auto_renew boolean not null default false,
   updated_at timestamptz not null default now(),
   check (credits_used <= period_credit_limit)
 );
@@ -91,7 +209,7 @@ create table public.membership_credit_events (
   id bigint generated always as identity primary key,
   user_id uuid not null references public.profiles(id) on delete restrict,
   actor_id uuid references public.profiles(id) on delete set null,
-  event_type text not null check (event_type in ('cycle_grant','cycle_renewal','cycle_downgrade','plan_activation','job_post','job_application','admin_adjustment')),
+  event_type text not null check (event_type in ('cycle_grant','cycle_renewal','cycle_downgrade','plan_activation','job_post','job_application','admin_adjustment','renewal_consent')),
   delta integer not null check (delta <> 0 and delta between -100000 and 100000),
   idempotency_key text not null check (length(idempotency_key) between 1 and 160),
   reference_id text not null default '' check (length(reference_id) <= 120),
@@ -106,11 +224,11 @@ grant all on public.membership_credit_events to service_role;
 create table public.ledger_accounts (
   account_key text primary key check (length(account_key) between 3 and 160),
   owner_id uuid references public.profiles(id) on delete restrict,
-  account_kind text not null check (account_kind in ('wallet_available','wallet_held','sandbox_clearing','sandbox_withdrawal','platform_commission','sandbox_ad_reward_pool')),
+  account_kind text not null check (account_kind in ('wallet_available','wallet_held','wallet_reward','sandbox_clearing','sandbox_withdrawal','platform_commission','sandbox_ad_reward_pool')),
   currency text not null default 'KAV' check (currency='KAV'),
   created_at timestamptz not null default now(),
   check ((owner_id is null and account_kind in ('sandbox_clearing','sandbox_withdrawal','platform_commission','sandbox_ad_reward_pool'))
-      or (owner_id is not null and account_kind in ('wallet_available','wallet_held')))
+      or (owner_id is not null and account_kind in ('wallet_available','wallet_held','wallet_reward')))
 );
 create unique index ledger_user_account_kind_unique on public.ledger_accounts(owner_id,account_kind) where owner_id is not null;
 insert into public.ledger_accounts(account_key,account_kind) values
@@ -125,7 +243,7 @@ create table public.ledger_transactions (
   actor_id uuid not null references public.profiles(id) on delete restrict,
   transaction_type text not null check (transaction_type in ('sandbox_deposit','sandbox_withdrawal','sandbox_membership_purchase','sandbox_membership_renewal','sandbox_milestone_hold','sandbox_milestone_release','sandbox_milestone_refund','sandbox_ad_reward')),
   idempotency_key text not null check (length(idempotency_key) between 8 and 160),
-  amount_kav bigint not null check (amount_kav > 0 and amount_kav <= 1000000000),
+  amount_kav numeric(14,2) not null check (amount_kav > 0 and amount_kav <= 1000000000),
   reference_type text not null default '' check (length(reference_type) <= 60),
   reference_id text not null default '' check (length(reference_id) <= 120),
   note text not null default '' check (length(note) <= 500),
@@ -143,7 +261,7 @@ create table public.ledger_entries (
   id bigint generated always as identity primary key,
   transaction_id uuid not null references public.ledger_transactions(id) on delete restrict,
   account_key text not null references public.ledger_accounts(account_key) on delete restrict,
-  amount_kav bigint not null check (amount_kav <> 0),
+  amount_kav numeric(14,2) not null check (amount_kav <> 0),
   created_at timestamptz not null default now()
 );
 create index ledger_entries_transaction_idx on public.ledger_entries(transaction_id);
@@ -157,7 +275,9 @@ create table public.contract_milestones (
   contract_id uuid not null references public.contracts(id) on delete restrict,
   created_by uuid not null references public.profiles(id) on delete restrict,
   title text not null check (length(btrim(title)) between 3 and 160),
-  amount_kav bigint not null check (amount_kav between 1 and 1000000000),
+  amount_kav numeric(14,2) not null check (amount_kav between 0.01 and 1000000000),
+  client_fee_bps integer not null check (client_fee_bps between 0 and 9999),
+  freelancer_fee_bps integer not null check (freelancer_fee_bps between 0 and 9999),
   status text not null default 'draft' check (status in ('draft','funded','submitted','disputed','released','refunded')),
   idempotency_key text not null check (length(idempotency_key) between 8 and 160),
   created_at timestamptz not null default now(),
@@ -267,6 +387,22 @@ create constraint trigger ledger_transaction_balance_check after insert on publi
 create constraint trigger ledger_entry_balance_check after insert on public.ledger_entries
   deferrable initially deferred for each row execute function public.techkarvo_assert_balanced_transaction();
 
+create or replace function public.techkarvo_assert_nonnegative_wallet()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare kind text; total numeric(14,2);
+begin
+  select account_kind into kind from public.ledger_accounts where account_key=new.account_key;
+  if kind in ('wallet_available','wallet_held','wallet_reward') then
+    select coalesce(sum(amount_kav),0) into total from public.ledger_entries where account_key=new.account_key;
+    if total<0 then raise exception 'Simulated wallet balance cannot become negative' using errcode='23514'; end if;
+  end if;
+  return null;
+end;
+$$;
+revoke all on function public.techkarvo_assert_nonnegative_wallet() from public, anon, authenticated;
+create constraint trigger ledger_wallet_nonnegative_check after insert on public.ledger_entries
+  deferrable initially deferred for each row execute function public.techkarvo_assert_nonnegative_wallet();
+
 -- Never expose ledger writes or wallet account identifiers directly to clients.
 -- Authenticated operations are exposed only as security-definer RPCs.
 
@@ -297,7 +433,8 @@ returns void language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.ledger_accounts(account_key,owner_id,account_kind)
     values ('user:'||p_user::text||':available',p_user,'wallet_available'),
-           ('user:'||p_user::text||':held',p_user,'wallet_held')
+           ('user:'||p_user::text||':held',p_user,'wallet_held'),
+           ('user:'||p_user::text||':rewards',p_user,'wallet_reward')
     on conflict do nothing;
 end;
 $$;
@@ -305,28 +442,29 @@ revoke all on function public.techkarvo_ensure_wallet_accounts(uuid) from public
 
 create or replace function public.techkarvo_sandbox_wallet()
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare actor uuid := (select auth.uid()); available bigint; held bigint; recent jsonb;
+declare actor uuid := (select auth.uid()); available numeric(14,2); held numeric(14,2); rewards numeric(14,2); recent jsonb;
 begin
   if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
   perform public.techkarvo_ensure_wallet_accounts(actor);
   select coalesce(sum(e.amount_kav),0) into available from public.ledger_entries e where e.account_key='user:'||actor::text||':available';
   select coalesce(sum(e.amount_kav),0) into held from public.ledger_entries e where e.account_key='user:'||actor::text||':held';
+  select coalesce(sum(e.amount_kav),0) into rewards from public.ledger_entries e where e.account_key='user:'||actor::text||':rewards';
   select coalesce(jsonb_agg(to_jsonb(x) order by x.created_at desc),'[]'::jsonb) into recent from (
     select t.id,t.transaction_type,t.amount_kav,t.note,t.created_at from public.ledger_transactions t
     where t.actor_id=actor or exists(select 1 from public.ledger_entries e where e.transaction_id=t.id and e.account_key in ('user:'||actor::text||':available','user:'||actor::text||':held'))
     order by t.created_at desc limit 50
   ) x;
-  return jsonb_build_object('currency','KAV','available_kav',available,'held_kav',held,
+  return jsonb_build_object('currency','KAV','available_kav',available,'held_kav',held,'reward_kav',rewards,
     'reference_rate','1 USDT = 1 KAV','simulation_only',true,'transactions',recent);
 end;
 $$;
 
-create or replace function public.techkarvo_sandbox_deposit(p_usdt bigint,p_idempotency_key text)
+create or replace function public.techkarvo_sandbox_deposit(p_usdt numeric,p_idempotency_key text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare actor uuid := (select auth.uid()); txn uuid; max_amount bigint; enabled boolean;
+declare actor uuid := (select auth.uid()); txn uuid; max_amount numeric(14,2); enabled boolean;
 begin
   if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
-  if p_usdt is null or p_usdt < 1 or p_idempotency_key is null or p_idempotency_key !~ '^[A-Za-z0-9:_-]{8,160}$' then raise exception 'Invalid simulated deposit request' using errcode='22023'; end if;
+  if p_usdt is null or p_usdt < 0.01 or p_usdt > 1000000000 or round(p_usdt,2)<>p_usdt or p_idempotency_key is null or p_idempotency_key !~ '^[A-Za-z0-9:_-]{8,160}$' then raise exception 'Invalid simulated deposit request' using errcode='22023'; end if;
   select sandbox_enabled,max_deposit_usdt into enabled,max_amount from public.financial_sandbox_config where singleton;
   if not coalesce(enabled,false) then raise exception 'Financial sandbox is paused' using errcode='55000'; end if;
   if p_usdt > max_amount then raise exception 'Simulated deposit exceeds configured limit' using errcode='22023'; end if;
@@ -344,12 +482,12 @@ begin
 end;
 $$;
 
-create or replace function public.techkarvo_sandbox_withdraw(p_amount_kav bigint,p_idempotency_key text)
+create or replace function public.techkarvo_sandbox_withdraw(p_amount_kav numeric,p_idempotency_key text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare actor uuid := (select auth.uid()); txn uuid; max_amount bigint; enabled boolean; balance bigint;
+declare actor uuid := (select auth.uid()); txn uuid; max_amount numeric(14,2); enabled boolean; balance numeric(14,2);
 begin
   if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
-  if p_amount_kav is null or p_amount_kav < 1 or p_idempotency_key is null or p_idempotency_key !~ '^[A-Za-z0-9:_-]{8,160}$' then raise exception 'Invalid simulated withdrawal request' using errcode='22023'; end if;
+  if p_amount_kav is null or p_amount_kav < 0.01 or p_amount_kav > 1000000000 or round(p_amount_kav,2)<>p_amount_kav or p_idempotency_key is null or p_idempotency_key !~ '^[A-Za-z0-9:_-]{8,160}$' then raise exception 'Invalid simulated withdrawal request' using errcode='22023'; end if;
   select sandbox_enabled,max_withdrawal_kav into enabled,max_amount from public.financial_sandbox_config where singleton;
   if not coalesce(enabled,false) then raise exception 'Financial sandbox is paused' using errcode='55000'; end if;
   if p_amount_kav > max_amount then raise exception 'Simulated withdrawal exceeds configured limit' using errcode='22023'; end if;
@@ -370,7 +508,7 @@ $$;
 create or replace function public.techkarvo_sandbox_activate_plan(p_slug text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare actor uuid := (select auth.uid()); account_kind text; plan_row public.membership_plans%rowtype; event_id bigint;
-  existing_event public.membership_credit_events%rowtype; balance bigint; txn uuid; amount_kav bigint; cycle_key text;
+  existing_event public.membership_credit_events%rowtype; balance numeric(14,2); txn uuid; amount_kav numeric(14,2); cycle_key text;
 begin
   if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
   select account_type into account_kind from public.profiles where id=actor;
@@ -390,10 +528,7 @@ begin
     raise exception 'Only one simulated membership purchase or selection is allowed per cycle' using errcode='23514';
   end if;
   if plan_row.slug <> 'free' then
-    if plan_row.simulated_price_usdt is null then
-      raise exception 'Set a sample whole-USDT price before purchasing this simulation plan' using errcode='22023';
-    end if;
-    amount_kav := plan_row.simulated_price_usdt::bigint;
+    amount_kav := plan_row.simulated_price_usdt;
     perform public.techkarvo_ensure_wallet_accounts(actor);
     select coalesce(sum(e.amount_kav),0) into balance from public.ledger_entries e
       where e.account_key='user:'||actor::text||':available';
@@ -410,9 +545,9 @@ begin
     on conflict(user_id,idempotency_key) do nothing returning id into event_id;
   if event_id is null then raise exception 'Membership selection already processed' using errcode='23514'; end if;
   insert into public.membership_entitlements(user_id,plan_id,period_started_at,period_ends_at,period_credit_limit,credits_used)
-    values(actor,plan_row.id,date_trunc('month',now()),date_trunc('month',now())+interval '1 month',plan_row.included_usage_credits,0)
+    values(actor,plan_row.id,date_trunc('month',now()),date_trunc('month',now())+interval '1 month',plan_row.included_usage_credits,0,false)
     on conflict(user_id) do update set plan_id=excluded.plan_id,period_started_at=excluded.period_started_at,
-      period_ends_at=excluded.period_ends_at,period_credit_limit=excluded.period_credit_limit,credits_used=0,updated_at=now();
+      period_ends_at=excluded.period_ends_at,period_credit_limit=excluded.period_credit_limit,credits_used=0,auto_renew=false,updated_at=now();
   return jsonb_build_object('plan',plan_row.slug,'credits',plan_row.included_usage_credits,
     'transaction_id',txn,'amount_kav',amount_kav,'simulation_only',true);
 end;
@@ -422,7 +557,7 @@ create or replace function public.techkarvo_consume_usage_credit()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare actor uuid; ent public.membership_entitlements%rowtype; event_key text;
   selected_plan public.membership_plans%rowtype; free_plan public.membership_plans%rowtype;
-  balance bigint; txn uuid; renewal_price bigint; renewal_event text; original_plan_id uuid;
+  balance numeric(14,2); txn uuid; renewal_price numeric(14,2); renewal_event text; original_plan_id uuid;
 begin
   if tg_table_name='jobs' then actor := new.client_id;
   else actor := new.freelancer_id;
@@ -436,8 +571,8 @@ begin
     select * into free_plan from public.membership_plans
       where account_type=selected_plan.account_type and slug='free' and is_active;
     if free_plan.id is null then raise exception 'No active Free fallback plan is configured' using errcode='55000'; end if;
-    if selected_plan.slug <> 'free' and selected_plan.is_active and selected_plan.simulated_price_usdt is not null then
-      renewal_price := selected_plan.simulated_price_usdt::bigint;
+    if ent.auto_renew and selected_plan.slug <> 'free' and selected_plan.is_active then
+      renewal_price := selected_plan.simulated_price_usdt;
       perform pg_advisory_xact_lock(hashtextextended(actor::text,0));
       perform public.techkarvo_ensure_wallet_accounts(actor);
       select coalesce(sum(amount_kav),0) into balance from public.ledger_entries
@@ -456,7 +591,8 @@ begin
     end if;
     update public.membership_entitlements set plan_id=selected_plan.id,
       period_started_at=date_trunc('month',now()),period_ends_at=date_trunc('month',now())+interval '1 month',
-      period_credit_limit=selected_plan.included_usage_credits,credits_used=0,updated_at=now()
+      period_credit_limit=selected_plan.included_usage_credits,credits_used=0,
+      auto_renew=case when selected_plan.slug='free' then false else ent.auto_renew end,updated_at=now()
       where user_id=actor returning * into ent;
     renewal_event := case when selected_plan.id=free_plan.id and original_plan_id<>free_plan.id then 'cycle_downgrade' else 'cycle_renewal' end;
     insert into public.membership_credit_events(user_id,event_type,delta,idempotency_key,reference_id)
@@ -470,19 +606,43 @@ begin
   return new;
 end;
 $$;
+create or replace function public.techkarvo_set_membership_auto_renew(p_enabled boolean)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare actor uuid := (select auth.uid()); ent public.membership_entitlements%rowtype; plan_row public.membership_plans%rowtype;
+begin
+  if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
+  if p_enabled is null then raise exception 'Choose whether to enable renewal' using errcode='22023'; end if;
+  select * into ent from public.membership_entitlements where user_id=actor for update;
+  if ent.user_id is null then raise exception 'Membership entitlement is not configured' using errcode='55000'; end if;
+  select * into plan_row from public.membership_plans where id=ent.plan_id;
+  if p_enabled and (plan_row.slug='free' or plan_row.simulated_price_usdt<=0) then
+    raise exception 'Only a paid simulation plan can be set to renew' using errcode='22023';
+  end if;
+  update public.membership_entitlements set auto_renew=p_enabled,updated_at=now() where user_id=actor;
+  insert into public.membership_credit_events(user_id,actor_id,event_type,delta,idempotency_key,reference_id)
+    values(actor,actor,'renewal_consent',case when p_enabled then 1 else -1 end,
+      'renewal-consent:'||gen_random_uuid()::text,case when p_enabled then 'consented' else 'withdrawn' end);
+  return jsonb_build_object('auto_renew',p_enabled,'simulation_only',true);
+end;
+$$;
 create trigger techkarvo_job_usage_credit before insert on public.jobs for each row execute function public.techkarvo_consume_usage_credit();
 create trigger techkarvo_application_usage_credit before insert on public.job_applications for each row execute function public.techkarvo_consume_usage_credit();
 revoke all on function public.techkarvo_consume_usage_credit() from public, anon, authenticated;
 
-create or replace function public.techkarvo_sandbox_create_milestone(p_contract_id uuid,p_title text,p_amount_kav bigint,p_idempotency_key text)
+create or replace function public.techkarvo_sandbox_create_milestone(p_contract_id uuid,p_title text,p_amount_kav numeric,p_idempotency_key text)
 returns uuid language plpgsql security definer set search_path = '' as $$
-declare actor uuid := (select auth.uid()); client uuid; milestone_id uuid;
+declare actor uuid := (select auth.uid()); client uuid; milestone_id uuid; client_rate integer; freelancer_rate integer;
 begin
   if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
   select c.client_id into client from public.contracts c where c.id=p_contract_id and c.status='active' and c.client_id=actor;
   if client is null then raise exception 'Only the hiring client can add a milestone to an active contract' using errcode='42501'; end if;
-  insert into public.contract_milestones(contract_id,created_by,title,amount_kav,idempotency_key)
-    values(p_contract_id,actor,p_title,p_amount_kav,p_idempotency_key) returning id into milestone_id;
+  if p_amount_kav is null or p_amount_kav<0.01 or p_amount_kav>1000000000 or round(p_amount_kav,2)<>p_amount_kav then raise exception 'Milestone amount must be positive KAV with at most two decimals' using errcode='22023'; end if;
+  select mp.fee_bps into client_rate from public.membership_entitlements e join public.membership_plans mp on mp.id=e.plan_id where e.user_id=actor;
+  select mp.fee_bps into freelancer_rate from public.membership_entitlements e join public.membership_plans mp on mp.id=e.plan_id
+    join public.contracts c on c.freelancer_id=e.user_id where c.id=p_contract_id;
+  if client_rate is null or freelancer_rate is null then raise exception 'Both contract parties need configured membership plans' using errcode='55000'; end if;
+  insert into public.contract_milestones(contract_id,created_by,title,amount_kav,idempotency_key,client_fee_bps,freelancer_fee_bps)
+    values(p_contract_id,actor,p_title,p_amount_kav,p_idempotency_key,client_rate,freelancer_rate) returning id into milestone_id;
   insert into public.milestone_events(milestone_id,actor_id,event_type) values(milestone_id,actor,'created');
   return milestone_id;
 end;
@@ -490,7 +650,7 @@ $$;
 
 create or replace function public.techkarvo_sandbox_fund_milestone(p_milestone_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare actor uuid := (select auth.uid()); m public.contract_milestones%rowtype; c public.contracts%rowtype; balance bigint; txn uuid;
+declare actor uuid := (select auth.uid()); m public.contract_milestones%rowtype; c public.contracts%rowtype; balance numeric(14,2); txn uuid; client_fee numeric(14,2);
 begin
   if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
   select * into m from public.contract_milestones where id=p_milestone_id for update;
@@ -501,11 +661,13 @@ begin
   perform public.techkarvo_ensure_wallet_accounts(actor);
   perform pg_advisory_xact_lock(hashtextextended(actor::text,0));
   select coalesce(sum(amount_kav),0) into balance from public.ledger_entries where account_key='user:'||actor::text||':available';
-  if balance < m.amount_kav then raise exception 'Insufficient simulated KAV balance' using errcode='23514'; end if;
+  client_fee := round(m.amount_kav*m.client_fee_bps/10000.0,2);
+  if balance < m.amount_kav+client_fee then raise exception 'Insufficient simulated KAV balance for milestone and service fee' using errcode='23514'; end if;
   insert into public.ledger_transactions(actor_id,transaction_type,idempotency_key,amount_kav,reference_type,reference_id,note)
-    values(actor,'sandbox_milestone_hold','milestone-fund:'||m.id,m.amount_kav,'milestone',m.id::text,'Simulated milestone hold; no funds secured') returning id into txn;
+    values(actor,'sandbox_milestone_hold','milestone-fund:'||m.id,m.amount_kav+client_fee,'milestone',m.id::text,'Simulated hold and client service fee; no funds secured') returning id into txn;
   insert into public.ledger_entries(transaction_id,account_key,amount_kav) values
-    (txn,'user:'||actor::text||':available',-m.amount_kav),(txn,'user:'||actor::text||':held',m.amount_kav);
+    (txn,'user:'||actor::text||':available',-(m.amount_kav+client_fee)),(txn,'user:'||actor::text||':held',m.amount_kav);
+  if client_fee>0 then insert into public.ledger_entries(transaction_id,account_key,amount_kav) values(txn,'platform:simulated_commission',client_fee); end if;
   update public.contract_milestones set status='funded',updated_at=now() where id=m.id;
   insert into public.milestone_events(milestone_id,actor_id,event_type) values(m.id,actor,'funded');
   return jsonb_build_object('milestone_id',m.id,'transaction_id',txn,'simulation_only',true);
@@ -515,7 +677,7 @@ $$;
 create or replace function public.techkarvo_sandbox_milestone_action(p_milestone_id uuid,p_action text,p_reason text default '')
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare actor uuid := (select auth.uid()); m public.contract_milestones%rowtype; c public.contracts%rowtype;
-  target text; event_kind text; txn uuid; fee bigint; rate integer; dispute_id uuid;
+  target text; event_kind text; txn uuid; fee numeric(14,2); rate integer; dispute_id uuid;
 begin
   if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
   if p_action not in ('submit','release','refund','dispute') then raise exception 'Unsupported milestone action' using errcode='22023'; end if;
@@ -535,9 +697,9 @@ begin
     event_kind := 'disputed';
   elsif p_action='release' then
     if actor<>c.client_id or c.status<>'active' or m.status<>'submitted' then raise exception 'Only the hiring client can release a submitted milestone on an active contract' using errcode='42501'; end if;
-    select commission_bps into rate from public.financial_sandbox_config where singleton and sandbox_enabled;
+    select 1 into rate from public.financial_sandbox_config where singleton and sandbox_enabled;
     if rate is null then raise exception 'Financial sandbox is paused' using errcode='55000'; end if;
-    fee := floor((m.amount_kav::numeric*rate)/10000)::bigint;
+    fee := round(m.amount_kav*m.freelancer_fee_bps/10000.0,2);
     perform public.techkarvo_ensure_wallet_accounts(c.freelancer_id);
     insert into public.ledger_transactions(actor_id,transaction_type,idempotency_key,amount_kav,reference_type,reference_id,note)
       values(actor,'sandbox_milestone_release','milestone-release:'||m.id,m.amount_kav,'milestone',m.id::text,'Simulated release; no payout occurs') returning id into txn;
@@ -549,11 +711,13 @@ begin
     event_kind := 'released';
   else
     if actor<>c.client_id or c.status<>'active' or m.status<>'funded' then raise exception 'Only the hiring client may refund a funded milestone outside a dispute' using errcode='42501'; end if;
+    fee := round(m.amount_kav*m.client_fee_bps/10000.0,2);
     insert into public.ledger_transactions(actor_id,transaction_type,idempotency_key,amount_kav,reference_type,reference_id,note)
-      values(actor,'sandbox_milestone_refund','milestone-refund:'||m.id,m.amount_kav,'milestone',m.id::text,'Simulated refund; no funds moved') returning id into txn;
+      values(actor,'sandbox_milestone_refund','milestone-refund:'||m.id,m.amount_kav+fee,'milestone',m.id::text,'Simulated refund of principal and client service fee') returning id into txn;
     insert into public.ledger_entries(transaction_id,account_key,amount_kav) values
       (txn,'user:'||c.client_id::text||':held',-m.amount_kav),
-      (txn,'user:'||c.client_id::text||':available',m.amount_kav);
+      (txn,'user:'||c.client_id::text||':available',m.amount_kav+fee),
+      (txn,'platform:simulated_commission',-fee);
     update public.contract_milestones set status='refunded',updated_at=now() where id=m.id;
     update public.financial_disputes set status='resolved_refund',resolved_by=actor,resolved_at=now() where milestone_id=m.id and status='open';
     update public.contracts set status='active' where id=c.id and status='disputed'
@@ -569,7 +733,7 @@ $$;
 create or replace function public.techkarvo_sandbox_resolve_dispute(p_dispute_id uuid,p_resolution text,p_note text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare actor uuid := (select auth.uid()); d public.financial_disputes%rowtype; m public.contract_milestones%rowtype; c public.contracts%rowtype;
-  txn uuid; fee bigint; rate integer; tx_type text; from_acct text; to_acct text;
+  txn uuid; fee numeric(14,2); rate integer; tx_type text; from_acct text; to_acct text;
 begin
   if actor is null or not public.techkarvo_is_platform_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
   if p_resolution not in ('refund','release') or length(btrim(coalesce(p_note,'')))<5 then raise exception 'Select a valid simulated resolution and add a review note' using errcode='22023'; end if;
@@ -580,23 +744,27 @@ begin
   if p_resolution='refund' then
     tx_type:='sandbox_milestone_refund'; from_acct:='user:'||c.client_id::text||':held'; to_acct:='user:'||c.client_id::text||':available';
   else
-    select commission_bps into rate from public.financial_sandbox_config where singleton and sandbox_enabled;
+    select 1 into rate from public.financial_sandbox_config where singleton and sandbox_enabled;
     if rate is null then raise exception 'Financial sandbox is paused' using errcode='55000'; end if;
-    fee:=floor((m.amount_kav::numeric*rate)/10000)::bigint;
+    fee:=round(m.amount_kav*m.freelancer_fee_bps/10000.0,2);
     perform public.techkarvo_ensure_wallet_accounts(c.freelancer_id);
   end if;
   tx_type:=case when p_resolution='refund' then 'sandbox_milestone_refund' else 'sandbox_milestone_release' end;
   insert into public.ledger_transactions(actor_id,transaction_type,idempotency_key,amount_kav,reference_type,reference_id,note)
-    values(actor,tx_type,'dispute-resolution:'||d.id,m.amount_kav,'dispute',d.id::text,'Admin simulated resolution: '||left(btrim(p_note),300)) returning id into txn;
+    values(actor,tx_type,'dispute-resolution:'||d.id,
+      case when p_resolution='refund' then m.amount_kav+round(m.amount_kav*m.client_fee_bps/10000.0,2) else m.amount_kav end,
+      'dispute',d.id::text,'Admin simulated resolution: '||left(btrim(p_note),300)) returning id into txn;
   if p_resolution='refund' then
-    insert into public.ledger_entries(transaction_id,account_key,amount_kav) values(txn,from_acct,-m.amount_kav),(txn,to_acct,m.amount_kav);
+    fee:=round(m.amount_kav*m.client_fee_bps/10000.0,2);
+    insert into public.ledger_entries(transaction_id,account_key,amount_kav) values
+      (txn,from_acct,-m.amount_kav),(txn,to_acct,m.amount_kav+fee),(txn,'platform:simulated_commission',-fee);
     update public.contract_milestones set status='refunded',updated_at=now() where id=m.id;
     update public.financial_disputes set status='resolved_refund',resolution_note=left(btrim(p_note),4000),resolved_by=actor,resolved_at=now() where id=d.id;
     update public.contracts set status='active' where id=c.id and status='disputed'
       and not exists(select 1 from public.financial_disputes fd join public.contract_milestones fm on fm.id=fd.milestone_id where fm.contract_id=c.id and fd.status='open' and fd.id<>d.id);
     insert into public.milestone_events(milestone_id,actor_id,event_type,details) values(m.id,actor,'refunded',jsonb_build_object('dispute_id',d.id));
   else
-    insert into public.ledger_entries(transaction_id,account_key,amount_kav) values
+  insert into public.ledger_entries(transaction_id,account_key,amount_kav) values
       (txn,'user:'||c.client_id::text||':held',-m.amount_kav),
       (txn,'user:'||c.freelancer_id::text||':available',m.amount_kav-fee);
     if fee>0 then insert into public.ledger_entries(transaction_id,account_key,amount_kav) values(txn,'platform:simulated_commission',fee); end if;
@@ -614,11 +782,13 @@ $$;
 
 create or replace function public.techkarvo_sandbox_claim_ad_reward()
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare actor uuid := (select auth.uid()); reward bigint; limit_per_day integer; enabled boolean; claim_count integer; txn uuid;
+declare actor uuid := (select auth.uid()); reward numeric(14,2); limit_per_day integer; enabled boolean; claim_count integer; txn uuid;
 begin
   if actor is null then raise exception 'Authentication required' using errcode='28000'; end if;
   select sandbox_enabled,ad_reward_kav,ad_rewards_per_day into enabled,reward,limit_per_day from public.financial_sandbox_config where singleton;
   if not coalesce(enabled,false) or limit_per_day < 1 then raise exception 'Simulated rewards are paused' using errcode='55000'; end if;
+  if not exists(select 1 from public.membership_entitlements e join public.membership_plans p on p.id=e.plan_id
+    where e.user_id=actor and p.entitlements->>'ad_rewards'='true') then raise exception 'Ad reward credits are not included in this membership' using errcode='42501'; end if;
   perform pg_advisory_xact_lock(hashtextextended(actor::text||current_date::text,2));
   select count(*) into claim_count from public.sandbox_ad_reward_claims where user_id=actor and claim_date=current_date;
   if claim_count>=limit_per_day then raise exception 'Daily simulated reward limit reached' using errcode='23514'; end if;
@@ -626,7 +796,7 @@ begin
   insert into public.ledger_transactions(actor_id,transaction_type,idempotency_key,amount_kav,note)
     values(actor,'sandbox_ad_reward','ad-reward:'||current_date::text||':'||(claim_count+1),reward,'Simulated ad reward; no advertisement network or funds') returning id into txn;
   insert into public.ledger_entries(transaction_id,account_key,amount_kav) values
-    (txn,'sandbox:ad_reward_pool',-reward),(txn,'user:'||actor::text||':available',reward);
+    (txn,'sandbox:ad_reward_pool',-reward),(txn,'user:'||actor::text||':rewards',reward);
   insert into public.sandbox_ad_reward_claims(user_id,claim_date,claim_number,transaction_id)
     values(actor,current_date,claim_count+1,txn);
   return jsonb_build_object('transaction_id',txn,'reward_kav',reward,'remaining_today',limit_per_day-claim_count-1,'simulation_only',true);
@@ -635,54 +805,58 @@ $$;
 
 create or replace function public.techkarvo_admin_upsert_membership_plan(
   p_account_type text,p_slug text,p_display_name text,p_description text,p_credits integer,
-  p_sample_price numeric,p_features jsonb,p_active boolean,p_display_order integer)
+  p_sample_price numeric,p_fee_bps integer,p_features jsonb,p_entitlements jsonb,p_active boolean,p_display_order integer)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare actor uuid := (select auth.uid()); plan_uuid uuid;
 begin
   if actor is null or not public.techkarvo_is_platform_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
-  if p_account_type not in ('client','freelancer') or p_slug not in ('free','plus','gold','premium')
+  if p_account_type is null or p_account_type not in ('client','freelancer') or p_slug is null or p_slug not in ('free','plus','gold','premium')
     or p_display_name is null or length(btrim(p_display_name)) not between 1 and 60
-    or p_description is null or length(p_description)>500 or p_credits not between 1 and 100000
-    or (p_sample_price is not null and (p_sample_price<=0 or p_sample_price>=1000000000 or trunc(p_sample_price)<>p_sample_price or p_sample_price::text in ('NaN','Infinity','-Infinity')))
-    or (p_slug='free' and p_sample_price is not null)
-    or p_active is null or p_display_order not between 0 and 1000 then raise exception 'Invalid role-specific sample membership plan' using errcode='22023'; end if;
+    or p_description is null or length(p_description)>500 or p_credits is null or p_credits not between 0 and 100000
+    or p_sample_price is null or p_sample_price<0 or p_sample_price>=1000000000 or round(p_sample_price,2)<>p_sample_price or p_sample_price::text in ('NaN','Infinity','-Infinity')
+    or p_fee_bps is null or p_fee_bps not between 0 and 9999
+    or (p_slug='free' and p_sample_price<>0) or (p_slug<>'free' and p_sample_price<=0)
+    or p_active is null or p_display_order is null or p_display_order not between 0 and 1000 then raise exception 'Invalid role-specific sample membership plan' using errcode='22023'; end if;
   if p_features is null or jsonb_typeof(p_features) is distinct from 'array' then
     raise exception 'Membership benefits must be a JSON list' using errcode='22023';
   end if;
+  if p_entitlements is null or jsonb_typeof(p_entitlements) is distinct from 'object'
+    or exists(select 1 from jsonb_each(p_entitlements) e where e.key not in ('profile_boost','featured_jobs','advanced_search','analytics','priority_support','ad_rewards') or jsonb_typeof(e.value)<>'boolean')
+    or octet_length(p_entitlements::text)>2048 then raise exception 'Invalid plan entitlements' using errcode='22023'; end if;
   if jsonb_array_length(p_features)>30 or exists (
     select 1 from jsonb_array_elements(p_features) feature(value)
     where jsonb_typeof(feature.value)<>'string' or length(btrim(feature.value#>>'{}')) not between 1 and 240
   ) then raise exception 'Membership benefits must contain up to 30 short text values' using errcode='22023'; end if;
   if p_slug='free' and not p_active then raise exception 'The Free sample plan must remain available' using errcode='23514'; end if;
-  insert into public.membership_plans(account_type,slug,display_name,description,included_usage_credits,simulated_price_usdt,features,is_active,display_order,updated_by,updated_at)
-    values(p_account_type,p_slug,p_display_name,btrim(p_description),p_credits,p_sample_price,p_features,p_active,p_display_order,actor,now())
+  insert into public.membership_plans(account_type,slug,display_name,description,included_usage_credits,simulated_price_usdt,fee_bps,features,entitlements,is_active,display_order,updated_by,updated_at)
+    values(p_account_type,p_slug,p_display_name,btrim(p_description),p_credits,p_sample_price,p_fee_bps,p_features,p_entitlements,p_active,p_display_order,actor,now())
     on conflict(account_type,slug) do update set display_name=excluded.display_name,description=excluded.description,
       included_usage_credits=excluded.included_usage_credits,simulated_price_usdt=excluded.simulated_price_usdt,
-      features=excluded.features,is_active=excluded.is_active,display_order=excluded.display_order,updated_by=actor,updated_at=now()
+      fee_bps=excluded.fee_bps,features=excluded.features,entitlements=excluded.entitlements,is_active=excluded.is_active,display_order=excluded.display_order,updated_by=actor,updated_at=now()
     returning id into plan_uuid;
   insert into public.admin_audit_log(actor_id,action,resource_type,resource_id,details)
     values(actor,'sandbox.membership_plan.update','membership_plan',p_account_type||':'||p_slug,
-      jsonb_build_object('credits',p_credits,'active',p_active,'simulation_only',true));
+      jsonb_build_object('credits',p_credits,'fee_bps',p_fee_bps,'active',p_active,'entitlements',p_entitlements,'simulation_only',true));
   return plan_uuid;
 end;
 $$;
 
 create or replace function public.techkarvo_admin_update_financial_config(
-  p_sandbox_enabled boolean,p_commission_bps integer,p_ad_reward_kav bigint,p_ad_rewards_per_day integer,
-  p_max_deposit_usdt bigint,p_max_withdrawal_kav bigint)
+  p_sandbox_enabled boolean,p_ad_reward_kav numeric,p_ad_rewards_per_day integer,
+  p_max_deposit_usdt numeric,p_max_withdrawal_kav numeric)
 returns void language plpgsql security definer set search_path = '' as $$
 declare actor uuid := (select auth.uid());
 begin
   if actor is null or not public.techkarvo_is_platform_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
-  if p_commission_bps not between 0 and 9999 or p_ad_reward_kav not between 1 and 1000
-    or p_ad_rewards_per_day not between 0 and 100 or p_max_deposit_usdt not between 1 and 1000000
-    or p_max_withdrawal_kav not between 1 and 1000000 then raise exception 'Financial simulation setting is out of bounds' using errcode='22023'; end if;
-  update public.financial_sandbox_config set sandbox_enabled=p_sandbox_enabled,commission_bps=p_commission_bps,
+  if p_sandbox_enabled is null or p_ad_reward_kav not between 0.01 and 1000 or round(p_ad_reward_kav,2)<>p_ad_reward_kav
+    or p_ad_rewards_per_day not between 0 and 100 or p_max_deposit_usdt not between 0.01 and 1000000 or round(p_max_deposit_usdt,2)<>p_max_deposit_usdt
+    or p_max_withdrawal_kav not between 0.01 and 1000000 or round(p_max_withdrawal_kav,2)<>p_max_withdrawal_kav then raise exception 'Financial simulation setting is out of bounds' using errcode='22023'; end if;
+  update public.financial_sandbox_config set sandbox_enabled=p_sandbox_enabled,
     ad_reward_kav=p_ad_reward_kav,ad_rewards_per_day=p_ad_rewards_per_day,max_deposit_usdt=p_max_deposit_usdt,
     max_withdrawal_kav=p_max_withdrawal_kav,updated_by=actor,updated_at=now() where singleton;
   insert into public.admin_audit_log(actor_id,action,resource_type,resource_id,details)
     values(actor,'sandbox.configuration.update','financial_sandbox_config','singleton',
-      jsonb_build_object('enabled',p_sandbox_enabled,'commission_bps',p_commission_bps,'ad_reward_kav',p_ad_reward_kav,
+      jsonb_build_object('enabled',p_sandbox_enabled,'ad_reward_kav',p_ad_reward_kav,
         'ad_rewards_per_day',p_ad_rewards_per_day,'max_deposit_usdt',p_max_deposit_usdt,'max_withdrawal_kav',p_max_withdrawal_kav,
         'real_money_enabled',false));
 end;
@@ -711,7 +885,7 @@ returns jsonb language plpgsql stable security definer set search_path = '' as $
 declare result jsonb;
 begin
   if not public.techkarvo_is_platform_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
-  select jsonb_build_object('sandbox_enabled',sandbox_enabled,'commission_bps',commission_bps,
+  select jsonb_build_object('sandbox_enabled',sandbox_enabled,
     'ad_reward_kav',ad_reward_kav,'ad_rewards_per_day',ad_rewards_per_day,'max_deposit_usdt',max_deposit_usdt,
     'max_withdrawal_kav',max_withdrawal_kav,'simulation_only',true) into result
     from public.financial_sandbox_config where singleton;
@@ -720,29 +894,31 @@ end;
 $$;
 
 revoke all on function public.techkarvo_sandbox_wallet() from public, anon, authenticated;
-revoke all on function public.techkarvo_sandbox_deposit(bigint,text) from public, anon, authenticated;
-revoke all on function public.techkarvo_sandbox_withdraw(bigint,text) from public, anon, authenticated;
+revoke all on function public.techkarvo_sandbox_deposit(numeric,text) from public, anon, authenticated;
+revoke all on function public.techkarvo_sandbox_withdraw(numeric,text) from public, anon, authenticated;
 revoke all on function public.techkarvo_sandbox_activate_plan(text) from public, anon, authenticated;
-revoke all on function public.techkarvo_sandbox_create_milestone(uuid,text,bigint,text) from public, anon, authenticated;
+revoke all on function public.techkarvo_sandbox_create_milestone(uuid,text,numeric,text) from public, anon, authenticated;
 revoke all on function public.techkarvo_sandbox_fund_milestone(uuid) from public, anon, authenticated;
 revoke all on function public.techkarvo_sandbox_milestone_action(uuid,text,text) from public, anon, authenticated;
 revoke all on function public.techkarvo_sandbox_resolve_dispute(uuid,text,text) from public, anon, authenticated;
 revoke all on function public.techkarvo_sandbox_claim_ad_reward() from public, anon, authenticated;
-revoke all on function public.techkarvo_admin_upsert_membership_plan(text,text,text,text,integer,numeric,jsonb,boolean,integer) from public, anon, authenticated;
-revoke all on function public.techkarvo_admin_update_financial_config(boolean,integer,bigint,integer,bigint,bigint) from public, anon, authenticated;
+revoke all on function public.techkarvo_set_membership_auto_renew(boolean) from public, anon, authenticated;
+revoke all on function public.techkarvo_admin_upsert_membership_plan(text,text,text,text,integer,numeric,integer,jsonb,jsonb,boolean,integer) from public, anon, authenticated;
+revoke all on function public.techkarvo_admin_update_financial_config(boolean,numeric,integer,numeric,numeric) from public, anon, authenticated;
 revoke all on function public.techkarvo_admin_financial_summary() from public, anon, authenticated;
 revoke all on function public.techkarvo_admin_financial_configuration() from public, anon, authenticated;
 grant execute on function public.techkarvo_sandbox_wallet() to authenticated;
-grant execute on function public.techkarvo_sandbox_deposit(bigint,text) to authenticated;
-grant execute on function public.techkarvo_sandbox_withdraw(bigint,text) to authenticated;
+grant execute on function public.techkarvo_sandbox_deposit(numeric,text) to authenticated;
+grant execute on function public.techkarvo_sandbox_withdraw(numeric,text) to authenticated;
 grant execute on function public.techkarvo_sandbox_activate_plan(text) to authenticated;
-grant execute on function public.techkarvo_sandbox_create_milestone(uuid,text,bigint,text) to authenticated;
+grant execute on function public.techkarvo_sandbox_create_milestone(uuid,text,numeric,text) to authenticated;
 grant execute on function public.techkarvo_sandbox_fund_milestone(uuid) to authenticated;
 grant execute on function public.techkarvo_sandbox_milestone_action(uuid,text,text) to authenticated;
 grant execute on function public.techkarvo_sandbox_resolve_dispute(uuid,text,text) to authenticated;
 grant execute on function public.techkarvo_sandbox_claim_ad_reward() to authenticated;
-grant execute on function public.techkarvo_admin_upsert_membership_plan(text,text,text,text,integer,numeric,jsonb,boolean,integer) to authenticated;
-grant execute on function public.techkarvo_admin_update_financial_config(boolean,integer,bigint,integer,bigint,bigint) to authenticated;
+grant execute on function public.techkarvo_set_membership_auto_renew(boolean) to authenticated;
+grant execute on function public.techkarvo_admin_upsert_membership_plan(text,text,text,text,integer,numeric,integer,jsonb,jsonb,boolean,integer) to authenticated;
+grant execute on function public.techkarvo_admin_update_financial_config(boolean,numeric,integer,numeric,numeric) to authenticated;
 grant execute on function public.techkarvo_admin_financial_summary() to authenticated;
 grant execute on function public.techkarvo_admin_financial_configuration() to authenticated;
 

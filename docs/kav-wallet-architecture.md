@@ -1,12 +1,12 @@
 # KAV Wallet and USDT Sandbox Architecture
 
-**Status: simulation-only implementation prepared; staging activation pending separate approval.** TechKarvo does not accept, custody, exchange, or transfer real money or crypto. Migration `202611150013_simulated_financial_memberships.sql` prepares authenticated server-side sandbox RPCs, role-specific sample membership plans and usage limits, an immutable balanced KAV journal, simulated funding/withdrawal entries, KAV-only sample membership purchases and renewals, milestone hold/release/refund/dispute transitions, commission, and bounded reward credits. Its source is covered by the disposable PostgreSQL CI workflow; it has **not** been applied to the seller's staging project and must not be presented as active there. Demo Mode remains local-only and separately isolated. Both use the fixed reference `1 USDT = 1 KAV` only as a labeled simulation rule. It is not a market price, reserve claim, redemption promise, or live conversion rate. Sample membership prices are intentionally blank until the buyer chooses amounts.
+**Status: simulation-only implementation prepared; staging activation is pending final isolated CI, backup, target, and dry-run checks.** TechKarvo does not accept, custody, exchange, or transfer real money or crypto. Migration `202611150013_simulated_financial_memberships.sql` prepares authenticated sandbox RPCs, the exact role-specific sample plans, usage and feature entitlements, an immutable balanced two-decimal KAV journal, simulated funding/withdrawal entries, explicit-consent renewals, milestone fee snapshots, refunds/disputes, and separate non-withdrawable reward credits. Demo Mode remains local-only and isolated. Both use the fixed reference `1 USDT = 1 KAV` only as a labeled simulation rule. It is not a market price, reserve claim, redemption promise, or live conversion rate.
 
 ## $0 build boundary
 
 - Keep the persistent sandbox ledger disabled in any hosted environment until the database owner approves and applies the reviewed staging migration. A buyer must review the SQL, CI results, RLS, triggers, and RPC behavior before applying it to a buyer-owned project.
 - The sandbox journal is fictional product testing data, not accounting evidence, customer balances, deposits, payouts, or legally meaningful escrow. Every API response and UI action must retain the simulation warning.
-- Use deterministic fake transaction IDs, fake USDT amounts, and a conspicuous `SIMULATED — NO FUNDS MOVED` label. Never use wallet addresses, real provider credentials, or outbound payment requests in the demo.
+- Use two-decimal sample amounts and a conspicuous `SIMULATED — NO FUNDS MOVED` label. Never use wallet addresses, real provider credentials, or outbound payment requests in the demo.
 - Do not add cryptocurrency signing, custody, exchange, production webhooks, real payout paths, or a user-editable balance in Supabase.
 - A buyer may connect a sandbox provider after choosing a provider and setting up a separate sandbox project. No external service is required to build or test the current product.
 
@@ -20,7 +20,7 @@
 ## Double-entry ledger requirements
 
 - Use append-only journal entries. Every posted transaction has at least two lines, all in one currency, whose signed amounts sum to zero.
-- Store integer minor units and explicit asset/currency identifiers. Treat the demo conversion of `1 USDT = 1 KAV` as a configurable simulation constant, never as a hard-coded live peg.
+- Use decimal minor-unit precision for sample KAV amounts and explicit asset/currency identifiers. Treat the demo conversion of `1 USDT = 1 KAV` as a simulation constant, never as a hard-coded live peg.
 - Separate accounts by owner and purpose: platform clearing, user available, user held, funding pending, provider payable, refund payable, withdrawal pending, fees, and loss/dispute reserve.
 - Enforce unique idempotency keys and external provider references. Posted entries cannot be edited/deleted; corrections use linked reversing entries with actor, reason, original transaction ID, and timestamp.
 - Enforce ownership, currency, state transitions, balanced journals, and idempotency in trusted server/database logic. Reconcile account and global totals continuously.
@@ -37,9 +37,9 @@ No stage above should be connected to a real provider or real funds until separa
 
 ## Membership and advertisement reward simulations
 
-- Represent Free, Plus, Gold, and Premium as versioned catalog entries controlled by buyer configuration. The demo can simulate entitlement changes and expiry; the production app currently has no membership billing or entitlement enforcement.
+- Represent Free, Plus, Gold, and Premium as role-specific catalog entries. The prepared staging catalog sets monthly prices/limits and plan-specific fees. Renewal defaults off and requires explicit opt-in. Backend checks gate job featuring, profile boosts, advanced-search access, premium analytics, priority support, and rewards. The product still has no real billing.
 - Keep tier names, prices, features, limits, and eligibility in configuration. Do not place pricing or commissions in client-only code as an authorization control.
-- Advertisement rewards must be sandbox events with per-user limits, deduplication, eligibility checks, and an audit record. Never reward views/clicks from a real ad network until the buyer has a compliant provider integration.
+- Advertisement rewards must be sandbox events with per-user limits, eligibility checks, and a separate reward balance that cannot be withdrawn or used as available KAV. Never reward views/clicks from a real ad network until the buyer has a compliant provider integration.
 - Do not create paid subscription prompts, real advertisements, or paid benefits in the current $0 build.
 
 ## Refunds, disputes, and withdrawals

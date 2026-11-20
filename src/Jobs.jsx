@@ -16,10 +16,23 @@ function Jobs() {
   const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sortMode, setSortMode] = useState("newest");
+  const [advancedSearch, setAdvancedSearch] = useState(false);
+  const [advancedSearchAccess, setAdvancedSearchAccess] = useState(false);
+  const [minBudget, setMinBudget] = useState("");
+  const [maxBudget, setMaxBudget] = useState("");
   const [supabaseJobs, setSupabaseJobs] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [jobsError, setJobsError] = useState("");
   const [loadAttempt, setLoadAttempt] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    if (user?.accountType !== "Freelancer") return () => { active = false; };
+    supabase.rpc("techkarvo_has_membership_feature", { p_feature: "advanced_search" }).then(({ data, error }) => {
+      if (active) setAdvancedSearchAccess(!error && data === true);
+    }).catch(() => { if (active) setAdvancedSearchAccess(false); });
+    return () => { active = false; };
+  }, [user?.accountType, user?.id]);
 
   useEffect(() => {
     let active = true;
@@ -77,6 +90,7 @@ function Jobs() {
           title: item.title,
           company: clientNames.get(item.client_id) || "TechKarvo Client",
           location: "Remote",
+          isFeatured: Boolean(item.is_featured),
           type: item.payment_type || "Freelance",
           category: item.category || "Other",
           createdAt: item.created_at,
@@ -120,11 +134,14 @@ function Jobs() {
     const matchesCategory =
       selectedCategory === "All" ? true : job.category === selectedCategory;
 
-    return matchesJobSearch(job, appliedSearchTerm) && matchesCategory;
+    const hasAdvancedSearch = advancedSearch && advancedSearchAccess && user?.accountType === "Freelancer";
+    const matchesMin = !hasAdvancedSearch || !minBudget || job.budget >= Number(minBudget);
+    const matchesMax = !hasAdvancedSearch || !maxBudget || job.budget <= Number(maxBudget);
+    return matchesJobSearch(job, appliedSearchTerm) && matchesCategory && matchesMin && matchesMax;
   }).sort((first, second) => sortMode === "title"
     ? first.title.localeCompare(second.title)
     : new Date(second.createdAt || 0).getTime() - new Date(first.createdAt || 0).getTime());
-  const hasActiveFilters = Boolean(appliedSearchTerm || selectedCategory !== "All");
+  const hasActiveFilters = Boolean(appliedSearchTerm || selectedCategory !== "All" || (advancedSearch && (minBudget || maxBudget)));
 
   return (
     <div className="jobs-page">
@@ -225,7 +242,9 @@ function Jobs() {
                 setSearchTerm("");
                 setAppliedSearchTerm("");
                 setSelectedCategory("All");
+                setMinBudget(""); setMaxBudget("");
               }}>Clear filters</button>}
+              {user?.accountType === "Freelancer" && advancedSearchAccess && <button type="button" className="clear-job-filters" aria-pressed={advancedSearch} onClick={() => setAdvancedSearch((value) => !value)}>{advancedSearch ? "Hide advanced filters" : "Advanced search"}</button>}
               <label className="jobs-sort-label" htmlFor="jobs-sort">Sort by
                 <select id="jobs-sort" value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
                   <option value="newest">Most recent</option>
@@ -234,6 +253,8 @@ function Jobs() {
               </label>
             </div>
           </div>
+
+          {advancedSearch && user?.accountType === "Freelancer" && advancedSearchAccess && <div className="jobs-results-controls" aria-label="Advanced job filters"><label htmlFor="jobs-min-budget">Minimum budget</label><input id="jobs-min-budget" type="number" min="0" step="0.01" value={minBudget} onChange={(event) => setMinBudget(event.target.value)} /><label htmlFor="jobs-max-budget">Maximum budget</label><input id="jobs-max-budget" type="number" min="0" step="0.01" value={maxBudget} onChange={(event) => setMaxBudget(event.target.value)} /></div>}
 
           <div className="jobs-grid">
             {jobsLoading ? (
@@ -249,7 +270,8 @@ function Jobs() {
                         {(job.company ? job.company : "C").charAt(0)}
                       </div>
 
-                      <span className="job-type">
+                      <span className={`job-type${job.isFeatured ? " job-featured" : ""}`}>
+                        {job.isFeatured ? "Featured" : null}{job.isFeatured ? " · " : ""}
                         {job.type ? job.type : "Freelance"}
                       </span>
                     </div>

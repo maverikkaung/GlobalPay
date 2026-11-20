@@ -7,8 +7,6 @@ insert into auth.users(id,raw_user_meta_data) values
 
 update public.membership_plans set simulated_price_usdt=10
   where account_type='client' and slug='plus';
-update public.membership_plans set simulated_price_usdt=12
-  where account_type='freelancer' and slug='plus';
 update public.membership_entitlements set plan_id=(select id from public.membership_plans where account_type='client' and slug='plus'),
   period_started_at=date_trunc('month',now())-interval '1 month',
   period_ends_at=now()-interval '1 second',period_credit_limit=10,credits_used=0
@@ -19,8 +17,30 @@ select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','a1111111-1111-4111-8111-111111111111',true);
 
 do $$
-declare wallet jsonb; first_tx jsonb; retry_tx jsonb; second_activation_denied boolean := false; direct_access_denied boolean := false; over_limit_denied boolean := false;
+declare wallet jsonb; first_tx jsonb; retry_tx jsonb; second_activation_denied boolean := false; direct_access_denied boolean := false; over_limit_denied boolean := false; feature_denied boolean := false;
 begin
+  if public.techkarvo_has_membership_feature('analytics') then raise exception 'Free plan must not receive premium analytics'; end if;
+  begin
+    perform public.techkarvo_user_analytics();
+    raise exception 'Free plan must not read premium analytics';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.techkarvo_sandbox_claim_ad_reward();
+    raise exception 'Free plan must not claim premium advertisement rewards';
+  exception when insufficient_privilege then null;
+  end;
+  insert into public.support_cases(requester_id,subject,description,category)
+    values(auth.uid(),'Standard support request','Standard support request for the Free account test','technical');
+  if (select priority from public.support_cases where requester_id=auth.uid() and subject='Standard support request')<>'normal' then
+    raise exception 'Free members must not receive priority support automatically';
+  end if;
+  if not exists(select 1 from public.membership_plans where account_type='freelancer' and slug='plus' and simulated_price_usdt=4.99 and fee_bps=800 and included_usage_credits=30) then
+    raise exception 'Freelancer Plus must seed the documented 4.99 KAV, 30 application, 8% plan';
+  end if;
+  if not exists(select 1 from public.membership_plans where account_type='client' and slug='premium' and simulated_price_usdt=39.99 and fee_bps=100 and included_usage_credits=100) then
+    raise exception 'Client Premium must seed the documented 39.99 KAV, 100 job, 1% plan';
+  end if;
   if not exists(select 1 from public.membership_entitlements where user_id=auth.uid()) then
     raise exception 'New profiles need a default membership entitlement';
   end if;
@@ -40,9 +60,14 @@ begin
   exception when check_violation then over_limit_denied := true;
   end;
   if not over_limit_denied then raise exception 'Free client job-post quota must be enforced in the database'; end if;
+  begin
+    insert into public.jobs(client_id,title,description,budget,is_featured) values(auth.uid(),'Unentitled feature job','Must be rejected by plan entitlement',10,true);
+  exception when insufficient_privilege then feature_denied := true;
+  end;
+  if not feature_denied then raise exception 'Free clients must not bypass featured-job entitlement checks'; end if;
   if (select credits_used from public.membership_entitlements where user_id=auth.uid())<>3 then raise exception 'Failed over-limit posting must not consume another credit'; end if;
   wallet := public.techkarvo_sandbox_wallet();
-  if (wallet->>'available_kav')::bigint <> 0 or wallet->>'simulation_only' <> 'true' then
+  if (wallet->>'available_kav')::numeric <> 0 or (wallet->>'reward_kav')::numeric <> 0 or wallet->>'simulation_only' <> 'true' then
     raise exception 'New wallet must start at zero and be explicitly simulated';
   end if;
   first_tx := public.techkarvo_sandbox_deposit(25,'deposit-client-0001');
@@ -51,19 +76,19 @@ begin
     raise exception 'Deposit retries must be idempotent';
   end if;
   wallet := public.techkarvo_sandbox_wallet();
-  if (wallet->>'available_kav')::bigint <> 25 then raise exception 'Retry must not duplicate the simulated credit'; end if;
+  if (wallet->>'available_kav')::numeric <> 25 then raise exception 'Retry must not duplicate the simulated credit'; end if;
   perform public.techkarvo_sandbox_withdraw(5,'withdraw-client-0001');
   wallet := public.techkarvo_sandbox_wallet();
-  if (wallet->>'available_kav')::bigint <> 20 then raise exception 'Simulated withdrawal should journal a balanced debit'; end if;
+  if (wallet->>'available_kav')::numeric <> 20 then raise exception 'Simulated withdrawal should journal a balanced debit'; end if;
   begin
     perform public.techkarvo_sandbox_withdraw(21,'withdraw-client-overspend');
     raise exception 'An overdraft must be rejected';
   exception when check_violation then null;
   end;
-  if (public.techkarvo_sandbox_wallet()->>'available_kav')::bigint<>20 then raise exception 'Rejected overspending must not change the wallet balance'; end if;
+  if (public.techkarvo_sandbox_wallet()->>'available_kav')::numeric<>20 then raise exception 'Rejected overspending must not change the wallet balance'; end if;
   perform public.techkarvo_sandbox_activate_plan('plus');
   wallet := public.techkarvo_sandbox_wallet();
-  if (wallet->>'available_kav')::bigint <> 10 then raise exception 'Configured membership purchase must debit simulated KAV at 1:1'; end if;
+  if (wallet->>'available_kav')::numeric <> 10 then raise exception 'Configured membership purchase must debit simulated KAV at 1:1'; end if;
   if (select count(*) from jsonb_array_elements(wallet->'transactions') as tx(value)
       where value->>'transaction_type'='sandbox_membership_purchase')<>1 then
     raise exception 'Paid plan selection must create one simulated membership purchase journal';
@@ -81,6 +106,11 @@ begin
 end;
 $$;
 
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','a1111111-1111-4111-8111-111111111111',true);
+select public.techkarvo_set_membership_auto_renew(true);
 reset role;
 update public.membership_entitlements set period_ends_at=now()-interval '1 second'
   where user_id='a1111111-1111-4111-8111-111111111111';
@@ -100,7 +130,7 @@ begin
       where value->>'transaction_type'='sandbox_membership_renewal')<>1 then
     raise exception 'Paid membership renewal must create one balanced simulated KAV journal';
   end if;
-  if (wallet->>'available_kav')::bigint<>0 then
+  if (wallet->>'available_kav')::numeric<>0 then
     raise exception 'Renewal must debit the configured sample price exactly once';
   end if;
 end;

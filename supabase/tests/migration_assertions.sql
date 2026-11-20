@@ -151,10 +151,46 @@ begin
     raise exception 'Ledger and sandbox configuration tables must not be directly readable';
   end if;
   if not has_function_privilege('authenticated', 'public.techkarvo_sandbox_wallet()', 'EXECUTE')
-      or not has_function_privilege('authenticated', 'public.techkarvo_sandbox_deposit(bigint,text)', 'EXECUTE')
-      or has_function_privilege('anon', 'public.techkarvo_sandbox_deposit(bigint,text)', 'EXECUTE')
-      or has_function_privilege('anon', 'public.techkarvo_sandbox_withdraw(bigint,text)', 'EXECUTE') then
+      or not has_function_privilege('authenticated', 'public.techkarvo_sandbox_deposit(numeric,text)', 'EXECUTE')
+      or has_function_privilege('anon', 'public.techkarvo_sandbox_deposit(numeric,text)', 'EXECUTE')
+      or has_function_privilege('anon', 'public.techkarvo_sandbox_withdraw(numeric,text)', 'EXECUTE') then
     raise exception 'Financial sandbox RPC grants must be authenticated-only';
+  end if;
+  if not has_function_privilege('authenticated', 'public.techkarvo_set_membership_auto_renew(boolean)', 'EXECUTE')
+    or has_function_privilege('anon', 'public.techkarvo_set_membership_auto_renew(boolean)', 'EXECUTE')
+    or not has_function_privilege('authenticated', 'public.techkarvo_has_membership_feature(text)', 'EXECUTE')
+    or has_function_privilege('anon', 'public.techkarvo_has_membership_feature(text)', 'EXECUTE') then
+    raise exception 'Membership consent and entitlement checks must be authenticated-only';
+  end if;
+  if exists(select 1 from (values
+      ('freelancer','free',0::numeric,5,1000),('freelancer','plus',4.99::numeric,30,800),
+      ('freelancer','gold',9.99::numeric,80,600),('freelancer','premium',19.99::numeric,200,500),
+      ('client','free',0::numeric,2,200),('client','plus',9.99::numeric,10,200),
+      ('client','gold',19.99::numeric,30,150),('client','premium',39.99::numeric,100,100)
+    ) expected(account_type,slug,price,credits,fee_bps)
+    left join public.membership_plans p using(account_type,slug)
+    where p.id is null or p.simulated_price_usdt<>expected.price or p.included_usage_credits<>expected.credits or p.fee_bps<>expected.fee_bps) then
+    raise exception 'Role-specific KAV pricing, usage limits, and fee rates must match product configuration';
+  end if;
+  if not exists(select 1 from information_schema.columns where table_schema='public' and table_name='membership_entitlements' and column_name='auto_renew' and column_default like '%false%')
+    or not exists(select 1 from information_schema.columns where table_schema='public' and table_name='ledger_entries' and column_name='amount_kav' and numeric_scale=2)
+    or not exists(select 1 from information_schema.columns where table_schema='public' and table_name='contract_milestones' and column_name='client_fee_bps') then
+    raise exception 'Two-decimal ledger, explicit renewal consent, and fee snapshots are required';
+  end if;
+  if not exists(select 1 from pg_constraint c join pg_class r on r.oid=c.conrelid join pg_namespace n on n.oid=r.relnamespace
+      where n.nspname='public' and r.relname='ledger_accounts' and pg_get_constraintdef(c.oid) like '%wallet_reward%')
+    or not has_function_privilege('authenticated', 'public.techkarvo_set_profile_boost(boolean)', 'EXECUTE')
+    or not has_function_privilege('authenticated', 'public.techkarvo_user_analytics()', 'EXECUTE') then
+    raise exception 'Reward separation and premium feature RPCs must be configured';
+  end if;
+  if (select entitlements->>'featured_jobs' from public.membership_plans where account_type='client' and slug='premium')<>'true'
+    or (select entitlements->>'profile_boost' from public.membership_plans where account_type='freelancer' and slug='gold')<>'true'
+    or (select entitlements->>'advanced_search' from public.membership_plans where account_type='freelancer' and slug='plus')<>'true'
+    or (select entitlements->>'priority_support' from public.membership_plans where account_type='freelancer' and slug='gold')<>'true'
+    or (select entitlements->>'analytics' from public.membership_plans where account_type='client' and slug='gold')<>'true'
+    or (select entitlements->>'priority_support' from public.membership_plans where account_type='client' and slug='gold')<>'true'
+    or (select entitlements->>'ad_rewards' from public.membership_plans where account_type='freelancer' and slug='plus')<>'true' then
+    raise exception 'Membership benefit flags must match the product plan catalog';
   end if;
   if exists (select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
       where n.nspname='public' and c.relname in ('membership_entitlements','membership_credit_events','ledger_accounts',
