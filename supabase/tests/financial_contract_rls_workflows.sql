@@ -84,14 +84,20 @@ begin
   reward := public.techkarvo_sandbox_claim_ad_reward();
   if not (reward->>'simulation_only')::boolean then raise exception 'Ad reward must be simulated'; end if;
   if (public.techkarvo_sandbox_wallet()->>'reward_kav')::numeric <> 1
-    or (public.techkarvo_sandbox_wallet()->>'available_kav')::numeric <> 92.23 then
+    or (public.techkarvo_sandbox_wallet()->>'available_kav')::numeric <> 94.23 then
     raise exception 'Ad rewards must be kept separate from withdrawable KAV';
   end if;
+  perform public.techkarvo_sandbox_withdraw(94.23,'withdraw-earned-balance-before-reward-check');
+  if (public.techkarvo_sandbox_wallet()->>'reward_kav')::numeric <> 1
+    or (public.techkarvo_sandbox_wallet()->>'available_kav')::numeric <> 0 then
+    raise exception 'Withdrawable earnings must not consume the separate reward account';
+  end if;
+  denied := false;
   begin
-    perform public.techkarvo_sandbox_withdraw(94.24,'withdraw-reward-isolation');
-    raise exception 'Reward credits must not be withdrawable';
-  exception when check_violation then null;
+    perform public.techkarvo_sandbox_withdraw(1,'withdraw-reward-isolation');
+  exception when check_violation then denied := true;
   end;
+  if not denied then raise exception 'Reward credits must not be withdrawable'; end if;
   begin
     perform public.techkarvo_sandbox_claim_ad_reward();
   exception when check_violation then denied := true;
