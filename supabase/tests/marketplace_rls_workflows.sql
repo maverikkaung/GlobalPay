@@ -28,6 +28,15 @@ insert into auth.users (id, raw_user_meta_data) values
   ('22222222-2222-4222-8222-222222222222', '{"full_name":"CI Freelancer","account_type":"freelancer"}'),
   ('22222222-2222-4222-8222-222222222223', '{"full_name":"CI Second Freelancer","account_type":"freelancer"}');
 
+-- This workflow needs three job fixtures to exercise application and hiring
+-- boundaries. Give its client a sufficiently large simulated plan allowance;
+-- the separately tested default Free-plan limit remains unchanged.
+update public.membership_entitlements
+set plan_id = (select id from public.membership_plans where account_type='client' and slug='premium'),
+    period_credit_limit = 100,
+    credits_used = 0
+where user_id = '11111111-1111-4111-8111-111111111111';
+
 insert into public.jobs (id, client_id, title, description, budget) values
   ('33333333-3333-4333-8333-333333333333', '11111111-1111-4111-8111-111111111111', 'Accepted project', 'Workflow fixture', 100),
   ('33333333-3333-4333-8333-333333333334', '11111111-1111-4111-8111-111111111111', 'Pending project', 'Workflow fixture', 50),
