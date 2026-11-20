@@ -413,3 +413,77 @@ test("staging Client applicant job, status, and search filters work on existing 
   await expect(firstApplicant).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2)).toBe(true);
 });
+
+test("staging financial sandbox shows role-specific plans, nets simulated transfers, and fits all viewports", async ({ browser }) => {
+  test.skip(!credentialsAvailable, "Set staging-only QA account variables to run authenticated financial browser coverage.");
+  test.setTimeout(180_000);
+
+  const cases = [
+    {
+      role: "Client",
+      credentials: clientCredentials,
+      planDetails: [
+        ["Free", "2 job posts / month", /0\.00 KAV \/ month · service fee: 2\.00%/],
+        ["Plus", "10 job posts / month", /9\.99 KAV \/ month · service fee: 2\.00%/],
+        ["Gold", "30 job posts / month", /19\.99 KAV \/ month · service fee: 1\.50%/],
+        ["Premium", "100 job posts / month", /39\.99 KAV \/ month · service fee: 1\.00%/]
+      ]
+    },
+    {
+      role: "Freelancer",
+      credentials: freelancerCredentials,
+      planDetails: [
+        ["Free", "5 applications / month", /0\.00 KAV \/ month · freelancer commission: 10\.00%/],
+        ["Plus", "30 applications / month", /4\.99 KAV \/ month · freelancer commission: 8\.00%/],
+        ["Gold", "80 applications / month", /9\.99 KAV \/ month · freelancer commission: 6\.00%/],
+        ["Premium", "200 applications / month", /19\.99 KAV \/ month · freelancer commission: 5\.00%/]
+      ]
+    }
+  ];
+
+  const cents = async (page) => {
+    const value = await page.locator(".financial-wallet-card h2").innerText();
+    return Math.round(Number(value.replace(/[^0-9.-]/g, "")) * 100);
+  };
+
+  for (const account of cases) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+    const page = await context.newPage();
+    try {
+      await signIn(page, account.credentials, account.role);
+      await page.goto("/financial-sandbox");
+      await expect(page.getByRole("heading", { name: "Membership & KAV Sandbox" })).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByText("SIMULATED — NO FUNDS MOVED")).toBeVisible();
+      await expect(page.getByText(/Reference only: 1 USDT = 1 KAV/)).toBeVisible();
+
+      const planSection = page.locator(".financial-section").filter({ has: page.getByRole("heading", { name: `${account.role} membership`, exact: true }) });
+      await expect(planSection).toHaveCount(1);
+      await expect(planSection.locator(".financial-plan-card")).toHaveCount(4);
+      for (const [name, usage, priceAndFee] of account.planDetails) {
+        const card = planSection.locator(".financial-plan-card").filter({ has: page.getByRole("heading", { name, exact: true }) });
+        await expect(card).toHaveCount(1);
+        await expect(card).toContainText(usage);
+        await expect(card).toContainText(priceAndFee);
+      }
+
+      const initialCents = await cents(page);
+      await page.locator("#sandbox-amount").fill("0.01");
+      await page.getByRole("button", { name: "Simulate USDT deposit" }).click();
+      await expect(page.getByRole("status")).toContainText("No funds moved.");
+      await expect.poll(() => cents(page)).toBe(initialCents + 1);
+      await expect(page.locator(".financial-transaction-list")).toContainText("sandbox deposit");
+
+      await page.getByRole("button", { name: "Simulate withdrawal" }).click();
+      await expect(page.getByRole("status")).toContainText("No payout occurred.");
+      await expect.poll(() => cents(page)).toBe(initialCents);
+      await expect(page.locator(".financial-transaction-list")).toContainText("sandbox withdrawal");
+
+      for (const width of [1024, 768, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2)).toBe(true);
+      }
+    } finally {
+      await context.close();
+    }
+  }
+});
