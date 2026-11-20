@@ -1,6 +1,6 @@
 import { chromium } from "@playwright/test";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createInterface } from "node:readline/promises";
@@ -9,7 +9,11 @@ import process from "node:process";
 
 const projectRef = "ntucgiieksrwebwvcmun";
 const stagingOrigin = "https://techkarvo-staging.vercel.app";
-const sessionDir = process.env.TK_QA_SESSION_DIR || join(tmpdir(), "techkarvo-staging-qa-session-r6");
+const sessionDir = process.env.TK_QA_SESSION_DIR || join(tmpdir(), "techkarvo-staging-qa-session-r8");
+
+if (!stdin.isTTY) {
+  throw new Error("Run the staging QA session setup in an interactive PowerShell or terminal window.");
+}
 
 if (existsSync(sessionDir)) {
   throw new Error("A QA session directory already exists. Preserve it and review it before starting another setup.");
@@ -24,20 +28,14 @@ if (process.platform === "win32" && process.env.USERNAME) {
 }
 
 const chromePath = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
-const client = await chromium.launchPersistentContext(join(sessionDir, "client-profile"), {
+const browser = await chromium.launch({
   executablePath: chromePath,
-  ignoreDefaultArgs: ["--no-sandbox"],
   headless: false,
-  viewport: { width: 1440, height: 960 }
+  args: ["--no-first-run", "--no-default-browser-check"]
 });
-const freelancer = await chromium.launchPersistentContext(join(sessionDir, "freelancer-profile"), {
-  executablePath: chromePath,
-  ignoreDefaultArgs: ["--no-sandbox"],
-  headless: false,
-  viewport: { width: 1440, height: 960 }
-});
+const client = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+const freelancer = await browser.newContext({ viewport: { width: 1440, height: 960 } });
 const prompt = createInterface({ input: stdin, output: stdout });
-let captured = false;
 
 async function openLogin(context, role) {
   const page = context.pages()[0] || await context.newPage();
@@ -94,13 +92,9 @@ try {
 
   writeFileSync(join(sessionDir, "client.json"), JSON.stringify(await client.storageState()), { mode: 0o600 });
   writeFileSync(join(sessionDir, "freelancer.json"), JSON.stringify(await freelancer.storageState()), { mode: 0o600 });
-  captured = true;
   process.stdout.write("Хоёр staging session Playwright-д нууцлалтай local temporary storage хэлбэрээр бэлэн боллоо. Токен болон profile агуулга дэлгэцэнд хэвлэгдээгүй.\n");
 } finally {
   prompt.close();
   await Promise.allSettled([client.close(), freelancer.close()]);
-  if (captured) {
-    rmSync(join(sessionDir, "client-profile"), { recursive: true, force: true });
-    rmSync(join(sessionDir, "freelancer-profile"), { recursive: true, force: true });
-  }
+  await browser.close().catch(() => {});
 }
