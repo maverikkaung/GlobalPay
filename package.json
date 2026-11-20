@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "node --test",
     "test:e2e": "node scripts/run-playwright.js",
+    "test:e2e:prepare": "node scripts/prepare-staging-qa-sessions.js",
     "preview": "vite preview"
   },
   "dependencies": {

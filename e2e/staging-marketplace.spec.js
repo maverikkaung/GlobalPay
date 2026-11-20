@@ -1,20 +1,38 @@
 import { test, expect } from "@playwright/test";
 import process from "node:process";
 import { Buffer } from "node:buffer";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 const stagingBase = process.env.PLAYWRIGHT_BASE_URL || "";
 const clientCredentials = { email: process.env.TK_QA_CLIENT_EMAIL, password: process.env.TK_QA_CLIENT_PASSWORD };
 const freelancerCredentials = { email: process.env.TK_QA_FREELANCER_EMAIL, password: process.env.TK_QA_FREELANCER_PASSWORD };
+const qaSessionDir = process.env.TK_QA_SESSION_DIR || join(tmpdir(), "techkarvo-staging-qa-session-r4");
+const clientStorageState = process.env.TK_QA_CLIENT_STORAGE_STATE || join(qaSessionDir, "client.json");
+const freelancerStorageState = process.env.TK_QA_FREELANCER_STORAGE_STATE || join(qaSessionDir, "freelancer.json");
+const credentialLoginAvailable = clientCredentials.email && clientCredentials.password && freelancerCredentials.email && freelancerCredentials.password;
+const sessionLoginAvailable = existsSync(clientStorageState) && existsSync(freelancerStorageState);
 const credentialsAvailable = /^https:\/\/techkarvo-staging\.vercel\.app\/?$/.test(stagingBase)
-  && clientCredentials.email && clientCredentials.password && freelancerCredentials.email && freelancerCredentials.password;
+  && (credentialLoginAvailable || sessionLoginAvailable);
+
+function storageStateFor(role) {
+  if (credentialLoginAvailable) return undefined;
+  return role === "Client" ? clientStorageState : freelancerStorageState;
+}
 
 const tinyPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=", "base64");
 
 async function signIn(page, credentials, role) {
-  await page.goto("/login");
-  await page.locator("#login-email").fill(credentials.email);
-  await page.locator("#login-password").fill(credentials.password);
-  await page.getByRole("button", { name: "Login", exact: true }).click();
+  const dashboardPath = role === "Client" ? "/client-dashboard" : "/freelancer-dashboard";
+  if (credentials?.email && credentials?.password) {
+    await page.goto("/login");
+    await page.locator("#login-email").fill(credentials.email);
+    await page.locator("#login-password").fill(credentials.password);
+    await page.getByRole("button", { name: "Login", exact: true }).click();
+  } else {
+    await page.goto(dashboardPath);
+  }
   await page.waitForURL(role === "Client" ? /client-dashboard/ : /freelancer-dashboard/, { timeout: 60_000 });
   await page.getByText(role === "Client" ? /CLIENT DASHBOARD/i : /FREELANCER DASHBOARD/i).waitFor({ timeout: 60_000 });
 }
@@ -33,8 +51,8 @@ function readUnreadCount(label) {
 
 test("staging Client acceptance makes the personal connection visible to both members", async ({ browser }) => {
   test.skip(!credentialsAvailable, "Set staging-only QA account variables to run authenticated staging browser coverage.");
-  const clientContext = await browser.newContext();
-  const freelancerContext = await browser.newContext();
+  const clientContext = await browser.newContext({ storageState: storageStateFor("Client") });
+  const freelancerContext = await browser.newContext({ storageState: storageStateFor("Freelancer") });
   const client = await clientContext.newPage();
   const freelancer = await freelancerContext.newPage();
   client.on("dialog", (dialog) => dialog.accept());
@@ -74,8 +92,8 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
   test.skip(!credentialsAvailable, "Set staging-only QA account variables to run authenticated staging browser coverage.");
   test.setTimeout(300_000);
 
-  const clientContext = await browser.newContext({ viewport: { width: 1440, height: 960 } });
-  const freelancerContext = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  const clientContext = await browser.newContext({ storageState: storageStateFor("Client"), viewport: { width: 1440, height: 960 } });
+  const freelancerContext = await browser.newContext({ storageState: storageStateFor("Freelancer"), viewport: { width: 1440, height: 960 } });
   const client = await clientContext.newPage();
   const freelancer = await freelancerContext.newPage();
   const runtimeErrors = [];
@@ -392,8 +410,11 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
   }
 });
 
-test("staging Client applicant job, status, and search filters work on existing QA records", async ({ page }) => {
+test("staging Client applicant job, status, and search filters work on existing QA records", async ({ browser }) => {
   test.skip(!credentialsAvailable, "Set staging-only QA account variables to run authenticated staging browser coverage.");
+  const context = await browser.newContext({ storageState: storageStateFor("Client") });
+  const page = await context.newPage();
+  try {
   await signIn(page, clientCredentials, "Client");
   await page.goto("/job-applicants");
   const firstApplicant = page.locator(".applicant-card").first();
@@ -412,6 +433,9 @@ test("staging Client applicant job, status, and search filters work on existing 
   await page.getByRole("combobox", { name: "Sort by", exact: true }).selectOption("oldest", { timeout: 15_000 });
   await expect(firstApplicant).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2)).toBe(true);
+  } finally {
+    await context.close();
+  }
 });
 
 test("staging financial sandbox shows role-specific plans, nets simulated transfers, and fits all viewports", async ({ browser }) => {
@@ -447,7 +471,7 @@ test("staging financial sandbox shows role-specific plans, nets simulated transf
   };
 
   for (const account of cases) {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+    const context = await browser.newContext({ storageState: storageStateFor(account.role), viewport: { width: 1440, height: 960 } });
     const page = await context.newPage();
     try {
       await signIn(page, account.credentials, account.role);

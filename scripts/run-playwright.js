@@ -1,10 +1,18 @@
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import process from "node:process";
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:5173";
-const localRun = !process.env.PLAYWRIGHT_BASE_URL;
+const qaSessionDir = process.env.TK_QA_SESSION_DIR || join(tmpdir(), "techkarvo-staging-qa-session-r4");
+const hasSavedQaSessions = existsSync(join(qaSessionDir, "client.json")) && existsSync(join(qaSessionDir, "freelancer.json"));
+const stagingSessionsRun = !process.env.PLAYWRIGHT_BASE_URL && hasSavedQaSessions;
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || (stagingSessionsRun
+  ? "https://techkarvo-staging.vercel.app"
+  : "http://127.0.0.1:5173");
+const localRun = !process.env.PLAYWRIGHT_BASE_URL && !stagingSessionsRun;
 const vitePath = fileURLToPath(new URL("../node_modules/vite/bin/vite.js", import.meta.url));
 const playwrightPath = fileURLToPath(new URL("../node_modules/@playwright/test/cli.js", import.meta.url));
 let vite;
@@ -62,6 +70,8 @@ try {
     vite.once("error", (error) => process.emitWarning(error));
     await waitForVite();
   }
+
+  if (stagingSessionsRun) process.env.TK_QA_SESSION_DIR = qaSessionDir;
 
   const result = await run(process.execPath, [playwrightPath, "test", ...process.argv.slice(2)], {
     env: { ...process.env, PLAYWRIGHT_BASE_URL: baseURL }
