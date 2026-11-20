@@ -70,6 +70,11 @@ begin
   if (select count(*) from public.membership_plans where account_type='freelancer') <> 0 then
     raise exception 'Client must not read freelancer-specific plans';
   end if;
+  begin
+    insert into public.jobs(client_id,title,description,budget,is_featured) values(auth.uid(),'Unentitled feature job','Must be rejected by plan entitlement',10,true);
+  exception when insufficient_privilege then feature_denied := true;
+  end;
+  if not feature_denied then raise exception 'Free clients must not bypass featured-job entitlement checks'; end if;
   insert into public.jobs(id,client_id,title,description,budget) values
     ('a3111111-1111-4111-8111-111111111111',auth.uid(),'Credit job 1','Monthly credit trigger fixture',10),
     ('a3222222-2222-4222-8222-222222222222',auth.uid(),'Credit job 2','Monthly credit trigger fixture',10);
@@ -79,11 +84,6 @@ begin
   exception when check_violation then over_limit_denied := true;
   end;
   if not over_limit_denied then raise exception 'Free client job-post quota must be enforced in the database'; end if;
-  begin
-    insert into public.jobs(client_id,title,description,budget,is_featured) values(auth.uid(),'Unentitled feature job','Must be rejected by plan entitlement',10,true);
-  exception when insufficient_privilege then feature_denied := true;
-  end;
-  if not feature_denied then raise exception 'Free clients must not bypass featured-job entitlement checks'; end if;
   if (select credits_used from public.membership_entitlements where user_id=auth.uid())<>2 then raise exception 'Failed over-limit posting must not consume another credit'; end if;
   wallet := public.techkarvo_sandbox_wallet();
   if (wallet->>'available_kav')::numeric <> 0 or (wallet->>'reward_kav')::numeric <> 0 or wallet->>'simulation_only' <> 'true' then
