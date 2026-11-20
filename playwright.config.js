@@ -14,7 +14,9 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Staging E2E uses two dedicated accounts with shared persistent records.
+  // Serialize the suite so parallel cases cannot race on connections, jobs, or wallets.
+  workers: process.env.CI || externalBaseURL ? 1 : undefined,
   reporter: "list",
   timeout: 60_000,
   expect: { timeout: 15_000 },

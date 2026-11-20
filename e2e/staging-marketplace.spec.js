@@ -37,6 +37,66 @@ async function signIn(page, credentials, role) {
   await page.getByText(role === "Client" ? /CLIENT DASHBOARD/i : /FREELANCER DASHBOARD/i).waitFor({ timeout: 60_000 });
 }
 
+async function profileIdFor(page) {
+  const id = await page.evaluate((projectRef) => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(`sb-${projectRef}-auth-token`) || "null");
+      const session = parsed?.access_token ? parsed : parsed?.currentSession;
+      return session?.user?.id || null;
+    } catch {
+      return null;
+    }
+  }, "ntucgiieksrwebwvcmun");
+  expect(id, "authenticated staging session should identify its account").toMatch(/^[0-9a-f-]{36}$/i);
+  return id;
+}
+
+function connectionCardFor(page, profileId) {
+  return page.locator(`.connection-card:has(a[href="/profiles/${profileId}"])`).first();
+}
+
+async function ensureAcceptedQaConnection(client, freelancer, postBody, clientId, freelancerId) {
+  await freelancer.goto("/social");
+  const post = freelancer.locator("article.social-card").filter({ hasText: postBody }).first();
+  const action = post.getByRole("button", { name: /^(Connect|Request pending|Accept connect|Message)$/ });
+  await expect(action).toBeVisible({ timeout: 60_000 });
+  const initialAction = (await action.innerText()).trim();
+
+  if (initialAction === "Connect") {
+    await action.click();
+    await expect(freelancer.getByText(/Connection request sent/i)).toBeVisible();
+  } else if (initialAction === "Accept connect") {
+    await action.click();
+    await freelancer.waitForURL(/\/messages\?conversation=/, { timeout: 30_000 });
+  }
+
+  await client.goto("/connections");
+  let clientCard = connectionCardFor(client, freelancerId);
+  await expect(clientCard).toBeVisible({ timeout: 60_000 });
+  if ((await clientCard.locator(".connection-status").innerText()).trim() === "Pending") {
+    const accept = clientCard.getByRole("button", { name: "Accept", exact: true });
+    if (await accept.count()) {
+      await accept.click();
+      await client.waitForURL(/\/messages\?conversation=/, { timeout: 30_000 });
+    } else {
+      await freelancer.goto("/connections");
+      const freelancerCard = connectionCardFor(freelancer, clientId);
+      await expect(freelancerCard.getByRole("button", { name: "Accept", exact: true })).toBeVisible({ timeout: 30_000 });
+      await freelancerCard.getByRole("button", { name: "Accept", exact: true }).click();
+      await freelancer.waitForURL(/\/messages\?conversation=/, { timeout: 30_000 });
+    }
+  }
+
+  await client.goto("/connections");
+  clientCard = connectionCardFor(client, freelancerId);
+  await expect(clientCard.locator(".connection-status")).toHaveText("Accepted", { timeout: 60_000 });
+  await freelancer.goto("/connections");
+  const freelancerCard = connectionCardFor(freelancer, clientId);
+  await expect(freelancerCard.locator(".connection-status")).toHaveText("Accepted", { timeout: 60_000 });
+  await expect(clientCard.getByRole("button", { name: "Message", exact: true })).toBeVisible();
+  await expect(freelancerCard.getByRole("button", { name: "Message", exact: true })).toBeVisible();
+}
+
 async function selectMessageFolder(page, folder) {
   const tab = page.getByRole("tab", { name: folder === "job" ? /Job Messages/ : /Personal Messages/ });
   await expect(tab).toBeEnabled({ timeout: 60_000 });
@@ -59,6 +119,8 @@ test("staging Client acceptance makes the personal connection visible to both me
   try {
     await signIn(client, clientCredentials, "Client");
     await signIn(freelancer, freelancerCredentials, "Freelancer");
+    const clientId = await profileIdFor(client);
+    const freelancerId = await profileIdFor(freelancer);
     const postBody = `QA connection visibility ${Date.now()}`;
     await client.goto("/social");
     await client.locator("#social-post-body").fill(postBody);
@@ -67,22 +129,7 @@ test("staging Client acceptance makes the personal connection visible to both me
     await freelancer.goto("/social");
     const post = freelancer.locator("article.social-card").filter({ hasText: postBody });
     await expect(post).toBeVisible();
-    const action = post.getByRole("button", { name: /^(Connect|Message)$/ });
-    await expect(action).toBeVisible();
-    if (await action.innerText() === "Connect") {
-      await action.click();
-      await expect(freelancer.getByText(/Connection request sent/i)).toBeVisible();
-      await client.goto("/connections");
-      const incoming = client.locator(".connection-card").filter({ hasText: "TechKarvo QA Freelancer" });
-      await expect(incoming.first()).toBeVisible();
-      await incoming.first().getByRole("button", { name: "Accept", exact: true }).click();
-      await client.waitForURL(/\/messages\?conversation=/);
-    }
-    await freelancer.goto("/connections");
-    const accepted = freelancer.locator(".connection-card").filter({ hasText: "TechKarvo QA Client" });
-    await expect(accepted.first()).toBeVisible({ timeout: 30_000 });
-    await expect(accepted.first().locator(".connection-status")).toHaveText("Accepted");
-    await expect(accepted.first().getByRole("button", { name: "Message", exact: true })).toBeVisible();
+    await ensureAcceptedQaConnection(client, freelancer, postBody, clientId, freelancerId);
   } finally {
     await clientContext.close();
     await freelancerContext.close();
@@ -114,6 +161,8 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
   try {
     await signIn(client, clientCredentials, "Client");
     await signIn(freelancer, freelancerCredentials, "Freelancer");
+    const clientId = await profileIdFor(client);
+    const freelancerId = await profileIdFor(freelancer);
 
     // Role-specific dashboard menu, keyboard close, theme persistence, and mobile menu fit.
     const clientQuick = client.getByRole("button", { name: "Quick actions" });
@@ -279,20 +328,7 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
 
     // Accepted personal connection, shared-post preview, real-time message, read receipt and safe deletion.
     await freelancer.goto("/social");
-    const connectPost = freelancer.locator("article.social-card").filter({ hasText: `${postBody} edited` }).first();
-    const connectAction = connectPost.getByRole("button", { name: "Connect", exact: true });
-    if (await connectAction.count()) {
-      await connectAction.click();
-      await expect(freelancer.getByText(/Connection request sent/i)).toBeVisible();
-      await client.goto("/connections");
-      const incomingRequest = client.locator(".connection-card").filter({ hasText: "TechKarvo QA Freelancer" }).first();
-      await incomingRequest.getByRole("button", { name: "Accept", exact: true }).click();
-      await client.waitForURL(/\/messages\?conversation=/, { timeout: 30_000 });
-    }
-    await freelancer.goto("/connections");
-    const acceptedConnection = freelancer.locator(".connection-card").filter({ hasText: "TechKarvo QA Client" }).first();
-    await expect(acceptedConnection).toBeVisible({ timeout: 30_000 });
-    await expect(acceptedConnection.locator(".connection-status")).toHaveText("Accepted");
+    await ensureAcceptedQaConnection(client, freelancer, `${postBody} edited`, clientId, freelancerId);
     await freelancer.goto("/social");
     const sharedPost = freelancer.locator("article.social-card").filter({ hasText: `${postBody} edited` }).first();
     await expect(sharedPost.getByRole("button", { name: "Message", exact: true })).toBeVisible();
@@ -327,7 +363,7 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await expect(client.getByText(personalMessage, { exact: true })).toHaveCount(0);
 
     // Active contract must prevent blocking; complete it, then verify block/unblock, mute and report.
-    const safety = client.getByRole("region", { name: "Safety controls for TechKarvo QA Freelancer" });
+    const safety = client.locator(".member-safety-actions").first();
     // Open the job conversation from its application before checking contract protection.
     await client.goto("/job-applicants");
     const activeApplicant = client.locator(".applicant-card").filter({ hasText: jobTitle });
@@ -447,20 +483,20 @@ test("staging financial sandbox shows role-specific plans, nets simulated transf
       role: "Client",
       credentials: clientCredentials,
       planDetails: [
-        ["Free", "2 job posts / month", /0\.00 KAV \/ month · service fee: 2\.00%/],
-        ["Plus", "10 job posts / month", /9\.99 KAV \/ month · service fee: 2\.00%/],
-        ["Gold", "30 job posts / month", /19\.99 KAV \/ month · service fee: 1\.50%/],
-        ["Premium", "100 job posts / month", /39\.99 KAV \/ month · service fee: 1\.00%/]
+        ["free", "Free Client", "2 job posts / month", /0\.00 KAV \/ month · service fee: 2\.00%/],
+        ["plus", "Plus Client", "10 job posts / month", /9\.99 KAV \/ month · service fee: 2\.00%/],
+        ["gold", "Gold Client", "30 job posts / month", /19\.99 KAV \/ month · service fee: 1\.50%/],
+        ["premium", "Premium Client", "100 job posts / month", /39\.99 KAV \/ month · service fee: 1\.00%/]
       ]
     },
     {
       role: "Freelancer",
       credentials: freelancerCredentials,
       planDetails: [
-        ["Free", "5 applications / month", /0\.00 KAV \/ month · freelancer commission: 10\.00%/],
-        ["Plus", "30 applications / month", /4\.99 KAV \/ month · freelancer commission: 8\.00%/],
-        ["Gold", "80 applications / month", /9\.99 KAV \/ month · freelancer commission: 6\.00%/],
-        ["Premium", "200 applications / month", /19\.99 KAV \/ month · freelancer commission: 5\.00%/]
+        ["free", "Free Freelancer", "5 applications / month", /0\.00 KAV \/ month · freelancer commission: 10\.00%/],
+        ["plus", "Plus Freelancer", "30 applications / month", /4\.99 KAV \/ month · freelancer commission: 8\.00%/],
+        ["gold", "Gold Freelancer", "80 applications / month", /9\.99 KAV \/ month · freelancer commission: 6\.00%/],
+        ["premium", "Premium Freelancer", "200 applications / month", /19\.99 KAV \/ month · freelancer commission: 5\.00%/]
       ]
     }
   ];
@@ -483,9 +519,10 @@ test("staging financial sandbox shows role-specific plans, nets simulated transf
       const planSection = page.locator(".financial-section").filter({ has: page.getByRole("heading", { name: `${account.role} membership`, exact: true }) });
       await expect(planSection).toHaveCount(1);
       await expect(planSection.locator(".financial-plan-card")).toHaveCount(4);
-      for (const [name, usage, priceAndFee] of account.planDetails) {
-        const card = planSection.locator(".financial-plan-card").filter({ has: page.getByRole("heading", { name, exact: true }) });
+      for (const [slug, name, usage, priceAndFee] of account.planDetails) {
+        const card = planSection.locator(`.financial-plan-card[data-plan-slug="${slug}"][data-account-type="${account.role.toLowerCase()}"]`);
         await expect(card).toHaveCount(1);
+        await expect(card.getByRole("heading", { name, exact: true })).toBeVisible();
         await expect(card).toContainText(usage);
         await expect(card).toContainText(priceAndFee);
       }

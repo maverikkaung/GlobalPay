@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
-import { existsSync } from "node:fs";
+import { closeSync, existsSync, openSync, unlinkSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import process from "node:process";
@@ -16,6 +16,26 @@ const localRun = !process.env.PLAYWRIGHT_BASE_URL && !stagingSessionsRun;
 const vitePath = fileURLToPath(new URL("../node_modules/vite/bin/vite.js", import.meta.url));
 const playwrightPath = fileURLToPath(new URL("../node_modules/@playwright/test/cli.js", import.meta.url));
 let vite;
+let qaRunLockPath;
+let qaRunLockFd;
+
+function acquireQaRunLock() {
+  qaRunLockPath = join(qaSessionDir, ".playwright-run.lock");
+  try {
+    qaRunLockFd = openSync(qaRunLockPath, "wx", 0o600);
+    writeSync(qaRunLockFd, `${process.pid}\n`);
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    throw new Error("Another authenticated staging Playwright run is using these QA sessions. Wait for it to finish; preserve its lock file.", { cause: error });
+  }
+}
+
+function releaseQaRunLock() {
+  if (qaRunLockFd === undefined) return;
+  closeSync(qaRunLockFd);
+  if (existsSync(qaRunLockPath)) unlinkSync(qaRunLockPath);
+  qaRunLockFd = undefined;
+}
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -56,6 +76,7 @@ async function stopVite() {
 }
 
 try {
+  if (stagingSessionsRun) acquireQaRunLock();
   if (localRun) {
     process.env.PLAYWRIGHT_BASE_URL = baseURL;
     vite = spawn(process.execPath, [vitePath, "--host", "127.0.0.1"], {
@@ -82,4 +103,5 @@ try {
   process.exitCode = 1;
 } finally {
   await stopVite();
+  releaseQaRunLock();
 }
