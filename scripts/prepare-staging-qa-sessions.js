@@ -9,7 +9,7 @@ import process from "node:process";
 
 const projectRef = "ntucgiieksrwebwvcmun";
 const stagingOrigin = "https://techkarvo-staging.vercel.app";
-const sessionDir = join(tmpdir(), "techkarvo-staging-qa-session-r4");
+const sessionDir = process.env.TK_QA_SESSION_DIR || join(tmpdir(), "techkarvo-staging-qa-session-r6");
 
 if (existsSync(sessionDir)) {
   throw new Error("A QA session directory already exists. Preserve it and review it before starting another setup.");
@@ -42,6 +42,17 @@ let captured = false;
 async function openLogin(context, role) {
   const page = context.pages()[0] || await context.newPage();
   await page.goto(`${stagingOrigin}/login`);
+  await page.evaluate((title) => { document.title = title; }, `TechKarvo Staging QA ${role} Login`);
+  const authenticated = await page.evaluate(() => Object.keys(localStorage).some((key) => {
+    if (!key.includes("auth-token")) return false;
+    try {
+      const session = JSON.parse(localStorage.getItem(key) || "null");
+      return Boolean(session?.access_token || session?.currentSession?.access_token);
+    } catch {
+      return false;
+    }
+  }));
+  if (authenticated) throw new Error(`The fresh ${role} browser context unexpectedly has an existing login.`);
   process.stdout.write(`${role} нэвтрэх цонх staging дээр нээлттэй.\n`);
   return page;
 }
@@ -49,19 +60,23 @@ async function openLogin(context, role) {
 async function verifySession(page, role) {
   const expectedPath = role === "Client" ? /\/client-dashboard/ : /\/freelancer-dashboard/;
   const expectedHeading = role === "Client" ? /CLIENT DASHBOARD/i : /FREELANCER DASHBOARD/i;
-  if (!expectedPath.test(new URL(page.url()).pathname)) return false;
+  const currentUrl = new URL(page.url());
+  if (currentUrl.origin !== stagingOrigin || !expectedPath.test(currentUrl.pathname)) return false;
   if (!await page.getByText(expectedHeading).count()) return false;
-  return await page.evaluate((ref) => {
+  return await page.evaluate(({ ref, deniedIdentity }) => {
     const key = `sb-${ref}-auth-token`;
     try {
       const raw = localStorage.getItem(key);
       if (!raw) return false;
       const parsed = JSON.parse(raw);
-      return Boolean(parsed.access_token || parsed.currentSession?.access_token);
+      const session = parsed.access_token ? parsed : parsed.currentSession;
+      const email = String(session?.user?.email || "").trim().toLowerCase();
+      const identity = `${email} ${session?.user?.user_metadata?.full_name || ""}`.toLowerCase();
+      return Boolean(session?.access_token && email && email !== deniedIdentity && !/qa[\s_-]*admin/i.test(identity) && /(qa|test)/i.test(identity));
     } catch {
       return false;
     }
-  }, projectRef);
+  }, { ref: projectRef, deniedIdentity: "qa-admin@techkarvo.invalid" });
 }
 
 try {

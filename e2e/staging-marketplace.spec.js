@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 const stagingBase = process.env.PLAYWRIGHT_BASE_URL || "";
 const clientCredentials = { email: process.env.TK_QA_CLIENT_EMAIL, password: process.env.TK_QA_CLIENT_PASSWORD };
 const freelancerCredentials = { email: process.env.TK_QA_FREELANCER_EMAIL, password: process.env.TK_QA_FREELANCER_PASSWORD };
-const qaSessionDir = process.env.TK_QA_SESSION_DIR || join(tmpdir(), "techkarvo-staging-qa-session-r4");
+const qaSessionDir = process.env.TK_QA_SESSION_DIR || join(tmpdir(), "techkarvo-staging-qa-session-r6");
 const clientStorageState = process.env.TK_QA_CLIENT_STORAGE_STATE || join(qaSessionDir, "client.json");
 const freelancerStorageState = process.env.TK_QA_FREELANCER_STORAGE_STATE || join(qaSessionDir, "freelancer.json");
 const credentialLoginAvailable = clientCredentials.email && clientCredentials.password && freelancerCredentials.email && freelancerCredentials.password;

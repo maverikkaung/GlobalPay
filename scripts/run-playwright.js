@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import process from "node:process";
 
-const qaSessionDir = process.env.TK_QA_SESSION_DIR || join(tmpdir(), "techkarvo-staging-qa-session-r4");
+const qaSessionDir = process.env.TK_QA_SESSION_DIR || join(tmpdir(), "techkarvo-staging-qa-session-r6");
 const hasSavedQaSessions = existsSync(join(qaSessionDir, "client.json")) && existsSync(join(qaSessionDir, "freelancer.json"));
 const stagingSessionsRun = !process.env.PLAYWRIGHT_BASE_URL && hasSavedQaSessions;
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || (stagingSessionsRun
