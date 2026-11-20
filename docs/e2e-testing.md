@@ -12,6 +12,8 @@ The authenticated staging test is opt-in. It runs only when `PLAYWRIGHT_BASE_URL
 
 The financial sandbox browser test uses the same dedicated staging accounts. It checks each role's four-plan catalog and responsive layout, then records a simulated 0.01 KAV credit and equal simulated withdrawal per account. The paired journal entries are immutable QA evidence; the test returns each available balance to its starting amount and moves no real funds. Do not run this test with personal or production accounts.
 
+Playwright writes run artifacts to a unique operating-system temporary directory rather than cleaning a repository `test-results/` folder. This protects any pre-existing untracked test files in the project workspace.
+
 Never put these values in this repository, Playwright configuration, CI logs, or command-line arguments. To run against local code with staging data, set the variables only in a protected terminal session and run `npm run test:e2e`. The staging test uses only the dedicated QA accounts. It creates clearly named QA jobs, applications, social posts, messages, reviews, and one explicitly labeled QA report; it deletes only its own test post/message records where those delete flows are under test. It uploads small QA images under those QA account folders. It does not delete existing marketplace records or apply migrations.
 
 If the account values are unavailable, authenticated tests are reported as skipped. CI continues to run the public/demo browser regression automatically. Running authenticated tests on every GitHub push would require the staging QA credentials to be stored as protected GitHub Actions secrets; no such secrets are created by this project change.

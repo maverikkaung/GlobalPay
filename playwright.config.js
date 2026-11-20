@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import process from "node:process";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL;
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
@@ -8,6 +10,7 @@ const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "**/*.spec.js",
+  outputDir: path.join(tmpdir(), `techkarvo-playwright-${process.pid}`),
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
