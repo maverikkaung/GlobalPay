@@ -544,7 +544,7 @@ begin
       'plan-selection:'||cycle_key,plan_row.id::text)
     on conflict(user_id,idempotency_key) do nothing returning id into event_id;
   if event_id is null then raise exception 'Membership selection already processed' using errcode='23514'; end if;
-  insert into public.membership_entitlements(user_id,plan_id,period_started_at,period_ends_at,period_credit_limit,credits_used)
+  insert into public.membership_entitlements(user_id,plan_id,period_started_at,period_ends_at,period_credit_limit,credits_used,auto_renew)
     values(actor,plan_row.id,date_trunc('month',now()),date_trunc('month',now())+interval '1 month',plan_row.included_usage_credits,0,false)
     on conflict(user_id) do update set plan_id=excluded.plan_id,period_started_at=excluded.period_started_at,
       period_ends_at=excluded.period_ends_at,period_credit_limit=excluded.period_credit_limit,credits_used=0,auto_renew=false,updated_at=now();
