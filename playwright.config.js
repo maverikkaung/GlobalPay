@@ -26,14 +26,7 @@ export default defineConfig({
     launchOptions: executablePath ? { executablePath } : {},
     trace: "off"
   },
-  webServer: externalBaseURL ? undefined : {
-    command: "npm run dev -- --host 127.0.0.1",
-    url: "http://127.0.0.1:5173/demo",
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-    env: {
-      VITE_SUPABASE_URL: "https://e2e-placeholder.invalid",
-      VITE_SUPABASE_ANON_KEY: "e2e-placeholder-public-key"
-    }
-  }
+  // `npm run test:e2e` owns the local Vite process so Windows can shut it down
+  // reliably without Playwright's shell-based webServer process-tree cleanup.
+  webServer: undefined
 });
