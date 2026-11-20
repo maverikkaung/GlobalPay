@@ -35,6 +35,11 @@ async function signIn(page, credentials, role) {
   }
   await page.waitForURL(role === "Client" ? /client-dashboard/ : /freelancer-dashboard/, { timeout: 60_000 });
   await page.getByText(role === "Client" ? /CLIENT DASHBOARD/i : /FREELANCER DASHBOARD/i).waitFor({ timeout: 60_000 });
+  // Supabase rotates refresh tokens. Persist the refreshed, still-authenticated session
+  // to the user-only temporary file so later serial tests never reuse a spent token.
+  if (sessionLoginAvailable && !credentialLoginAvailable) {
+    await page.context().storageState({ path: storageStateFor(role) });
+  }
 }
 
 async function ensureQaMarketplacePlan(page, role, slug, priceKav, creditLimit) {
