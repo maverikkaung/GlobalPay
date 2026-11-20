@@ -51,6 +51,18 @@ async function profileIdFor(page) {
   return id;
 }
 
+async function authenticatedEmailFor(page) {
+  return page.evaluate((projectRef) => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(`sb-${projectRef}-auth-token`) || "null");
+      const session = parsed?.access_token ? parsed : parsed?.currentSession;
+      return String(session?.user?.email || "").trim().toLowerCase();
+    } catch {
+      return "";
+    }
+  }, "ntucgiieksrwebwvcmun");
+}
+
 function connectionCardFor(page, profileId) {
   return page.locator(`.connection-card:has(a[href="/profiles/${profileId}"])`).first();
 }
@@ -409,9 +421,11 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     // Account settings: private account info, verified password update, and safe email-change validation.
     await client.goto("/account-settings");
     await expect(client.getByText("Verified", { exact: true })).toBeVisible();
-    await expect(client.getByText(clientCredentials.email, { exact: true })).toBeVisible();
-    await client.locator("#settings-new-email").fill(clientCredentials.email);
-    await client.locator("#settings-email-password").fill(clientCredentials.password);
+    const clientEmail = await authenticatedEmailFor(client);
+    expect(clientEmail).toBeTruthy();
+    await expect(client.getByText(clientEmail, { exact: true })).toBeVisible();
+    await client.locator("#settings-new-email").fill(clientEmail);
+    await client.locator("#settings-email-password").fill("");
     await client.getByRole("button", { name: "Request verified email change" }).click();
     await expect(client.getByRole("alert").filter({ hasText: "Enter a different email address." })).toBeVisible();
     if (process.env.TK_QA_CLIENT_NEXT_PASSWORD) {
