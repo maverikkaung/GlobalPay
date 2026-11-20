@@ -36,10 +36,10 @@ begin
     raise exception 'Free members must not receive priority support automatically';
   end if;
   if not exists(select 1 from public.membership_plans where account_type='freelancer' and slug='plus' and simulated_price_usdt=4.99 and fee_bps=800 and included_usage_credits=30) then
-    raise exception 'Freelancer Plus must seed the documented 4.99 KAV, 30 application, 8% plan';
+    raise exception 'Freelancer Plus must seed the documented 4.99 KAV, 30 application, 8%% plan';
   end if;
   if not exists(select 1 from public.membership_plans where account_type='client' and slug='premium' and simulated_price_usdt=39.99 and fee_bps=100 and included_usage_credits=100) then
-    raise exception 'Client Premium must seed the documented 39.99 KAV, 100 job, 1% plan';
+    raise exception 'Client Premium must seed the documented 39.99 KAV, 100 job, 1%% plan';
   end if;
   if not exists(select 1 from public.membership_entitlements where user_id=auth.uid()) then
     raise exception 'New profiles need a default membership entitlement';
