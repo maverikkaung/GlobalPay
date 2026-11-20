@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildSocialFeed, getConnectionForPair, isValidMarketplaceImage, mapPostEngagement, resolveSocialPageUser } from "./social-marketplace.js";
+import { buildSocialFeed, getConnectionForPair, isValidMarketplaceImage, mapPostEngagement, resolveSocialPageUser, updateSocialPost } from "./social-marketplace.js";
 
 test("standalone Daily Feed resolves the authenticated user when its route provides no prop", () => {
   const authenticatedUser = { id: "freelancer-id", accountType: "Freelancer" };
@@ -42,6 +42,17 @@ test("post engagement derives current user's like state and safe author projecti
   assert.equal(result[0].likeCount, 2);
   assert.equal(result[0].likedByMe, true);
   assert.equal(result[0].comments[0].author.full_name, "Public author");
+});
+
+test("confirmed post edits replace stale feed content without changing other posts", () => {
+  const feed = [
+    { id: "post-1", feedType: "post", body: "Old content", author: { full_name: "Author" } },
+    { id: "post-2", feedType: "post", body: "Keep this" }
+  ];
+  const updated = updateSocialPost(feed, "post-1", { body: "Updated content", updated_at: "2026-11-20T12:00:00Z" });
+  assert.equal(updated[0].body, "Updated content");
+  assert.equal(updated[0].author.full_name, "Author");
+  assert.equal(updated[1], feed[1]);
 });
 
 test("marketplace uploads accept only size-limited JPEG, PNG, and WebP images", () => {

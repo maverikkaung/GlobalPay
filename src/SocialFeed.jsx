@@ -4,7 +4,7 @@ import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { getRequestErrorMessage } from "./request-errors.js";
 import { toSafeExternalUrl } from "./external-urls.js";
-import { buildSocialFeed, getConnectionForPair, isValidMarketplaceImage, mapPostEngagement, MARKETPLACE_MEDIA_BUCKET, resolveSocialPageUser } from "./social-marketplace.js";
+import { buildSocialFeed, getConnectionForPair, isValidMarketplaceImage, mapPostEngagement, MARKETPLACE_MEDIA_BUCKET, resolveSocialPageUser, updateSocialPost } from "./social-marketplace.js";
 import DashboardNav from "./DashboardNav.jsx";
 
 function imageUrl(path) {
@@ -255,6 +255,12 @@ export function SocialFeed({ user }) {
         ? await supabase.from("posts").update(payload).eq("id", editingPost.id).eq("author_id", userId).select("id").single()
         : await supabase.from("posts").insert({ ...payload, author_id: userId }).select("id").single();
       if (result.error) throw result.error;
+      if (editingPost) {
+        // Invalidate an older realtime fetch before applying the confirmed update locally.
+        // This keeps a stale in-flight feed response from hiding a successful edit.
+        requestId.current += 1;
+        setFeed((current) => updateSocialPost(current, result.data.id, payload));
+      }
       if (uploadedPath && oldImagePath) await supabase.storage.from(MARKETPLACE_MEDIA_BUCKET).remove([oldImagePath]);
       clearComposer(); setNotice(editingPost ? "Your post was updated." : "Your professional post is live."); await loadFeed();
     } catch (saveError) {

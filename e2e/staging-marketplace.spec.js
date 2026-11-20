@@ -37,6 +37,32 @@ async function signIn(page, credentials, role) {
   await page.getByText(role === "Client" ? /CLIENT DASHBOARD/i : /FREELANCER DASHBOARD/i).waitFor({ timeout: 60_000 });
 }
 
+async function ensureQaMarketplacePlan(page, role, slug, priceKav, creditLimit) {
+  await page.goto("/financial-sandbox", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Membership & KAV Sandbox" })).toBeVisible({ timeout: 60_000 });
+  const currentCard = page.locator(".financial-plan-card").filter({ has: page.getByRole("button", { name: "Current simulation plan" }) });
+  await expect(currentCard).toHaveCount(1);
+  const currentSlug = await currentCard.getAttribute("data-plan-slug");
+
+  if (currentSlug === "free") {
+    const currentWallet = await page.locator(".financial-wallet-card h2").innerText();
+    const availableCents = Math.round(Number(currentWallet.replace(/[^0-9.-]/g, "")) * 100);
+    const priceCents = Math.round(priceKav * 100);
+    const depositCents = Math.max(0, priceCents - availableCents);
+    if (depositCents > 0) {
+      await page.locator("#sandbox-amount").fill((depositCents / 100).toFixed(2));
+      await page.getByRole("button", { name: "Simulate USDT deposit" }).click();
+      await expect(page.getByRole("status")).toContainText("No funds moved.");
+      await expect(page.locator(".financial-wallet-card h2")).toContainText((priceCents / 100).toFixed(2));
+    }
+    const paidPlan = page.locator(`.financial-plan-card[data-plan-slug="${slug}"][data-account-type="${role.toLowerCase()}"]`);
+    await paidPlan.getByRole("button", { name: "Purchase with simulated KAV" }).click();
+    await expect(page.getByRole("status")).toContainText("Simulated membership purchase recorded in KAV");
+  }
+
+  await expect(page.locator(".financial-entitlement")).toContainText(new RegExp(`of ${creditLimit} used`), { timeout: 30_000 });
+}
+
 async function profileIdFor(page) {
   const id = await page.evaluate((projectRef) => {
     try {
@@ -173,6 +199,10 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
   try {
     await signIn(client, clientCredentials, "Client");
     await signIn(freelancer, freelancerCredentials, "Freelancer");
+    // Use ordinary sandbox flows to give these dedicated QA accounts enough monthly credits.
+    // This is conditional and never resets balances, membership history, or ledger entries.
+    await ensureQaMarketplacePlan(client, "Client", "premium", 39.99, 100);
+    await ensureQaMarketplacePlan(freelancer, "Freelancer", "plus", 4.99, 30);
     const clientId = await profileIdFor(client);
     const freelancerId = await profileIdFor(freelancer);
 
@@ -333,6 +363,7 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await editablePost.getByRole("button", { name: "Edit", exact: true }).click();
     await client.locator("#social-post-body").fill(`${postBody} edited`);
     await client.getByRole("button", { name: "Save changes" }).click();
+    await expect(client.getByRole("status").filter({ hasText: "Your post was updated." })).toBeVisible();
     const editedPost = client.locator("article.social-card").filter({ hasText: `${postBody} edited` }).first();
     await expect(editedPost).toBeVisible();
     await editedPost.getByRole("button", { name: "Share", exact: true }).click();
@@ -434,7 +465,7 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await expect(client.getByText("Verified", { exact: true })).toBeVisible();
     const clientEmail = await authenticatedEmailFor(client);
     expect(clientEmail).toBeTruthy();
-    await expect(client.getByText(clientEmail, { exact: true })).toBeVisible();
+    await expect(client.getByText(clientEmail, { exact: true }).first()).toBeVisible();
     await client.locator("#settings-new-email").fill(clientEmail);
     await client.locator("#settings-email-password").fill("");
     await client.getByRole("button", { name: "Request verified email change" }).click();

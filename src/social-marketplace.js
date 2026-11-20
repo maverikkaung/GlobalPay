@@ -24,6 +24,12 @@ export function buildSocialFeed(posts, profiles, mutedUserIds = []) {
   return postItems.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
 }
 
+export function updateSocialPost(items, postId, changes) {
+  return items.map((item) => item.feedType === "post" && item.id === postId
+    ? { ...item, ...changes }
+    : item);
+}
+
 export function mapPostEngagement(items, likes, comments, profiles, userId) {
   const likesByPost = new Map();
   for (const like of likes) {
