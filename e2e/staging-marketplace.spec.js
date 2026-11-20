@@ -31,7 +31,7 @@ async function signIn(page, credentials, role) {
     await page.locator("#login-password").fill(credentials.password);
     await page.getByRole("button", { name: "Login", exact: true }).click();
   } else {
-    await page.goto(dashboardPath);
+    await page.goto(dashboardPath, { waitUntil: "domcontentloaded" });
   }
   await page.waitForURL(role === "Client" ? /client-dashboard/ : /freelancer-dashboard/, { timeout: 60_000 });
   await page.getByText(role === "Client" ? /CLIENT DASHBOARD/i : /FREELANCER DASHBOARD/i).waitFor({ timeout: 60_000 });
