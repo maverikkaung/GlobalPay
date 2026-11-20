@@ -5,6 +5,29 @@ insert into auth.users(id,raw_user_meta_data) values
   ('a2222222-2222-4222-8222-222222222222','{"full_name":"Sandbox Freelancer","account_type":"freelancer"}'),
   ('a3333333-3333-4333-8333-333333333333','{"full_name":"Renewal Fallback Client","account_type":"client"}');
 
+do $$
+begin
+  if exists (
+    select 1
+    from (values
+      ('freelancer','free',0::numeric,5,1000),
+      ('freelancer','plus',4.99::numeric,30,800),
+      ('freelancer','gold',9.99::numeric,80,600),
+      ('freelancer','premium',19.99::numeric,200,500),
+      ('client','free',0::numeric,2,200),
+      ('client','plus',9.99::numeric,10,200),
+      ('client','gold',19.99::numeric,30,150),
+      ('client','premium',39.99::numeric,100,100)
+    ) as expected(account_type,slug,price,credits,fee_bps)
+    left join public.membership_plans actual using (account_type,slug)
+    where actual.id is null
+       or actual.simulated_price_usdt is distinct from expected.price
+       or actual.included_usage_credits is distinct from expected.credits
+       or actual.fee_bps is distinct from expected.fee_bps
+  ) then raise exception 'Seeded role-specific simulation plan terms do not match the documented catalog'; end if;
+end;
+$$;
+
 update public.membership_plans set simulated_price_usdt=10
   where account_type='client' and slug='plus';
 update public.membership_entitlements set plan_id=(select id from public.membership_plans where account_type='client' and slug='plus'),
@@ -34,9 +57,6 @@ begin
     values(auth.uid(),'Standard support request','Standard support request for the Free account test','technical');
   if (select priority from public.support_cases where requester_id=auth.uid() and subject='Standard support request')<>'normal' then
     raise exception 'Free members must not receive priority support automatically';
-  end if;
-  if not exists(select 1 from public.membership_plans where account_type='freelancer' and slug='plus' and simulated_price_usdt=4.99 and fee_bps=800 and included_usage_credits=30) then
-    raise exception 'Freelancer Plus must seed the documented 4.99 KAV, 30 application, 8%% plan';
   end if;
   if not exists(select 1 from public.membership_plans where account_type='client' and slug='premium' and simulated_price_usdt=39.99 and fee_bps=100 and included_usage_credits=100) then
     raise exception 'Client Premium must seed the documented 39.99 KAV, 100 job, 1%% plan';
@@ -167,6 +187,9 @@ declare wrong_role_denied boolean := false; other_wallet_denied boolean := false
 begin
   if (select count(*) from public.membership_plans where account_type='freelancer' and is_active) <> 4 then
     raise exception 'Freelancer role must see its own plans';
+  end if;
+  if not exists(select 1 from public.membership_plans where account_type='freelancer' and slug='plus' and simulated_price_usdt=4.99 and fee_bps=800 and included_usage_credits=30) then
+    raise exception 'Freelancer Plus must seed the documented 4.99 KAV, 30 application, 8%% plan';
   end if;
   begin
     perform public.techkarvo_sandbox_activate_plan('not-a-plan');
