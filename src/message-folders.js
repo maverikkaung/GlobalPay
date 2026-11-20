@@ -13,3 +13,11 @@ export function countUnreadByFolder(conversations) {
     return totals;
   }, { job: 0, personal: 0 });
 }
+
+export function getHiddenConversationIdsWithNewIncoming(hiddenRows, incomingMessages, userId) {
+  const hiddenAtByConversation = new Map((hiddenRows || []).map((row) => [row.conversation_id, Date.parse(row.hidden_at)]));
+  return [...new Set((incomingMessages || []).filter((message) => {
+    const hiddenAt = hiddenAtByConversation.get(message.conversation_id);
+    return hiddenAt !== undefined && message.sender_id !== userId && Date.parse(message.created_at) > hiddenAt;
+  }).map((message) => message.conversation_id))];
+}

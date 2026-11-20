@@ -4,7 +4,7 @@ import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import DashboardNav from "./DashboardNav.jsx";
 import { countUnreadMessagesByConversation } from "./marketplace.js";
-import { classifyConversation, countUnreadByFolder, getConversationsForFolder } from "./message-folders.js";
+import { classifyConversation, countUnreadByFolder, getConversationsForFolder, getHiddenConversationIdsWithNewIncoming } from "./message-folders.js";
 import { MARKETPLACE_MEDIA_BUCKET } from "./social-marketplace.js";
 import { toSafeExternalUrl } from "./external-urls.js";
 import MemberSafetyActions from "./MemberSafetyActions.jsx";
@@ -117,9 +117,30 @@ function Messages() {
         .order("created_at", { ascending: false });
       if (result.error) throw result.error;
 
-      const hiddenResult = await supabase.from("conversation_hides").select("conversation_id").eq("user_id", user.id);
+      const hiddenResult = await supabase.from("conversation_hides").select("conversation_id, hidden_at").eq("user_id", user.id);
       if (hiddenResult.error && !["PGRST205", "42P01"].includes(hiddenResult.error.code)) throw hiddenResult.error;
-      const hiddenIds = new Set((hiddenResult.data || []).map((item) => item.conversation_id));
+      const hiddenRows = hiddenResult.data || [];
+      let visibleHiddenRows = hiddenRows;
+      if (hiddenRows.length) {
+        const incomingResults = await Promise.all(hiddenRows.map((hidden) =>
+          supabase.from("messages").select("conversation_id, sender_id, created_at")
+            .eq("conversation_id", hidden.conversation_id)
+            .neq("sender_id", user.id)
+            .gt("created_at", hidden.hidden_at)
+            .order("created_at", { ascending: false }).limit(1)));
+        const incomingMessages = incomingResults.flatMap((result) => {
+          if (result.error) throw result.error;
+          return result.data || [];
+        });
+        const restoredIds = getHiddenConversationIdsWithNewIncoming(hiddenRows, incomingMessages, user.id);
+        if (restoredIds.length) {
+          const restored = await supabase.from("conversation_hides").delete()
+            .eq("user_id", user.id).in("conversation_id", restoredIds);
+          if (restored.error) throw restored.error;
+          visibleHiddenRows = hiddenRows.filter((item) => !restoredIds.includes(item.conversation_id));
+        }
+      }
+      const hiddenIds = new Set(visibleHiddenRows.map((item) => item.conversation_id));
       const rows = (result.data || []).filter((item) => !hiddenIds.has(item.id));
       const applicationRows = rows.filter((item) => !item.application_id.startsWith("connection:"));
       const directRows = rows.filter((item) => item.application_id.startsWith("connection:"));
