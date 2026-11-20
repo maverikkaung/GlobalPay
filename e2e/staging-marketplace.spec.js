@@ -414,7 +414,7 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await expect(client.getByText("No personal conversations yet")).toBeVisible();
     await freelancer.reload();
     await selectMessageFolder(freelancer, "personal");
-    await expect(freelancer.getByRole("button", { name: /TechKarvo QA Client/ })).toBeVisible();
+    await expect(freelancer.locator(`.conversation-item[data-other-id="${clientId}"]`)).toBeVisible();
 
     // Account settings: private account info, verified password update, and safe email-change validation.
     await client.goto("/account-settings");

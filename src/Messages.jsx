@@ -394,7 +394,7 @@ function Messages() {
           ) : (
             <div className="conversation-list">
               {folderConversations.map((item) => (
-                <button key={item.id} type="button" className={"conversation-item " + (selectedId === item.id ? "selected" : "")} onClick={() => setSelectedId(item.id)}>
+                <button key={item.id} type="button" data-other-id={item.otherId} className={"conversation-item " + (selectedId === item.id ? "selected" : "")} onClick={() => setSelectedId(item.id)}>
                   <span className="conversation-avatar">{item.otherName.charAt(0).toUpperCase()}</span>
                   <span className="conversation-copy"><strong>{item.otherName}</strong><small>{item.jobTitle}</small></span>
                   {item.unreadCount > 0 && <span className="conversation-unread" aria-label={`${item.unreadCount} unread messages`}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</span>}
