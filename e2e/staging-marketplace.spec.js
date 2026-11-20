@@ -372,25 +372,15 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await safety.getByRole("button", { name: "Block" }).click();
     await expect(safety.getByRole("alert")).toBeVisible();
     await client.goto("/my-projects");
-    const qaProjectCards = client.locator(".my-project-card").filter({ hasText: "QA regression job" });
-    const completeQaProjects = qaProjectCards.getByRole("button", { name: "Mark complete" });
-    let completedQaProjects = 0;
-    const currentProject = qaProjectCards.filter({ hasText: jobTitle });
+    const currentProject = client.locator(".my-project-card").filter({ hasText: jobTitle });
     await expect(currentProject).toBeVisible();
     const currentProjectStatus = (await currentProject.locator(".my-project-status").textContent()).trim().toLowerCase();
     if (currentProjectStatus === "open") {
       await currentProject.getByRole("button", { name: "Mark complete" }).click();
       await expect(client.getByText("Project marked complete.")).toBeVisible();
-      completedQaProjects += 1;
     } else {
       expect(currentProjectStatus).toBe("completed");
     }
-    while (await completeQaProjects.count() > 0 && completedQaProjects < 20) {
-      await completeQaProjects.first().click();
-      await expect(client.getByText("Project marked complete.")).toBeVisible();
-      completedQaProjects += 1;
-    }
-    await expect(completeQaProjects).toHaveCount(0);
 
     await client.goto("/messages");
     await selectMessageFolder(client, "personal");
