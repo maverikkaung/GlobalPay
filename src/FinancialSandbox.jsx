@@ -102,7 +102,7 @@ export default function FinancialSandbox() {
     setBusy(false);
     if (result.error) { setError("Profile boost requires an active eligible membership."); return; }
     setProfileBoostUntil(result.data?.profile_boost_until || null);
-    setNotice(enabled ? "Profile boost enabled for 30 days." : "Profile boost turned off.");
+    setNotice(enabled ? "Profile boost enabled within your active membership period." : "Profile boost turned off.");
   }
 
   async function loadAnalytics() {

@@ -83,6 +83,18 @@ function Jobs() {
       }
       if (!active) return;
 
+      const featuredCandidates = result.data.filter((job) => job.is_featured).map((job) => job.id);
+      const featuredIds = new Set();
+      if (featuredCandidates.length) {
+        try {
+          const { data } = await supabase.rpc("techkarvo_current_featured_job_ids", { p_job_ids: featuredCandidates });
+          for (const job of data || []) featuredIds.add(job.id);
+        } catch {
+          // The open jobs list stays usable when badge verification is unavailable.
+        }
+      }
+      if (!active) return;
+
       const formattedJobs = result.data.map(function(item) {
         return {
           id: item.id,
@@ -90,7 +102,7 @@ function Jobs() {
           title: item.title,
           company: clientNames.get(item.client_id) || "TechKarvo Client",
           location: "Remote",
-          isFeatured: Boolean(item.is_featured),
+          isFeatured: featuredIds.has(item.id),
           type: item.payment_type || "Freelance",
           category: item.category || "Other",
           createdAt: item.created_at,

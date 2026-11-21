@@ -1,5 +1,24 @@
 # TechKarvo staging verification and migration runbook
 
+## အဆင့် ၃ · Staging migration အဆင်သင့်ဖြစ်မှု
+
+၂၀၂၆-၁၁-၂၁ ရက်တွင် သတ်မှတ်ထားသော `techkarvo-staging` project ကို read-only transaction ဖြင့် စစ်ဆေးခဲ့သည်။ PostgreSQL 17.12 တွင် migration 000–014 ကို မှတ်တမ်းတင်ထားပြီး 015 ကို မတွေ့ပါ။ အစီအစဉ် ၈ ခုနှင့် entitlement ၂၁ ခုရှိပြီး role မကိုက်ညီမှု ၀ ခု ဖြစ်သည်။ Simulated ledger transaction ၂၄ ခုနှင့် journal entry ၄၈ ခုရှိပြီး စုစုပေါင်း မညီသည့် transaction ၀ ခု ဖြစ်သည်။ စစ်ဆေးခဲ့သော membership၊ configuration နှင့် ledger ဇယားများတွင် RLS ဖွင့်ထားသည်။ Ledger balance trigger နှစ်ခုလုံး deferred ဖြစ်ပြီး အတွင်းသုံး balance/quota function များကို browser role က တိုက်ရိုက် ခေါ်ခွင့်မရှိပါ။
+
+| အစီအစဉ် | ပြောင်းလဲမှုနှင့် စစ်ဆေးရန် |
+| --- | --- |
+| 013 · တင်ပြီး | Role အလိုက် plan နှင့် လစဉ် quota၊ sandbox configuration၊ ledger၊ အကျိုးခံစားခွင့်နှင့် RLS ကို ဖန်တီးသည်။ ရှိပြီးသား staging တွင် ပြန်အသုံးချရန် မလိုပါ။ |
+| 014 · တင်ပြီး | Deferred balance စစ်ဆေးသည့် function ကို အစားထိုးသည်။ Staging မှာ function နှင့် trigger သတ်မှတ်ချက်ကို စစ်ပြီးဖြစ်သည်။ |
+| 015 · အတည်ပြုချက် လို | 013 ၏ plan ရွေးချယ်သည့် RPC ကို အစားထိုးပြီး 014 ၏ balance စစ်ဆေးမှုအောက်တွင် အလုပ်လုပ်သည်။ လက်ရှိလ credits သုံးပြီးသားကို ဆက်တွက်သည်။ Migration ကိုယ်တိုင် entitlement သို့မဟုတ် ledger row မပြောင်းပါ။ |
+| 016 · အတည်ပြုချက် လို | 015 ပြီးလျှင် အစီအစဉ် role၊ သက်တမ်း၊ active အခြေအနေနှင့် လက်ရှိ catalog entitlement ကို စစ်သည်။ ရှိပြီးသား badge/boost သတ်မှတ်ချက်ကို ထိန်းပြီး လက်ရှိအကျိုးခံစားခွင့်ကို ဖတ်သည့်အချိန်မှာ တွက်သည်။ |
+
+**အသုံးမချမီ။** Project reference နှင့် migration history ကို ပြန်တိုက်စစ်ပါ။ အသုံးချမည့် migration တစ်ခုချင်းစီကို ပိုင်ရှင်ထံမှ သီးခြားအတည်ပြုချက် ရယူပါ။ Schema၊ role/grant၊ entitlement/အသုံးပြုမှု၊ ledger နဲ့ migration history အားလုံး ပါဝင်သော သီးသန့် backup အသစ်ကို အတည်ပြုထားသည့် နည်းလမ်းနှင့် ဖန်တီးပြီး သီးခြား database ပေါ်မှာ ပြန်ထည့်စမ်းပါ။ ရှိပြီးသား backup ဖိုင်များကို ဤစစ်ဆေးမှုတွင် မဖွင့်ခဲ့သဖြင့် လတ်တလောဖြစ်မှုနှင့် ပြန်ထည့်လို့ရမှုကို အတည်မပြုရသေးပါ။ အသုံးမချမီ dry run ထဲတွင် အတည်ပြုထားသည့် migration များသာ ပေါ်ရပါမည်။
+
+**အသုံးချပြီးနောက်။** အစီအစဉ်အတိုင်း migration version တစ်ခုချင်းစီနှင့် function grant၊ search path၊ RLS၊ deferred balance trigger တို့ကို ဖတ်ရှုရုံ ပြန်စစ်ပါ။ အသုံးမချမီ ဖမ်းထားသော ledger transaction/entry အရေအတွက်နှင့် မညီသည့် journal အရေအတွက်၊ entitlement role နှင့် လက်ရှိလအသုံးပြုမှုကို ပြန်တိုက်စစ်ပါ။ Data ရေးသားသည့် QA workflow များကို သီးခြားအတည်ပြုချက်ရပြီးမှ run ပါ။
+
+**ပြန်လည်ရယူရန်။** Migration transaction မအောင်ပါက ရပ်ပြီး SQL အမှားနှင့် migration history ကို စစ်ပါ။ Commit ပြီးမှ ပြဿနာတွေ့လျှင် အသစ်ထည့်ထားသော function/view ကို reviewed forward migration နဲ့ ပြင်ပါ။ Ledger သို့မဟုတ် usage history ကို ဖြတ်တောက်ခြင်း၊ အဟောင်းဖြင့် အစားထိုးခြင်း မပြုဘဲ သီးခြား database ထဲမှာ backup ကို ပြန်ထည့်ပြီး ပြန်လည်ရယူမည့် အစီအစဉ်ကို စစ်ဆေးပါ။
+
+## ယခင်စစ်ဆေးမှုမှတ်တမ်း
+
 ## Current development staging reference
 
 - Supabase project: `techkarvo-staging`
