@@ -2,15 +2,13 @@ import { chromium } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { tmpdir } from "node:os";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import process from "node:process";
 import { navigateToStagingLogin, prepareSequentialLoginPages, QA_CHROME_ARGS } from "./staging-qa-session.js";
+import { qaSessionPaths, stagingOrigin, stagingProjectRef as projectRef } from "./staging-qa-storage.js";
 
-const projectRef = "ntucgiieksrwebwvcmun";
-const stagingOrigin = "https://techkarvo-staging.vercel.app";
-const sessionDir = resolve(process.env.TK_QA_SESSION_DIR || join(tmpdir(), "techkarvo-staging-qa-session"));
+const sessionDir = resolve(qaSessionPaths(process.env).directory);
 const chromePath = process.env.TK_QA_CHROME_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const repoRelativeSessionPath = relative(resolve(process.cwd()), sessionDir);
 

@@ -1,45 +1,91 @@
 import { test, expect } from "@playwright/test";
 import process from "node:process";
 import { Buffer } from "node:buffer";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
+import { persistRotatedSession, qaSessionPaths, sessionStatus, stagingOrigin } from "../scripts/staging-qa-storage.js";
 
 const stagingBase = process.env.PLAYWRIGHT_BASE_URL || "";
 const clientCredentials = { email: process.env.TK_QA_CLIENT_EMAIL, password: process.env.TK_QA_CLIENT_PASSWORD };
 const freelancerCredentials = { email: process.env.TK_QA_FREELANCER_EMAIL, password: process.env.TK_QA_FREELANCER_PASSWORD };
-const qaSessionDir = process.env.TK_QA_SESSION_DIR || join(tmpdir(), "techkarvo-staging-qa-session-r6");
-const clientStorageState = process.env.TK_QA_CLIENT_STORAGE_STATE || join(qaSessionDir, "client.json");
-const freelancerStorageState = process.env.TK_QA_FREELANCER_STORAGE_STATE || join(qaSessionDir, "freelancer.json");
-const credentialLoginAvailable = clientCredentials.email && clientCredentials.password && freelancerCredentials.email && freelancerCredentials.password;
-const sessionLoginAvailable = existsSync(clientStorageState) && existsSync(freelancerStorageState);
-const credentialsAvailable = /^https:\/\/techkarvo-staging\.vercel\.app\/?$/.test(stagingBase)
-  && (credentialLoginAvailable || sessionLoginAvailable);
+const credentialLoginAvailable = Boolean(clientCredentials.email && clientCredentials.password
+  && freelancerCredentials.email && freelancerCredentials.password);
+const isStaging = stagingBase.replace(/\/$/, "") === stagingOrigin;
+const sessionPaths = qaSessionPaths(process.env);
+const savedSessions = new WeakMap();
 
-function storageStateFor(role) {
-  if (credentialLoginAvailable) return undefined;
-  return role === "Client" ? clientStorageState : freelancerStorageState;
+async function openQaContext(browser, role, options = {}) {
+  if (credentialLoginAvailable) return browser.newContext(options);
+  const path = sessionPaths[role];
+  let state;
+  try {
+    state = JSON.parse(await readFile(path, "utf8"));
+  } catch (error) {
+    // The original error can include a private filename or a fragment of the JSON.
+    // eslint-disable-next-line preserve-caught-error
+    throw new Error(`${role} QA storage state is unavailable (${error.code || "invalid JSON"}).`);
+  }
+  const status = sessionStatus(state);
+  if (status === "missing or invalid") throw new Error(`${role} staging session: ${status}.`);
+  const context = await browser.newContext({ ...options, storageState: state });
+  savedSessions.set(context, { path, state, status });
+  return context;
+}
+
+async function saveQaSession(context) {
+  const saved = savedSessions.get(context);
+  if (!saved) return;
+  const current = await context.storageState();
+  if (await persistRotatedSession(saved.path, saved.state, current)) saved.state = current;
+}
+
+async function closeQaContext(context) {
+  try {
+    await saveQaSession(context);
+  } finally {
+    await context.close();
+  }
 }
 
 const tinyPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=", "base64");
 
 async function signIn(page, credentials, role) {
   const dashboardPath = role === "Client" ? "/client-dashboard" : "/freelancer-dashboard";
-  if (credentials?.email && credentials?.password) {
-    await page.goto("/login");
-    await page.locator("#login-email").fill(credentials.email);
-    await page.locator("#login-password").fill(credentials.password);
-    await page.getByRole("button", { name: "Login", exact: true }).click();
-  } else {
-    await page.goto(dashboardPath, { waitUntil: "domcontentloaded" });
+  const context = page.context();
+  const saved = savedSessions.get(context);
+  const authStatuses = new Set();
+  const recordAuthStatus = (response) => {
+    if (new URL(response.url()).pathname === "/auth/v1/token") {
+      authStatuses.add(`token HTTP ${response.status()}`);
+    }
+  };
+  page.on("response", recordAuthStatus);
+  try {
+    if (credentialLoginAvailable) {
+      await page.goto("/login");
+      await page.locator("#login-email").fill(credentials.email);
+      await page.locator("#login-password").fill(credentials.password);
+      await page.getByRole("button", { name: "Login", exact: true }).click();
+    } else {
+      await page.goto(dashboardPath, { waitUntil: "domcontentloaded" });
+    }
+    const dashboard = page.getByText(role === "Client" ? /CLIENT DASHBOARD/i : /FREELANCER DASHBOARD/i);
+    const login = page.locator("#login-email");
+    if (saved) {
+      await dashboard.or(login).first().waitFor({ timeout: 45_000 });
+      if (await login.isVisible()) throw new Error("Session redirected to login.");
+    }
+    await page.waitForURL((url) => url.origin === stagingOrigin && url.pathname === dashboardPath, { timeout: 45_000 });
+    await dashboard.waitFor({ timeout: 45_000 });
+  } catch {
+    const onLogin = new URL(page.url()).pathname === "/login";
+    const browserState = saved ? sessionStatus(await context.storageState().catch(() => ({}))) : "password sign-in";
+    throw new Error(`${role} dashboard unavailable (${onLogin ? "login page" : "dashboard not ready"}). `
+      + `Initial state: ${saved?.status || "password sign-in"}. Browser state: ${browserState}. `
+      + `Auth response: ${[...authStatuses].join(", ") || "none observed"}.`);
+  } finally {
+    page.off("response", recordAuthStatus);
   }
-  await page.waitForURL(role === "Client" ? /client-dashboard/ : /freelancer-dashboard/, { timeout: 60_000 });
-  await page.getByText(role === "Client" ? /CLIENT DASHBOARD/i : /FREELANCER DASHBOARD/i).waitFor({ timeout: 60_000 });
-  // Supabase rotates refresh tokens. Persist the refreshed, still-authenticated session
-  // to the user-only temporary file so later serial tests never reuse a spent token.
-  if (sessionLoginAvailable && !credentialLoginAvailable) {
-    await page.context().storageState({ path: storageStateFor(role) });
-  }
+  await saveQaSession(context);
 }
 
 async function ensureQaMarketplacePlan(page, role, slug, priceKav, creditLimit) {
@@ -173,9 +219,9 @@ function readUnreadCount(label) {
 }
 
 test("staging Client acceptance makes the personal connection visible to both members", async ({ browser }) => {
-  test.skip(!credentialsAvailable, "Set staging-only QA account variables to run authenticated staging browser coverage.");
-  const clientContext = await browser.newContext({ storageState: storageStateFor("Client") });
-  const freelancerContext = await browser.newContext({ storageState: storageStateFor("Freelancer") });
+  test.skip(!isStaging, "Set staging-only QA account variables to run authenticated staging browser coverage.");
+  const clientContext = await openQaContext(browser, "Client");
+  const freelancerContext = await openQaContext(browser, "Freelancer");
   const client = await clientContext.newPage();
   const freelancer = await freelancerContext.newPage();
   client.on("dialog", (dialog) => dialog.accept());
@@ -197,15 +243,15 @@ test("staging Client acceptance makes the personal connection visible to both me
     });
     await ensureAcceptedQaConnection(client, freelancer, postBody, clientId, freelancerId);
   } finally {
-    await Promise.allSettled([clientContext.close(), freelancerContext.close()]);
+    await Promise.all([closeQaContext(clientContext), closeQaContext(freelancerContext)]);
   }
 });
 test("staging Client and Freelancer workflows: media, jobs, social, messaging, safety, contracts, reviews and settings", async ({ browser }) => {
-  test.skip(!credentialsAvailable, "Set staging-only QA account variables to run authenticated staging browser coverage.");
+  test.skip(!isStaging, "Set staging-only QA account variables to run authenticated staging browser coverage.");
   test.setTimeout(300_000);
 
-  const clientContext = await browser.newContext({ storageState: storageStateFor("Client"), viewport: { width: 1440, height: 960 } });
-  const freelancerContext = await browser.newContext({ storageState: storageStateFor("Freelancer"), viewport: { width: 1440, height: 960 } });
+  const clientContext = await openQaContext(browser, "Client", { viewport: { width: 1440, height: 960 } });
+  const freelancerContext = await openQaContext(browser, "Freelancer", { viewport: { width: 1440, height: 960 } });
   const client = await clientContext.newPage();
   const freelancer = await freelancerContext.newPage();
   const runtimeErrors = [];
@@ -560,14 +606,13 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     expect(runtimeErrors).toEqual([]);
     expect(failedRequests).toEqual([]);
   } finally {
-    await clientContext.close();
-    await freelancerContext.close();
+    await Promise.all([closeQaContext(clientContext), closeQaContext(freelancerContext)]);
   }
 });
 
 test("staging Client applicant job, status, and search filters work on existing QA records", async ({ browser }) => {
-  test.skip(!credentialsAvailable, "Set staging-only QA account variables to run authenticated staging browser coverage.");
-  const context = await browser.newContext({ storageState: storageStateFor("Client") });
+  test.skip(!isStaging, "Set staging-only QA account variables to run authenticated staging browser coverage.");
+  const context = await openQaContext(browser, "Client");
   const page = await context.newPage();
   try {
   await signIn(page, clientCredentials, "Client");
@@ -589,12 +634,12 @@ test("staging Client applicant job, status, and search filters work on existing 
   await expect(firstApplicant).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2)).toBe(true);
   } finally {
-    await context.close();
+    await closeQaContext(context);
   }
 });
 
 test("staging financial sandbox shows role-specific plans, nets simulated transfers, and fits all viewports", async ({ browser }) => {
-  test.skip(!credentialsAvailable, "Set staging-only QA account variables to run authenticated financial browser coverage.");
+  test.skip(!isStaging, "Set staging-only QA account variables to run authenticated financial browser coverage.");
   test.setTimeout(180_000);
 
   const cases = [
@@ -626,7 +671,7 @@ test("staging financial sandbox shows role-specific plans, nets simulated transf
   };
 
   for (const account of cases) {
-    const context = await browser.newContext({ storageState: storageStateFor(account.role), viewport: { width: 1440, height: 960 } });
+    const context = await openQaContext(browser, account.role, { viewport: { width: 1440, height: 960 } });
     const page = await context.newPage();
     try {
       await signIn(page, account.credentials, account.role);
@@ -663,7 +708,7 @@ test("staging financial sandbox shows role-specific plans, nets simulated transf
         await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2)).toBe(true);
       }
     } finally {
-      await context.close();
+      await closeQaContext(context);
     }
   }
 });

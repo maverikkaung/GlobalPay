@@ -2,28 +2,35 @@ import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { closeSync, existsSync, openSync, unlinkSync, writeSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import process from "node:process";
+import { qaSessionPaths, stagingOrigin } from "./staging-qa-storage.js";
 
-const qaSessionDir = process.env.TK_QA_SESSION_DIR || join(tmpdir(), "techkarvo-staging-qa-session-r8");
-const hasSavedQaSessions = existsSync(join(qaSessionDir, "client.json")) && existsSync(join(qaSessionDir, "freelancer.json"));
-const stagingSessionsRun = !process.env.PLAYWRIGHT_BASE_URL && hasSavedQaSessions;
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || (stagingSessionsRun
-  ? "https://techkarvo-staging.vercel.app"
+const sessionPaths = qaSessionPaths(process.env);
+const paths = [sessionPaths.Client, sessionPaths.Freelancer];
+const hasSavedQaSessions = paths.every(existsSync);
+const selectedSessions = process.env.TK_QA_SESSION_DIR || process.env.TK_QA_CLIENT_STORAGE_STATE
+  || process.env.TK_QA_FREELANCER_STORAGE_STATE;
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || (hasSavedQaSessions || selectedSessions
+  ? stagingOrigin
   : "http://127.0.0.1:5173");
-const localRun = !process.env.PLAYWRIGHT_BASE_URL && !stagingSessionsRun;
+const localRun = !process.env.PLAYWRIGHT_BASE_URL && baseURL !== stagingOrigin;
+const credentialLogin = process.env.TK_QA_CLIENT_EMAIL && process.env.TK_QA_CLIENT_PASSWORD
+  && process.env.TK_QA_FREELANCER_EMAIL && process.env.TK_QA_FREELANCER_PASSWORD;
 const vitePath = fileURLToPath(new URL("../node_modules/vite/bin/vite.js", import.meta.url));
 const playwrightPath = fileURLToPath(new URL("../node_modules/@playwright/test/cli.js", import.meta.url));
 let vite;
-let qaRunLockPath;
-let qaRunLockFd;
+const qaRunLocks = [];
 
 function acquireQaRunLock() {
-  qaRunLockPath = join(qaSessionDir, ".playwright-run.lock");
+  for (const path of paths.filter(existsSync)) acquireSessionLock(path);
+}
+
+function acquireSessionLock(path) {
+  const lockPath = `${path}.playwright-run.lock`;
   try {
-    qaRunLockFd = openSync(qaRunLockPath, "wx", 0o600);
-    writeSync(qaRunLockFd, `${process.pid}\n`);
+    const lockFd = openSync(lockPath, "wx", 0o600);
+    qaRunLocks.push({ lockPath, lockFd });
+    writeSync(lockFd, `${process.pid}\n`);
   } catch (error) {
     if (error.code !== "EEXIST") throw error;
     throw new Error("Another authenticated staging Playwright run is using these QA sessions. Wait for it to finish; preserve its lock file.", { cause: error });
@@ -31,10 +38,10 @@ function acquireQaRunLock() {
 }
 
 function releaseQaRunLock() {
-  if (qaRunLockFd === undefined) return;
-  closeSync(qaRunLockFd);
-  if (existsSync(qaRunLockPath)) unlinkSync(qaRunLockPath);
-  qaRunLockFd = undefined;
+  for (const { lockPath, lockFd } of qaRunLocks) {
+    closeSync(lockFd);
+    unlinkSync(lockPath);
+  }
 }
 
 function run(command, args, options = {}) {
@@ -76,7 +83,7 @@ async function stopVite() {
 }
 
 try {
-  if (stagingSessionsRun) acquireQaRunLock();
+  if (baseURL.replace(/\/$/, "") === stagingOrigin && !credentialLogin) acquireQaRunLock();
   if (localRun) {
     process.env.PLAYWRIGHT_BASE_URL = baseURL;
     vite = spawn(process.execPath, [vitePath, "--host", "127.0.0.1"], {
@@ -91,8 +98,6 @@ try {
     vite.once("error", (error) => process.emitWarning(error));
     await waitForVite();
   }
-
-  if (stagingSessionsRun) process.env.TK_QA_SESSION_DIR = qaSessionDir;
 
   const result = await run(process.execPath, [playwrightPath, "test", ...process.argv.slice(2)], {
     env: { ...process.env, PLAYWRIGHT_BASE_URL: baseURL }
