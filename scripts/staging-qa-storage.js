@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { rename, unlink, writeFile } from "node:fs/promises";
+import { link, rename, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -49,10 +49,14 @@ export function shouldPersistSession(previous, current, now = Date.now()) {
 
 export async function persistRotatedSession(path, previous, current) {
   if (!shouldPersistSession(previous, current)) return false;
-  const pending = `${path}.pending-${randomUUID()}`;
+  const suffix = randomUUID();
+  const pending = `${path}.pending-${suffix}`;
+  const backup = `${path}.backup-${suffix}`;
   try {
-    await writeFile(pending, JSON.stringify(current), { mode: 0o600, flag: "wx" });
+    await writeFile(pending, JSON.stringify(current), { mode: 0o600, flag: "wx", flush: true });
     try {
+      // Preserve the exact old file and its permissions before the atomic replacement.
+      await link(path, backup);
       await rename(pending, path);
     } catch (error) {
       await unlink(pending).catch(() => {});

@@ -33,7 +33,7 @@ async function openQaContext(browser, role, options = {}) {
 
 async function saveQaSession(context) {
   const saved = savedSessions.get(context);
-  if (!saved) return;
+  if (!saved?.verified) return;
   const current = await context.storageState();
   if (await persistRotatedSession(saved.path, saved.state, current)) saved.state = current;
 }
@@ -85,6 +85,7 @@ async function signIn(page, credentials, role) {
   } finally {
     page.off("response", recordAuthStatus);
   }
+  if (saved) saved.verified = true;
   await saveQaSession(context);
 }
 

@@ -53,5 +53,10 @@ test("a teardown rotation can be loaded by the next test and a later sign-out pr
   assert.equal(await persistRotatedSession(path, afterLogin, afterTest), true);
   assert.equal(await persistRotatedSession(path, afterTest, {}), false);
   assert.deepEqual(JSON.parse(await readFile(path, "utf8")), afterTest);
-  assert.deepEqual(await readdir(directory), ["client.json"]);
+  const backups = (await readdir(directory)).filter((file) => file.startsWith("client.json.backup-"));
+  assert.equal(backups.length, 2);
+  const recovered = await Promise.all(backups.map(async (file) => JSON.parse(await readFile(join(directory, file), "utf8"))));
+  assert.ok(recovered.some((entry) => JSON.stringify(entry) === JSON.stringify(initial)));
+  assert.ok(recovered.some((entry) => JSON.stringify(entry) === JSON.stringify(afterLogin)));
+  assert.equal((await readdir(directory)).length, 3);
 });
