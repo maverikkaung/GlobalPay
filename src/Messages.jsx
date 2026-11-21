@@ -4,7 +4,7 @@ import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import DashboardNav from "./DashboardNav.jsx";
 import { countUnreadMessagesByConversation } from "./marketplace.js";
-import { classifyConversation, countUnreadByFolder, getConversationsForFolder, getHiddenConversationIdsWithNewIncoming, isApplicationMessagingOpen } from "./message-folders.js";
+import { classifyConversation, countUnreadByFolder, getConversationsForFolder, isApplicationMessagingOpen } from "./message-folders.js";
 import { MARKETPLACE_MEDIA_BUCKET } from "./social-marketplace.js";
 import { toSafeExternalUrl } from "./external-urls.js";
 import MemberSafetyActions from "./MemberSafetyActions.jsx";
@@ -123,29 +123,29 @@ function Messages() {
 
       const hiddenResult = await supabase.from("conversation_hides").select("conversation_id, hidden_at").eq("user_id", user.id);
       if (hiddenResult.error && !["PGRST205", "42P01"].includes(hiddenResult.error.code)) throw hiddenResult.error;
-      const hiddenRows = hiddenResult.data || [];
-      let visibleHiddenRows = hiddenRows;
-      if (hiddenRows.length) {
-        const incomingResults = await Promise.all(hiddenRows.map((hidden) =>
-          supabase.from("messages").select("conversation_id, sender_id, created_at")
-            .eq("conversation_id", hidden.conversation_id)
-            .neq("sender_id", user.id)
-            .gt("created_at", hidden.hidden_at)
-            .order("created_at", { ascending: false }).limit(1)));
-        const incomingMessages = incomingResults.flatMap((result) => {
-          if (result.error) throw result.error;
-          return result.data || [];
-        });
-        const restoredIds = getHiddenConversationIdsWithNewIncoming(hiddenRows, incomingMessages, user.id);
-        if (restoredIds.length) {
+      const conversationRows = result.data || [];
+      const availableIds = new Set(conversationRows.map((item) => item.id));
+      const hiddenRows = (hiddenResult.data || []).filter((item) => availableIds.has(item.conversation_id));
+      const stillHidden = await Promise.all(hiddenRows.map(async (hidden) => {
+        const incoming = await supabase.from("messages").select("id")
+          .eq("conversation_id", hidden.conversation_id).neq("sender_id", user.id)
+          .gt("created_at", hidden.hidden_at).limit(1);
+        if (incoming.error || !incoming.data?.length) return hidden.conversation_id;
+        if (!active) return hidden.conversation_id;
+
+        // The incoming message reopens the thread even if the hide cannot be cleared.
+        // Match the original timestamp so another tab's newer hide is never cleared here.
+        try {
           const restored = await supabase.from("conversation_hides").delete()
-            .eq("user_id", user.id).in("conversation_id", restoredIds);
-          if (restored.error) throw restored.error;
-          visibleHiddenRows = hiddenRows.filter((item) => !restoredIds.includes(item.conversation_id));
+            .eq("user_id", user.id).eq("conversation_id", hidden.conversation_id).eq("hidden_at", hidden.hidden_at);
+          if (restored.error) console.warn("Unable to clear the conversation hide.");
+        } catch {
+          console.warn("Unable to clear the conversation hide.");
         }
-      }
-      const hiddenIds = new Set(visibleHiddenRows.map((item) => item.conversation_id));
-      const rows = (result.data || []).filter((item) => !hiddenIds.has(item.id));
+        return null;
+      }));
+      const hiddenIds = new Set(stillHidden);
+      const rows = conversationRows.filter((item) => !hiddenIds.has(item.id));
       const applicationRows = rows.filter((item) => !item.application_id.startsWith("connection:"));
       const directRows = rows.filter((item) => item.application_id.startsWith("connection:"));
       const applicationIds = applicationRows.map((item) => item.application_id);
@@ -218,7 +218,8 @@ function Messages() {
       const requestedThread = requestedConversationId && formatted.some((item) => item.id === requestedConversationId)
         ? requestedConversationId
         : "";
-      const initialId = requestedId || requestedThread || formatted[0]?.id || "";
+      const requestedApplicationThread = formatted.some((item) => item.id === requestedId) ? requestedId : "";
+      const initialId = requestedApplicationThread || requestedThread || formatted[0]?.id || "";
       const initialConversation = formatted.find((item) => item.id === initialId);
       setActiveFolder(initialConversation?.messageFolder || "job");
       setSelectedId(initialId);

@@ -100,6 +100,21 @@ end;
 $$;
 insert into public.conversation_hides (conversation_id, user_id)
 select id, auth.uid() from public.conversations where application_id = '86666666-6666-4666-8666-666666666666';
+select set_config('request.jwt.claim.sub', '82222222-2222-4222-8222-222222222222', true);
+do $$
+begin
+  if exists (select 1 from public.conversation_hides where conversation_id in (
+    select id from public.conversations where application_id = '86666666-6666-4666-8666-666666666666'
+  )) then
+    raise exception 'The other participant cannot see the owner''s conversation hide';
+  end if;
+  delete from public.conversation_hides where conversation_id in (
+    select id from public.conversations where application_id = '86666666-6666-4666-8666-666666666666'
+  );
+  if found then raise exception 'The other participant cannot remove the owner''s conversation hide'; end if;
+end;
+$$;
+select set_config('request.jwt.claim.sub', '81111111-1111-4111-8111-111111111111', true);
 do $$
 begin
   if not exists (select 1 from public.conversation_hides where user_id = auth.uid()) then

@@ -5,12 +5,14 @@ import path from "node:path";
 import { QA_CHROME_ARGS } from "./scripts/staging-qa-session.js";
 
 const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL;
+const localBase = !externalBaseURL || new URL(externalBaseURL).hostname === "127.0.0.1";
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
   || (process.platform === "win32" ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" : undefined);
 
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "**/*.spec.js",
+  testIgnore: localBase ? undefined : "**/isolated/**",
   outputDir: path.join(tmpdir(), `techkarvo-playwright-${process.pid}`),
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),

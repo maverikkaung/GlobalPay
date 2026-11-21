@@ -1,8 +1,10 @@
 import { test, expect } from "@playwright/test";
 import process from "node:process";
 import { Buffer } from "node:buffer";
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { persistRotatedSession, qaSessionPaths, sessionStatus, stagingOrigin } from "../scripts/staging-qa-storage.js";
+import { guardQaDeletions, isStagingBackend } from "./qa-deletion-guard.js";
 
 const stagingBase = process.env.PLAYWRIGHT_BASE_URL || "";
 const clientCredentials = { email: process.env.TK_QA_CLIENT_EMAIL, password: process.env.TK_QA_CLIENT_PASSWORD };
@@ -14,7 +16,7 @@ const sessionPaths = qaSessionPaths(process.env);
 const savedSessions = new WeakMap();
 
 async function openQaContext(browser, role, options = {}) {
-  if (credentialLoginAvailable) return browser.newContext(options);
+  if (credentialLoginAvailable) return restrictQaBackend(await browser.newContext(options));
   const path = sessionPaths[role];
   let state;
   try {
@@ -28,6 +30,12 @@ async function openQaContext(browser, role, options = {}) {
   if (status === "missing or invalid") throw new Error(`${role} staging session: ${status}.`);
   const context = await browser.newContext({ ...options, storageState: state });
   savedSessions.set(context, { path, state, status });
+  return restrictQaBackend(context);
+}
+
+async function restrictQaBackend(context) {
+  await context.route((url) => /^\/(auth|rest|storage)\/v1\//.test(url.pathname)
+    && !isStagingBackend(url, url.pathname), (route) => route.abort("blockedbyclient"));
   return context;
 }
 
@@ -257,6 +265,7 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
   const freelancer = await freelancerContext.newPage();
   const runtimeErrors = [];
   const failedRequests = [];
+  const blockedDeletions = [];
   for (const page of [client, freelancer]) {
     page.setDefaultNavigationTimeout(60_000);
     page.on("pageerror", (error) => runtimeErrors.push(error.message));
@@ -279,6 +288,8 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await ensureQaMarketplacePlan(freelancer, "Freelancer", "plus", 4.99, 30);
     const clientId = await profileIdFor(client);
     const freelancerId = await profileIdFor(freelancer);
+    const clientDeletions = await guardQaDeletions(client, clientId, freelancerId, tinyPng, blockedDeletions);
+    const freelancerDeletions = await guardQaDeletions(freelancer, freelancerId, clientId, tinyPng, blockedDeletions);
 
     // Role-specific dashboard menu, keyboard close, theme persistence, and mobile menu fit.
     const clientQuick = client.getByRole("button", { name: "Quick actions" });
@@ -399,12 +410,19 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
 
     // Public post with an image; likes/comments update notifications and owner edits/deletes their own QA post.
     await client.goto("/social");
-    const postBody = `QA image post ${Date.now()}`;
+    const postBody = `QA image post ${randomUUID()}`;
     await client.locator("#social-post-body").fill(postBody);
     await client.locator(".social-image-picker input[type=file]").setInputFiles({ name: "qa-feed-image.png", mimeType: "image/png", buffer: tinyPng });
     await expect(client.locator(".social-composer-preview")).toBeVisible();
     const notificationButton = client.getByRole("button", { name: /^Notifications,/ });
+    const createdPost = client.waitForResponse((response) => {
+      const req = response.request();
+      if (!response.ok() || req.method() !== "POST" || !isStagingBackend(new URL(response.url()), "/rest/v1/posts")) return false;
+      const data = req.postDataJSON();
+      return data?.author_id === clientId && data?.body === postBody;
+    });
     await client.getByRole("button", { name: "Publish", exact: true }).click();
+    await clientDeletions.recordPost(await createdPost, postBody);
     await expect(client.getByText("Your professional post is live.")).toBeVisible();
     const ownPost = client.locator("article.social-card").filter({ hasText: postBody }).first();
     await expect(ownPost.locator("img.social-post-image")).toBeVisible();
@@ -458,18 +476,30 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await sharedPost.getByRole("button", { name: "Message", exact: true }).click();
     await freelancer.waitForURL(/\/messages\?.*sharePost=/);
     await expect(freelancer.locator(".message-share-draft")).toBeVisible();
-    const personalMessage = `QA personal message ${Date.now()}`;
+    const personalMessage = `QA personal message ${randomUUID()}`;
     await freelancer.locator("#message-body").fill(personalMessage);
+    const createdMessage = freelancer.waitForResponse(async (response) => {
+      if (!response.ok() || response.request().method() !== "GET" || !isStagingBackend(new URL(response.url()), "/rest/v1/messages")) return false;
+      const rows = await response.json().catch(() => null);
+      return Array.isArray(rows) && rows.some((row) => row.sender_id === freelancerId && row.body === personalMessage);
+    });
+    const messageInsert = freelancer.waitForResponse((response) => {
+      if (!response.ok() || response.request().method() !== "POST" || !isStagingBackend(new URL(response.url()), "/rest/v1/messages")) return false;
+      const data = response.request().postDataJSON();
+      return data?.sender_id === freelancerId && data?.body === personalMessage;
+    });
     await freelancer.getByRole("button", { name: "Share in conversation" }).click();
+    const [insertion, messageRows] = await Promise.all([messageInsert, createdMessage]);
+    const personalThread = `/messages?conversation=${await freelancerDeletions.recordMessage(insertion, messageRows, personalMessage)}`;
     const sentPersonalMessage = freelancer.locator(".message-bubble").filter({ hasText: personalMessage });
     await expect(sentPersonalMessage.locator(".message-shared-post")).toBeVisible();
-    await client.goto("/messages");
-    await selectMessageFolder(client, "personal");
+    await client.goto(personalThread);
+    await expect(client.getByRole("tab", { name: /Personal Messages/ })).toHaveAttribute("aria-selected", "true");
     await expect(client.getByText(personalMessage)).toBeVisible({ timeout: 60_000 });
     const receivedPersonalMessage = client.locator(".message-bubble").filter({ hasText: personalMessage });
     await expect(receivedPersonalMessage.locator(".message-shared-post")).toBeVisible();
     await expect.poll(async () => readUnreadCount(await client.getByRole("link", { name: /^Messages,/ }).getAttribute("aria-label")), { timeout: 30_000 }).toBeLessThanOrEqual(unreadMessagesBeforePersonalChat);
-    await expect.poll(async () => freelancer.getByText("Seen", { exact: true }).count(), { timeout: 30_000 }).toBeGreaterThan(0);
+    await expect(sentPersonalMessage.getByText("Seen", { exact: true })).toBeVisible({ timeout: 30_000 });
     await client.goto("/social");
     const postToDelete = client.locator("article.social-card").filter({ hasText: `${postBody} edited` }).first();
     await postToDelete.getByRole("button", { name: "Delete", exact: true }).click();
@@ -479,8 +509,8 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await messageBubble.getByRole("button", { name: "Delete for Everyone" }).click();
     await expect(freelancer.locator(".message-bubble").filter({ hasText: "[Message removed]" }).last()
       .getByText("[Message removed]", { exact: true })).toBeVisible();
-    await client.goto("/messages");
-    await selectMessageFolder(client, "personal");
+    await client.goto(personalThread);
+    await expect(client.getByRole("tab", { name: /Personal Messages/ })).toHaveAttribute("aria-selected", "true");
     const clientRedactedMessage = client.locator(".message-bubble").filter({ hasText: "[Message removed]" }).last();
     await expect(clientRedactedMessage.getByText("[Message removed]", { exact: true })).toBeVisible();
     await expect(client.getByText(personalMessage, { exact: true })).toHaveCount(0);
@@ -607,6 +637,7 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     expect(runtimeErrors).toEqual([]);
     expect(failedRequests).toEqual([]);
   } finally {
+    if (blockedDeletions.length) process.stdout.write(`QA deletion requests skipped: ${blockedDeletions.join(", ")}.\n`);
     await Promise.all([closeQaContext(clientContext), closeQaContext(freelancerContext)]);
   }
 });
