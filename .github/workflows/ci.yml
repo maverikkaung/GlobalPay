@@ -64,6 +64,7 @@ jobs:
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150012_admin_support_configuration.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150013_simulated_financial_memberships.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150014_fix_deferred_ledger_balance_trigger.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150015_preserve_membership_cycle_usage.sql
         env:
           PGPASSWORD: postgres
       - name: Assert marketplace RLS and write boundaries

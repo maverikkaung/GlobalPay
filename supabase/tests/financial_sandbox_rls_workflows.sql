@@ -106,6 +106,10 @@ begin
   end;
   if (public.techkarvo_sandbox_wallet()->>'available_kav')::numeric<>20 then raise exception 'Rejected overspending must not change the wallet balance'; end if;
   perform public.techkarvo_sandbox_activate_plan('plus');
+  if not exists (select 1 from public.membership_entitlements where user_id=auth.uid()
+    and period_credit_limit=10 and credits_used=2) then
+    raise exception 'Upgrading to Plus must preserve jobs already posted during the current cycle';
+  end if;
   wallet := public.techkarvo_sandbox_wallet();
   if (wallet->>'available_kav')::numeric <> 10 then raise exception 'Configured membership purchase must debit simulated KAV at 1:1'; end if;
   if (select count(*) from jsonb_array_elements(wallet->'transactions') as tx(value)
@@ -179,6 +183,27 @@ end;
 $$;
 
 reset role;
+update public.membership_entitlements
+  set plan_id=(select id from public.membership_plans where account_type='client' and slug='gold'),
+      period_credit_limit=30, credits_used=3
+  where user_id='a3333333-3333-4333-8333-333333333333';
+set local role authenticated;
+do $$
+begin
+  begin
+    perform public.techkarvo_sandbox_activate_plan('free');
+    raise exception 'A plan with less than the current usage must be rejected';
+  exception when check_violation then
+    if sqlerrm <> 'This plan has fewer credits than already used this cycle' then raise; end if;
+  end;
+  if not exists (select 1 from public.membership_entitlements where user_id=auth.uid()
+    and period_credit_limit=30 and credits_used=3) then
+    raise exception 'A rejected plan selection must preserve the entitlement';
+  end if;
+end;
+$$;
+
+reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','a2222222-2222-4222-8222-222222222222',true);
 do $$
@@ -199,6 +224,10 @@ begin
   insert into public.job_applications(job_id,client_id,freelancer_id,full_name,cover_letter)
     values(job_id,owner_id,auth.uid(),'Sandbox Freelancer','Testing application usage credit');
   if (select credits_used from public.membership_entitlements where user_id=auth.uid())<>1 then raise exception 'Freelancer applications must consume server-enforced usage credits'; end if;
+  perform public.techkarvo_sandbox_activate_plan('free');
+  if (select credits_used from public.membership_entitlements where user_id=auth.uid())<>1 then
+    raise exception 'Selecting Free must preserve applications already submitted during the current cycle';
+  end if;
   begin
     perform 1 from public.membership_entitlements where user_id='a1111111-1111-4111-8111-111111111111';
   exception when insufficient_privilege then other_wallet_denied := true;
