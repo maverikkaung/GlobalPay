@@ -1,5 +1,27 @@
 # TechKarvo product readiness audit
 
+## အဆင့် ၂ · ထုတ်လုပ်ရေး အဆင်သင့်ဖြစ်မှုနှင့် လုံခြုံရေး
+
+စစ်ဆေးမှုအခြေခံ commit မှာ `f7f5a9b` ဖြစ်ပြီး staging Playwright ၈ ခုနှင့် regression ၇၂ ခု အောင်ထားသည်။ ဤအပိုင်းတွင် repository ထဲမှ React လမ်းကြောင်း၊ API ခေါ်ဆိုမှု၊ migration၊ RLS စမ်းသပ်ချက်နှင့် deployment configuration ကို သုံးသပ်ထားသည်။ Production Supabase နှင့် Vercel setting များကို အတည်ပြုရန် သီးခြားစစ်ဆေးမှု လိုသည်။
+
+| အဆင့် | တွေ့ရှိချက် | လုပ်ဆောင်ရန် |
+| --- | --- | --- |
+| Critical | စစ်ဆေးခဲ့သည့် source အတွင်း အတည်ပြုနိုင်သော Critical ပြဿနာ မတွေ့ပါ။ တကယ့်ငွေကြေးအတွက် billing provider၊ webhook အတည်ပြုမှုနှင့် reconciliation မပါသေးပါ။ | အစီအစဉ်ဝယ်ယူခြင်း၊ KAV၊ အပ်ငွေ၊ ထုတ်ငွေနှင့် contract ငွေစာရင်းကို simulation အဖြစ်သာ ထားရန်။ |
+| High | Browser build သည် ရွေးမသုံးသော key alias ကို မစစ်ခဲ့ဘဲ Vite environment တစ်ခုလုံးကို client code သို့ ပေးခဲ့သည်။ အသုံးပြုနေသည့် config တွင် လျှို့ဝှက် key အမှန် ထွက်ခဲ့ကြောင်း သက်သေ မတွေ့ပါ။ | Browser environment ကို လိုအပ်သည့် Supabase တန်ဖိုးများအထိ ကန့်သတ်ပြီး key alias နှစ်ခုလုံး စစ်သည်။ Loopback development မှလွဲ၍ HTTPS သုံးရန်။ |
+| High | `techkarvo_sandbox_activate_plan` သည် အစီအစဉ်ရွေးချိန်တွင် လက်ရှိလ အသုံးပြုပြီးသော quota ကို ပြန်စသည်။ | လက်ရှိလ သုံးစွဲမှုကို ဆက်တွက်ပြီး role နှစ်ခုအတွက် database regression စမ်းရန်။ |
+| High | Production Auth တွင် SMTP၊ redirect allowlist၊ စကားဝှက်နှင့် email ပြောင်းလဲရေး စည်းမျဉ်း၊ အလွဲသုံးစားမှု ကန့်သတ်ချက်၊ အရန်မှ ပြန်ယူနိုင်မှုတို့ကို repository ဖြင့် အတည်မပြုနိုင်ပါ။ | ထုတ်လုပ်ရေးပတ်ဝန်းကျင်ကို ဖွင့်မီ သတ်မှတ်ချက်နှင့် recovery rehearsal ကို သီးခြားစစ်ရန်။ |
+| Medium | Advanced Search အတွက် RPC က plan ကို စစ်သော်လည်း job data က public ဖြစ်ပြီး budget filter က browser ထဲတွင် အလုပ်လုပ်သည်။ Featured job flag နှင့် profile boost အချိန်ကို ဖတ်ရာတွင် လက်ရှိ entitlement နှင့် တိုက်စစ်မှု မပြည့်စုံသေးပါ။ | Paid benefit တစ်ခုချင်းအတွက် အတိအကျ အကျိုးသက်ရောက်မှုနှင့် သက်တမ်းကုန်/plan ပြောင်းသည့် အခြေအနေကို သတ်မှတ်ပြီး server-side မှ စစ်ရန်။ |
+| Medium | Financial sandbox ပိတ်သည့် setting ကို deposit၊ withdrawal နှင့် reward အပါအဝင် လုပ်ဆောင်ချက်အချို့က စစ်သော်လည်း plan ဝယ်ယူမှုနှင့် သက်တမ်းတိုးမှုက အတူတူ မစစ်ပါ။ | Sandbox ကို ပိတ်ထားချိန် ခွင့်ပြုမည့် လုပ်ဆောင်ချက်များကို သတ်မှတ်ပြီး lifecycle တစ်လျှောက် စစ်ရန်။ ရှိပြီးသား ledger records ကို ထိန်းရန်။ |
+| Medium | Marketplace media bucket သည် public ဖြစ်သည်။ Storage စည်းမျဉ်းများသည် owner path နှင့် file အမျိုးအစား/အရွယ်အစားကို သတ်မှတ်ထားပြီး authenticated feed အတွင်း ပုံကိုလည်း public URL ဖြင့် သုံးသည်။ Application email ကို သက်ဆိုင်ရာ Client/Freelancer ထံ ပြသသည်။ | Public ပုံနှင့် application contact တို့ကို UI တွင် တင်မီ ရှင်းပြပြီး retention၊ ဖယ်ရှားမှုနှင့် ပုံဆိုင်ရာ ခွင့်ပြုချက်ကို သတ်မှတ်ရန်။ |
+| Medium | Job feed၊ application lists နှင့် messaging history တွင် database ရလဒ်ကန့်သတ်ချက်ကို ကျော်သည့်အခါ ဆက်ကြည့်ရန် စနစ်မပြည့်စုံပါ။ Notifications က နောက်ဆုံး ၁၀၀ ခုကိုသာ တင်သည်။ Auth စာမျက်နှာအချို့က service error စာသားကို တိုက်ရိုက်ပြသည်။ | စာမျက်နှာခွဲဖတ်ခြင်း၊ တည်ငြိမ်သော sort key နှင့် စစ်ထားသော error message များ ထည့်ရန်။ |
+| Low | Browser tests တွင် dashboard keyboard menu၊ မိုဘိုင်းနှင့် tablet အကျယ်တို့ ပါပြီး Admin၊ Auth recovery နှင့် accessibility အပြည့်အစုံအတွက် သီးခြား browser coverage လိုသည်။ | Keyboard focus၊ screen-reader status နှင့် 320px viewport ကို သက်ဆိုင်ရာ workflow တစ်ခုချင်းစီ စစ်ရန်။ |
+
+**Marketplace နှင့် ခွင့်ပြုချက်။** Job နှင့် application ရေးသားခွင့်ကို role၊ ပိုင်ရှင်နှင့် ဆက်နွှယ်မှုအလိုက် database က စစ်သည်။ Hire မှ contract ဖန်တီးမှု၊ အလုပ်ပြီးဆုံးမှ review ခွင့်၊ စကားဝိုင်းအဖွဲ့ဝင်နှင့် သတိပေးချက်ပိုင်ရှင် စစ်ဆေးမှုတို့ကို migrations နှင့် fixture tests တွင် ထည့်ထားသည်။ Admin RPC များသည် သီးသန့် admin registry ကို စစ်သည်။ Staging Client/Freelancer စမ်းသပ်မှုက အဓိက workflow များကို လွှမ်းခြုံပြီး admin လုပ်ငန်းစဉ်နှင့် production Auth settings အတွက် ထပ်စစ်ရန်လိုသည်။
+
+**အဖွဲ့ဝင်အစီအစဉ်။** Free၊ Plus နှင့် Gold လစဉ် quota များမှာ Client အလုပ်ကြော်ငြာ ၂/၁၀/၃၀ ခုနှင့် Freelancer လျှောက်လွှာ ၅/၃၀/၈၀ ခု ဖြစ်သည်။ Premium ကိုလည်း သီးခြားရှိပြီး ၁၀၀/၂၀၀ သတ်မှတ်ထားသည်။ Plan ကို account role အလိုက် ခွဲထားပြီး job/application insert trigger က အသုံးပြုမှုကို transaction အတွင်း စစ်သည်။ အစီအစဉ်ဝယ်ယူမှုနှင့် အလိုအလျောက်သက်တမ်းတိုးခြင်းကို simulated KAV ဖြင့်သာ ချိတ်ထားသည်။ အသုံးပြုသူသည် ကိုယ်ပိုင် entitlement ကို ဖတ်နိုင်ပြီး ledger table များကို တိုက်ရိုက် အသုံးမပြုနိုင်ပါ။
+
+## ယခင်သုံးသပ်ချက်မှတ်တမ်း
+
 Audit baseline: branch `codex/marketplace-data-foundation`, including migration 013 financial sandbox source work (2026-11-19). This is a code/documentation review plus the staging and browser tests recorded for this development environment. A feature is not marked complete merely because a table or screen exists.
 
 ## Current implementation

@@ -1,7 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseBrowserConfig } from "./supabase-config.js";
 
-const config = getSupabaseBrowserConfig(import.meta.env);
+const config = getSupabaseBrowserConfig({
+  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+  VITE_SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY
+});
 const supabaseUrl = config.url;
 const supabaseKey = config.key;
 export const isSupabaseConfigured = config.configured;

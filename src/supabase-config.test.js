@@ -29,8 +29,26 @@ test("rejects modern secret and legacy service-role keys", () => {
   assert.equal(isPrivilegedSupabaseKey(token("anon")), false);
 });
 
+test("rejects a privileged key in a lower-priority alias and without a URL", () => {
+  assert.equal(getSupabaseBrowserConfig({
+    VITE_SUPABASE_URL: "https://example.test",
+    VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_fixture",
+    VITE_SUPABASE_ANON_KEY: ` ${token("service_role")} `
+  }).reason, "privileged-key");
+  assert.equal(getSupabaseBrowserConfig({ VITE_SUPABASE_ANON_KEY: " sb_secret_fixture " }).reason, "privileged-key");
+});
+
 test("rejects malformed URLs and reports missing public configuration", () => {
   assert.equal(getSupabaseBrowserConfig({ VITE_SUPABASE_URL: "relative/path", VITE_SUPABASE_PUBLISHABLE_KEY: "public" }).reason, "invalid-url");
   assert.equal(getSupabaseBrowserConfig({ VITE_SUPABASE_URL: "https://user:pass@example.com", VITE_SUPABASE_PUBLISHABLE_KEY: "public" }).reason, "invalid-url");
   assert.equal(getSupabaseBrowserConfig({}).reason, "missing");
+});
+
+test("requires HTTPS outside loopback development", () => {
+  const config = (url) => getSupabaseBrowserConfig({ VITE_SUPABASE_URL: url, VITE_SUPABASE_ANON_KEY: "fixture" });
+  assert.equal(config("http://example.test").reason, "invalid-url");
+  assert.equal(config("https://example.test?query=value").reason, "invalid-url");
+  assert.equal(config("https://example.test").configured, true);
+  assert.equal(config("http://127.0.0.1:54321").configured, true);
+  assert.equal(config("http://[::1]:54321").configured, true);
 });

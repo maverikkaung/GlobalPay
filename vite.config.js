@@ -1,29 +1,26 @@
 import react from '@vitejs/plugin-react'
-import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { defineConfig, loadEnv } from 'vite'
-
-const isPrivilegedKey = (value) => {
-  if (!value) return false
-  if (value.startsWith('sb_secret_')) return true
-
-  const segments = value.split('.')
-  if (segments.length !== 3) return false
-  try {
-    const payload = JSON.parse(Buffer.from(segments[1], 'base64url').toString('utf8'))
-    return payload.role === 'service_role'
-  } catch {
-    return false
-  }
-}
+import { getSupabaseBrowserConfig } from './src/supabase-config.js'
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  const publicKey = env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY
+  const env = loadEnv(mode, process.cwd(), 'VITE_SUPABASE_')
+  const { reason } = getSupabaseBrowserConfig(env)
 
-  if (isPrivilegedKey(publicKey)) {
+  if (reason === 'privileged-key') {
     throw new Error('A privileged Supabase key cannot be used in a VITE_ browser variable.')
   }
+  if (reason === 'invalid-url') {
+    throw new Error('Use an HTTPS Supabase URL or a local loopback development URL.')
+  }
 
-  return { plugins: [react()] }
+  return {
+    plugins: [react()],
+    envPrefix: [],
+    define: {
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL ?? ''),
+      'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_SUPABASE_PUBLISHABLE_KEY ?? ''),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY ?? ''),
+    },
+  }
 })
