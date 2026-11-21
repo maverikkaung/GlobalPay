@@ -2,6 +2,10 @@ export function classifyConversation(applicationId) {
   return typeof applicationId === "string" && applicationId.startsWith("connection:") ? "personal" : "job";
 }
 
+export function isApplicationMessagingOpen(status) {
+  return status === "Pending" || status === "Accepted";
+}
+
 export function getConversationsForFolder(conversations, folder) {
   return conversations.filter((conversation) => conversation.messageFolder === folder);
 }

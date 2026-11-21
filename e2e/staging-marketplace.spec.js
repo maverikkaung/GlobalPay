@@ -99,45 +99,55 @@ function connectionCardFor(page, profileId) {
 }
 
 async function ensureAcceptedQaConnection(client, freelancer, postBody, clientId, freelancerId) {
-  await freelancer.goto("/social");
-  const post = freelancer.locator("article.social-card").filter({ hasText: postBody }).first();
-  const action = post.getByRole("button", { name: /^(Connect|Request pending|Accept connect|Message)$/ });
-  await expect(action).toBeVisible({ timeout: 60_000 });
-  const initialAction = (await action.innerText()).trim();
-
-  if (initialAction === "Connect") {
-    await action.click();
-    await expect(freelancer.getByText(/Connection request sent/i)).toBeVisible();
-  } else if (initialAction === "Accept connect") {
-    await action.click();
-    await freelancer.waitForURL(/\/messages\?conversation=/, { timeout: 30_000 });
-  }
-
-  await client.goto("/connections");
-  let clientCard = connectionCardFor(client, freelancerId);
-  await expect(clientCard).toBeVisible({ timeout: 60_000 });
-  if ((await clientCard.locator(".connection-status").innerText()).trim() === "Pending") {
-    const accept = clientCard.getByRole("button", { name: "Accept", exact: true });
-    if (await accept.count()) {
-      await accept.click();
-      await client.waitForURL(/\/messages\?conversation=/, { timeout: 30_000 });
-    } else {
-      await freelancer.goto("/connections");
-      const freelancerCard = connectionCardFor(freelancer, clientId);
-      await expect(freelancerCard.getByRole("button", { name: "Accept", exact: true })).toBeVisible({ timeout: 30_000 });
-      await freelancerCard.getByRole("button", { name: "Accept", exact: true }).click();
-      await freelancer.waitForURL(/\/messages\?conversation=/, { timeout: 30_000 });
+  let initialAction = "";
+  await test.step("check the existing connection state on the Freelancer post", async () => {
+    await freelancer.goto("/social");
+    const post = freelancer.locator("article.social-card").filter({ hasText: postBody }).first();
+    await expect(post, "the Client's QA post should be visible in the Freelancer feed").toBeVisible({ timeout: 20_000 });
+    const action = post.getByRole("button", { name: /^(Connect|Request pending|Accept connect|Request declined|Message)$/ });
+    await expect(action, "the post should show the current connection action").toBeVisible({ timeout: 15_000 });
+    initialAction = (await action.innerText()).trim();
+    if (initialAction === "Request declined") {
+      throw new Error("The existing QA connection is Declined. The workflow cannot reopen it without changing existing staging data.");
     }
-  }
 
-  await client.goto("/connections");
-  clientCard = connectionCardFor(client, freelancerId);
-  await expect(clientCard.locator(".connection-status")).toHaveText("Accepted", { timeout: 60_000 });
-  await freelancer.goto("/connections");
-  const freelancerCard = connectionCardFor(freelancer, clientId);
-  await expect(freelancerCard.locator(".connection-status")).toHaveText("Accepted", { timeout: 60_000 });
-  await expect(clientCard.getByRole("button", { name: "Message", exact: true })).toBeVisible();
-  await expect(freelancerCard.getByRole("button", { name: "Message", exact: true })).toBeVisible();
+    if (initialAction === "Connect") {
+      await action.click();
+      await expect(freelancer.getByText(/Connection request sent/i), "a new request should be confirmed by the UI").toBeVisible({ timeout: 15_000 });
+    } else if (initialAction === "Accept connect") {
+      await action.click();
+      await freelancer.waitForURL(/\/messages\?conversation=/, { timeout: 20_000 });
+    }
+  });
+
+  await test.step("accept the pending request and verify both members see the accepted connection", async () => {
+    await client.goto("/connections");
+    let clientCard = connectionCardFor(client, freelancerId);
+    await expect(clientCard, "the Client should see the Freelancer connection record").toBeVisible({ timeout: 20_000 });
+    if ((await clientCard.locator(".connection-status").innerText()).trim() === "Pending") {
+      const accept = clientCard.getByRole("button", { name: "Accept", exact: true });
+      if (await accept.count()) {
+        await accept.click();
+        await client.waitForURL(/\/messages\?conversation=/, { timeout: 20_000 });
+      } else {
+        await freelancer.goto("/connections");
+        const freelancerCard = connectionCardFor(freelancer, clientId);
+        const freelancerAccept = freelancerCard.getByRole("button", { name: "Accept", exact: true });
+        await expect(freelancerAccept, "the receiving member should have an Accept action").toBeVisible({ timeout: 15_000 });
+        await freelancerAccept.click();
+        await freelancer.waitForURL(/\/messages\?conversation=/, { timeout: 20_000 });
+      }
+    }
+
+    await client.goto("/connections");
+    clientCard = connectionCardFor(client, freelancerId);
+    await expect(clientCard.locator(".connection-status"), "the Client connection must be Accepted before personal chat is eligible").toHaveText("Accepted", { timeout: 20_000 });
+    await freelancer.goto("/connections");
+    const freelancerCard = connectionCardFor(freelancer, clientId);
+    await expect(freelancerCard.locator(".connection-status"), "the Freelancer connection must show the same Accepted state").toHaveText("Accepted", { timeout: 20_000 });
+    await expect(clientCard.getByRole("button", { name: "Message", exact: true })).toBeVisible();
+    await expect(freelancerCard.getByRole("button", { name: "Message", exact: true })).toBeVisible();
+  });
 }
 
 async function selectMessageFolder(page, folder) {
@@ -145,6 +155,16 @@ async function selectMessageFolder(page, folder) {
   await expect(tab).toBeEnabled({ timeout: 60_000 });
   await tab.click();
   await expect(tab).toHaveAttribute("aria-selected", "true");
+}
+
+async function waitForJobMessageComposer(page, expectedJobTitle) {
+  const jobTab = page.getByRole("tab", { name: /Job Messages/ });
+  await expect(jobTab, "conversation loading must finish before checking the selected message folder").toBeEnabled({ timeout: 30_000 });
+  await expect(jobTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".thread-heading > div > span"), `the selected conversation should belong to job “${expectedJobTitle}”`).toHaveText(expectedJobTitle, { timeout: 30_000 });
+  await expect(page.locator(".messages-closed-note"), "Accepted applications should remain eligible for job messaging").toHaveCount(0);
+  await expect(page.locator(".message-composer"), "an eligible job conversation should render its composer").toBeVisible({ timeout: 15_000 });
+  await expect(page.locator("#message-body"), "the message input should be ready after the eligible job thread loads").toBeVisible({ timeout: 15_000 });
 }
 
 function readUnreadCount(label) {
@@ -160,22 +180,24 @@ test("staging Client acceptance makes the personal connection visible to both me
   const freelancer = await freelancerContext.newPage();
   client.on("dialog", (dialog) => dialog.accept());
   try {
-    await signIn(client, clientCredentials, "Client");
-    await signIn(freelancer, freelancerCredentials, "Freelancer");
+    await test.step("authenticate the dedicated Client and Freelancer sessions", async () => {
+      await signIn(client, clientCredentials, "Client");
+      await signIn(freelancer, freelancerCredentials, "Freelancer");
+    });
     const clientId = await profileIdFor(client);
     const freelancerId = await profileIdFor(freelancer);
     const postBody = `QA connection visibility ${Date.now()}`;
-    await client.goto("/social");
-    await client.locator("#social-post-body").fill(postBody);
-    await client.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(client.getByText("Your professional post is live.")).toBeVisible();
-    await freelancer.goto("/social");
-    const post = freelancer.locator("article.social-card").filter({ hasText: postBody });
-    await expect(post).toBeVisible();
+    await test.step("publish a Client post and verify it appears in the Freelancer feed", async () => {
+      await client.goto("/social");
+      await client.locator("#social-post-body").fill(postBody);
+      await client.getByRole("button", { name: "Publish", exact: true }).click();
+      await expect(client.getByText("Your professional post is live.")).toBeVisible({ timeout: 15_000 });
+      await freelancer.goto("/social");
+      await expect(freelancer.locator("article.social-card").filter({ hasText: postBody })).toBeVisible({ timeout: 20_000 });
+    });
     await ensureAcceptedQaConnection(client, freelancer, postBody, clientId, freelancerId);
   } finally {
-    await clientContext.close();
-    await freelancerContext.close();
+    await Promise.allSettled([clientContext.close(), freelancerContext.close()]);
   }
 });
 test("staging Client and Freelancer workflows: media, jobs, social, messaging, safety, contracts, reviews and settings", async ({ browser }) => {
@@ -308,16 +330,22 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await expect(applicant.getByText("Accepted")).toBeVisible();
 
     // Job Messages, two-way delivery, and read receipts.
-    await applicant.getByRole("link", { name: "Message" }).click();
-    await client.waitForURL(/\/messages\?application=/);
-    await expect(client.getByRole("tab", { name: /Job Messages/ })).toHaveAttribute("aria-selected", "true");
+    await test.step("open the Accepted application conversation and wait for its eligible composer", async () => {
+      await applicant.getByRole("link", { name: "Message" }).click();
+      await client.waitForURL(/\/messages\?application=/);
+      await waitForJobMessageComposer(client, jobTitle);
+    });
     const jobMessage = `QA job message ${Date.now()}`;
     await client.locator("#message-body").fill(jobMessage);
     await client.getByRole("button", { name: "Send", exact: true }).click();
     await expect(client.getByText(jobMessage)).toBeVisible();
     await freelancer.goto("/messages");
     await selectMessageFolder(freelancer, "job");
-    await expect(freelancer.getByText(jobMessage)).toBeVisible({ timeout: 60_000 });
+    const jobConversation = freelancer.locator(".conversation-item").filter({ hasText: jobTitle });
+    await expect(jobConversation, "the Freelancer should see this specific accepted job conversation").toHaveCount(1, { timeout: 30_000 });
+    await jobConversation.click();
+    await waitForJobMessageComposer(freelancer, jobTitle);
+    await expect(freelancer.getByText(jobMessage)).toBeVisible({ timeout: 30_000 });
     await expect.poll(async () => client.getByText("Seen", { exact: true }).count(), { timeout: 30_000 }).toBeGreaterThan(0);
     await selectMessageFolder(freelancer, "personal");
     await expect(freelancer.getByText(jobMessage)).toHaveCount(0);

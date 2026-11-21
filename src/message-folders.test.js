@@ -1,11 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { classifyConversation, countUnreadByFolder, getConversationsForFolder, getHiddenConversationIdsWithNewIncoming } from "./message-folders.js";
+import { classifyConversation, countUnreadByFolder, getConversationsForFolder, getHiddenConversationIdsWithNewIncoming, isApplicationMessagingOpen } from "./message-folders.js";
 
 test("only accepted social connection threads are classified as personal", () => {
   assert.equal(classifyConversation("connection:abc"), "personal");
   assert.equal(classifyConversation("application-123"), "job");
   assert.equal(classifyConversation(null), "job");
+});
+
+test("job messaging remains available only for pending or accepted applications", () => {
+  assert.equal(isApplicationMessagingOpen("Pending"), true);
+  assert.equal(isApplicationMessagingOpen("Accepted"), true);
+  for (const status of ["Rejected", "Withdrawn", "Completed", "Disputed", null, undefined]) {
+    assert.equal(isApplicationMessagingOpen(status), false, `${status} must not open job messaging`);
+  }
 });
 
 test("message folders filter conversations and count unread messages independently", () => {

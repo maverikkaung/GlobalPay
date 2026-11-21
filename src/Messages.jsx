@@ -4,7 +4,7 @@ import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import DashboardNav from "./DashboardNav.jsx";
 import { countUnreadMessagesByConversation } from "./marketplace.js";
-import { classifyConversation, countUnreadByFolder, getConversationsForFolder, getHiddenConversationIdsWithNewIncoming } from "./message-folders.js";
+import { classifyConversation, countUnreadByFolder, getConversationsForFolder, getHiddenConversationIdsWithNewIncoming, isApplicationMessagingOpen } from "./message-folders.js";
 import { MARKETPLACE_MEDIA_BUCKET } from "./social-marketplace.js";
 import { toSafeExternalUrl } from "./external-urls.js";
 import MemberSafetyActions from "./MemberSafetyActions.jsx";
@@ -70,6 +70,10 @@ function Messages() {
 
     async function loadConversations() {
       if (!user?.id) return;
+      setLoading(true);
+      setError("");
+      setSelectedId("");
+      setMessages([]);
 
       let requestedId = "";
       if (requestedApplicationId) {
@@ -204,7 +208,7 @@ function Messages() {
           otherName,
           otherTitle: isDirect ? otherProfile?.professional_title || otherProfile?.country || "Marketplace member" : application?.professional_title || "Marketplace member",
           jobTitle: isDirect ? "TechKarvo connection" : jobsById[String(item.job_id)] || "Project conversation",
-          messagingOpen: isDirect ? connectionsById[connectionId]?.status === "Accepted" : ["Pending", "Accepted"].includes(application?.status),
+          messagingOpen: isDirect ? connectionsById[connectionId]?.status === "Accepted" : isApplicationMessagingOpen(application?.status),
           messageFolder: classifyConversation(item.application_id),
           otherId,
           unreadCount: unreadByConversation[item.id] || 0
@@ -397,7 +401,7 @@ function Messages() {
       <DashboardNav user={user} />
 
       <div className="messages-shell">
-        <section className="messages-list-panel" aria-label="Conversations">
+        <section className="messages-list-panel" aria-label="Conversations" aria-busy={loading}>
           <div className="messages-panel-heading">
             <span className="dashboard-tag">YOUR WORKSPACE</span>
             <h1>Messages</h1>
@@ -407,7 +411,7 @@ function Messages() {
             <button type="button" role="tab" aria-selected={activeFolder === "job"} disabled={loading} onClick={() => { setActiveFolder("job"); setSelectedId(conversations.find((item) => item.messageFolder === "job")?.id || ""); }}>Job Messages{folderUnread.job > 0 && <span>{folderUnread.job > 99 ? "99+" : folderUnread.job}</span>}</button>
             <button type="button" role="tab" aria-selected={activeFolder === "personal"} disabled={loading} onClick={() => { setActiveFolder("personal"); setSelectedId(conversations.find((item) => item.messageFolder === "personal")?.id || ""); }}>Personal Messages{folderUnread.personal > 0 && <span>{folderUnread.personal > 99 ? "99+" : folderUnread.personal}</span>}</button>
           </div>
-          {loading ? <p className="messages-empty">Loading conversations…</p> : folderConversations.length === 0 ? (
+          {loading ? <p className="messages-empty" role="status">Loading conversations…</p> : folderConversations.length === 0 ? (
             <div className="messages-empty">
               <strong>No {activeFolder === "job" ? "job" : "personal"} conversations yet</strong>
               <span>{activeFolder === "job" ? "Conversations open from eligible job applications." : "Personal chats open after you accept a connection request."}</span>
