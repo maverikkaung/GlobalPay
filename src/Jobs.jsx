@@ -1,359 +1,180 @@
-import { useState, useEffect } from "react";
-import { NavLink, Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
-import { getJobCategories, matchesJobSearch, parseSkills } from "./marketplace.js";
-import DashboardNav from "./DashboardNav.jsx";
-import "./App.css";
+import { getJobCategories } from "./marketplace.js";
+import { JOB_FIELDS, filterJobs, formatJobBudget, jobJourneyPath, presentJob, readJobFilters, writeJobFilters } from "./job-discovery.js";
+import { JobJourney, JobSkills, JobState } from "./JobJourney.jsx";
 
-function Jobs() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const isAuthenticated = Boolean(user);
-  const currentUserId = user?.id;
-
-  const [searchTerm, setSearchTerm] = useState("");
-  const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [sortMode, setSortMode] = useState("newest");
-  const [advancedSearch, setAdvancedSearch] = useState(false);
-  const [advancedSearchAccess, setAdvancedSearchAccess] = useState(false);
-  const [minBudget, setMinBudget] = useState("");
-  const [maxBudget, setMaxBudget] = useState("");
-  const [supabaseJobs, setSupabaseJobs] = useState([]);
-  const [jobsLoading, setJobsLoading] = useState(true);
-  const [jobsError, setJobsError] = useState("");
-  const [loadAttempt, setLoadAttempt] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    if (user?.accountType !== "Freelancer") return () => { active = false; };
-    supabase.rpc("techkarvo_has_membership_feature", { p_feature: "advanced_search" }).then(({ data, error }) => {
-      if (active) setAdvancedSearchAccess(!error && data === true);
-    }).catch(() => { if (active) setAdvancedSearchAccess(false); });
-    return () => { active = false; };
-  }, [user?.accountType, user?.id]);
-
-  useEffect(() => {
-    let active = true;
-    async function loadJobs() {
-      setJobsLoading(true);
-      setJobsError("");
-      let result;
-      try {
-        result = await supabase
-          .from("jobs")
-          .select("*")
-          .eq("status", "open")
-          .order("created_at", { ascending: false });
-      } catch (error) {
-        if (!active) return;
-        console.error("Jobs loading failed:", error);
-        setJobsError("We couldn't load jobs right now. Please try again.");
-        setSupabaseJobs([]);
-        setJobsLoading(false);
-        return;
-      }
-
-      if (!active) return;
-      if (result.error) {
-        console.error("Jobs loading failed:", result.error.message);
-        setJobsError("We couldn't load jobs right now. Please try again.");
-        setSupabaseJobs([]);
-        setJobsLoading(false);
-        return;
-      }
-
-      const clientNames = new Map();
-      const clientIds = [...new Set(result.data.map((item) => item.client_id).filter(Boolean))];
-      if (isAuthenticated && clientIds.length > 0) {
-        try {
-          const clientsResult = await supabase.from("client_public_profiles")
-            .select("id, full_name").in("id", clientIds);
-          if (clientsResult.error) {
-            console.error("Client profile lookup failed:", clientsResult.error.message);
-          } else {
-            (clientsResult.data || []).forEach((profile) => {
-              if (profile.full_name) clientNames.set(profile.id, profile.full_name);
-            });
-          }
-        } catch (error) {
-          console.error("Client profile lookup failed:", error);
-        }
-      }
-      if (!active) return;
-
-      const featuredCandidates = result.data.filter((job) => job.is_featured).map((job) => job.id);
-      const featuredIds = new Set();
-      if (featuredCandidates.length) {
-        try {
-          const { data } = await supabase.rpc("techkarvo_current_featured_job_ids", { p_job_ids: featuredCandidates });
-          for (const job of data || []) featuredIds.add(job.id);
-        } catch {
-          // The open jobs list stays usable when badge verification is unavailable.
-        }
-      }
-      if (!active) return;
-
-      const formattedJobs = result.data.map(function(item) {
-        return {
-          id: item.id,
-          clientId: item.client_id,
-          title: item.title,
-          company: clientNames.get(item.client_id) || "TechKarvo Client",
-          location: "Remote",
-          isFeatured: featuredIds.has(item.id),
-          type: item.payment_type || "Freelance",
-          category: item.category || "Other",
-          createdAt: item.created_at,
-          budget: Number(item.budget) || 0,
-          salary: String(item.currency ? item.currency : "USD") + " " + String(item.budget),
-          description: item.description,
-          skills: parseSkills(item.skills)
-        };
-      });
-
-      setSupabaseJobs(formattedJobs);
-      setJobsLoading(false);
-    }
-
-    loadJobs();
-    return () => { active = false; };
-  }, [loadAttempt, isAuthenticated, currentUserId]);
-
-  const categories = getJobCategories(supabaseJobs);
-
-  const allJobs = supabaseJobs;
-  function applySearch(event) {
+function JobSearch({ query, onSearch }) {
+  const input = useRef(null);
+  useEffect(() => { input.current.value = query; }, [query]);
+  return <form className="journey-search" role="search" onSubmit={(event) => {
     event.preventDefault();
-    setAppliedSearchTerm(searchTerm.trim());
-  }
-
-  function handleApply(job) {
-    if (!user) {
-      navigate("/login", { state: { from: "/apply/" + job.id } });
-      return;
-    }
-
-    if (user.accountType !== "Freelancer") {
-      navigate("/client-dashboard");
-      return;
-    }
-
-    navigate("/apply/" + job.id);
-  }
-  const filteredJobs = allJobs.filter(function(job) {
-    const matchesCategory =
-      selectedCategory === "All" ? true : job.category === selectedCategory;
-
-    const hasAdvancedSearch = advancedSearch && advancedSearchAccess && user?.accountType === "Freelancer";
-    const matchesMin = !hasAdvancedSearch || !minBudget || job.budget >= Number(minBudget);
-    const matchesMax = !hasAdvancedSearch || !maxBudget || job.budget <= Number(maxBudget);
-    return matchesJobSearch(job, appliedSearchTerm) && matchesCategory && matchesMin && matchesMax;
-  }).sort((first, second) => sortMode === "title"
-    ? first.title.localeCompare(second.title)
-    : new Date(second.createdAt || 0).getTime() - new Date(first.createdAt || 0).getTime());
-  const hasActiveFilters = Boolean(appliedSearchTerm || selectedCategory !== "All" || (advancedSearch && (minBudget || maxBudget)));
-
-  return (
-    <div className="jobs-page">
-      {user ? <DashboardNav user={user} /> : <nav className="jobs-navbar">
-        <Link to="/" className="logo">
-          TechKarvo
-        </Link>
-
-        <nav aria-label="Main navigation" className="jobs-nav-links">
-          <NavLink to="/" end>Home</NavLink>
-          <Link to="/#features">Features</Link>
-          <Link to="/#about">About</Link>
-          <NavLink to="/jobs">Find Jobs</NavLink>
-        </nav>
-
-        <div className="nav-buttons">
-          {user ? (
-            <Link to={user.accountType === "Client" ? "/client-dashboard" : "/freelancer-dashboard"} className="signup-btn">Dashboard</Link>
-          ) : (
-            <><Link to="/login" className="login-btn">Log In</Link><Link to="/signup" className="signup-btn">Sign Up</Link></>
-          )}
-        </div>
-      </nav>}
-
-      <section className="jobs-hero">
-        <div className="jobs-hero-content">
-          <span className="section-label">
-            TechKarvo JOB FEED
-          </span>
-
-          <h1>
-            Find Your Next
-            <span> Opportunity</span>
-          </h1>
-
-          <p>
-            Discover remote jobs and connect with companies
-            around the world.
-          </p>
-
-          <form className="jobs-search" role="search" onSubmit={applySearch}>
-            <input
-              type="search"
-              aria-label="Search open jobs by title, client, description, or skill"
-              placeholder="Search jobs or companies..."
-              value={searchTerm}
-              onChange={function(event) {
-                setSearchTerm(event.target.value);
-              }}
-            />
-
-            <button type="submit">
-              Search
-            </button>
-          </form>
-        </div>
-      </section>
-
-      <section className="jobs-list-section">
-        <div className="jobs-container">
-          <div className="jobs-heading">
-            <div>
-              <h2>Explore Jobs</h2>
-              <p>
-                Find opportunities that match your skills.
-              </p>
-            </div>
-
-            <span className="jobs-count" aria-live="polite">
-              {jobsLoading ? "Loading jobs…" : `${filteredJobs.length} Jobs Found`}
-            </span>
-          </div>
-
-          <div className="job-categories">
-            {categories.map(function(category) {
-              return (
-                <button
-                  key={category}
-                  type="button"
-                  className={
-                    selectedCategory === category ? "active" : ""
-                  }
-                  aria-pressed={selectedCategory === category}
-                  onClick={function() {
-                    setSelectedCategory(category);
-                  }}
-                >
-                  {category}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="jobs-results-controls">
-            <p>{hasActiveFilters ? `Showing ${filteredJobs.length} matching ${filteredJobs.length === 1 ? "job" : "jobs"}` : "Browse all open opportunities"}</p>
-            <div className="jobs-results-actions">
-              {hasActiveFilters && <button type="button" className="clear-job-filters" onClick={() => {
-                setSearchTerm("");
-                setAppliedSearchTerm("");
-                setSelectedCategory("All");
-                setMinBudget(""); setMaxBudget("");
-              }}>Clear filters</button>}
-              {user?.accountType === "Freelancer" && advancedSearchAccess && <button type="button" className="clear-job-filters" aria-pressed={advancedSearch} onClick={() => setAdvancedSearch((value) => !value)}>{advancedSearch ? "Hide advanced filters" : "Advanced search"}</button>}
-              <label className="jobs-sort-label" htmlFor="jobs-sort">Sort by
-                <select id="jobs-sort" value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
-                  <option value="newest">Most recent</option>
-                  <option value="title">Title A to Z</option>
-                </select>
-              </label>
-            </div>
-          </div>
-
-          {advancedSearch && user?.accountType === "Freelancer" && advancedSearchAccess && <div className="jobs-results-controls" aria-label="Advanced job filters"><label htmlFor="jobs-min-budget">Minimum budget</label><input id="jobs-min-budget" type="number" min="0" step="0.01" value={minBudget} onChange={(event) => setMinBudget(event.target.value)} /><label htmlFor="jobs-max-budget">Maximum budget</label><input id="jobs-max-budget" type="number" min="0" step="0.01" value={maxBudget} onChange={(event) => setMaxBudget(event.target.value)} /></div>}
-
-          <div className="jobs-grid">
-            {jobsLoading ? (
-              <div className="no-jobs" role="status"><h3>Loading opportunities</h3><p>Fetching the latest open jobs…</p></div>
-            ) : jobsError ? (
-              <div className="no-jobs" role="alert"><h3>Jobs unavailable</h3><p>{jobsError}</p><button type="button" className="apply-btn" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button></div>
-            ) : filteredJobs.length > 0 ? (
-              filteredJobs.map(function(job) {
-                return (
-                  <div className="job-card" key={job.id}>
-                    <div className="job-card-top">
-                      <div className="company-icon">
-                        {(job.company ? job.company : "C").charAt(0)}
-                      </div>
-
-                      <span className={`job-type${job.isFeatured ? " job-featured" : ""}`}>
-                        {job.isFeatured ? "Featured" : null}{job.isFeatured ? " · " : ""}
-                        {job.type ? job.type : "Freelance"}
-                      </span>
-                    </div>
-
-                    <h3>{job.title}</h3>
-
-                    <p className="job-company">
-                      {user && job.clientId
-                        ? <Link to={"/profiles/" + job.clientId}>{job.company}</Link>
-                        : job.company}
-                    </p>
-                       <div className="job-info">
-                      <span>{job.location ? job.location : "Remote"}</span>
-                      <span>{job.salary}</span>
-                    </div>
-
-                    <p className="job-description">
-                      {job.description}
-                    </p>
-
-                    <div className="job-skills">
-                      {job.skills.map(function(skill, index) {
-                        return (
-                          <span key={index}>
-                            {skill}
-                          </span>
-                        );
-                      })}
-                    </div>
-
-                    <div className="job-card-actions">
-                      <Link
-                        to={"/jobs/" + job.id}
-                        className="view-job-link"
-                      >
-                        View Details
-                      </Link>
-
-                      <button
-                        type="button"
-                        className="apply-btn"
-                        onClick={function() {
-                          handleApply(job);
-                        }}
-                      >
-                        Apply Now
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="no-jobs">
-                <h3>No Jobs Found</h3>
-                <p>
-                  {supabaseJobs.length ? "Try another search keyword or category." : "New opportunities will appear here when clients post them."}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <footer className="jobs-footer">
-        <p>
-          © 2026 TechKarvo. All rights reserved.
-        </p>
-      </footer>
+    onSearch(new FormData(event.currentTarget).get("query"));
+  }}>
+    <label htmlFor="jobs-search-input">Search open jobs</label>
+    <div>
+      <input ref={input} id="jobs-search-input" name="query" type="search"
+        defaultValue={query} maxLength={120} placeholder="Try React, design or writing" />
+      <button className="journey-button" type="submit">Search</button>
     </div>
-  );
+  </form>;
 }
 
-export default Jobs;
+function BudgetFilters({ filters, onApply }) {
+  return <form className="journey-budget-form" onSubmit={(event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    onApply({ minBudget: data.get("min"), maxBudget: data.get("max") });
+  }}>
+    <label htmlFor="jobs-min-budget">Minimum budget</label>
+    <input id="jobs-min-budget" name="min" type="number" min="0" max="999999999999.99" step="0.01" defaultValue={filters.minBudget} />
+    <label htmlFor="jobs-max-budget">Maximum budget</label>
+    <input id="jobs-max-budget" name="max" type="number" min="0" max="999999999999.99" step="0.01" defaultValue={filters.maxBudget} />
+    <button className="journey-button journey-secondary" type="submit">Apply budget</button>
+  </form>;
+}
+
+function JobCard({ job, search, user }) {
+  return <article className="job-card journey-job-card">
+    <div className="journey-card-meta">
+      <span>{job.category || "Other"}</span>
+      {job.isFeatured && <span className="journey-featured">Featured</span>}
+    </div>
+    <div className="journey-card-heading">
+      <h3><Link to={jobJourneyPath("/jobs/" + job.id, search)}>{job.title}</Link></h3>
+      <p className="journey-budget">{formatJobBudget(job)}</p>
+    </div>
+    <p className="journey-muted">
+      {job.company && user
+        ? <Link to={"/profiles/" + job.clientId}>{job.company}</Link>
+        : <span>TechKarvo client</span>}
+      {job.paymentType && <span> · {job.paymentType}</span>}
+    </p>
+    <p className="journey-job-description">{job.description}</p>
+    <JobSkills skills={job.skills} limit={5} />
+    <div className="journey-actions">
+      <Link className="journey-button journey-secondary" to={jobJourneyPath("/jobs/" + job.id, search)}>View Details</Link>
+      {(!user || user.accountType === "Freelancer") && <Link className="journey-button" to={jobJourneyPath("/apply/" + job.id, search)}>Apply Now</Link>}
+    </div>
+  </article>;
+}
+
+export default function Jobs() {
+  const { user } = useAuth();
+  const userId = user?.id;
+  const canCheckAdvanced = user?.accountType === "Freelancer";
+  const [params, setParams] = useSearchParams();
+  const [attempt, setAttempt] = useState(0);
+  const [access, setAccess] = useState(null);
+  const [result, setResult] = useState(null);
+  const requestKey = (userId || "public") + ":" + attempt;
+
+  useEffect(() => {
+    if (!canCheckAdvanced) return;
+    let active = true;
+    supabase.rpc("techkarvo_has_membership_feature", { p_feature: "advanced_search" }).then(({ data, error }) => {
+      if (active) setAccess({ userId, allowed: !error && data === true });
+    }, () => {
+      if (active) setAccess({ userId, allowed: false });
+    });
+    return () => { active = false; };
+  }, [canCheckAdvanced, userId]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function load() {
+      try {
+        const { data, error } = await supabase.from("jobs").select(JOB_FIELDS)
+          .eq("status", "open").order("created_at", { ascending: false });
+        if (!active) return;
+        if (error) throw error;
+        const rows = data || [];
+        const clientIds = [...new Set(rows.map((job) => job.client_id).filter(Boolean))];
+        const featuredIds = rows.filter((job) => job.is_featured).map((job) => job.id);
+        const optional = (request) => request.then(({ data, error }) => error ? [] : data || [], () => []);
+        const [clients, featured] = await Promise.all([
+          userId && clientIds.length
+            ? optional(supabase.from("client_public_profiles").select("id,full_name").in("id", clientIds))
+            : [],
+          featuredIds.length ? optional(supabase.rpc("techkarvo_current_featured_job_ids", { p_job_ids: featuredIds })) : []
+        ]);
+        const names = new Map(clients.map((client) => [client.id, client.full_name]));
+        const featuredSet = new Set(featured.map(({ id }) => id));
+        if (active) setResult({
+          key: requestKey,
+          jobs: rows.map((row) => ({ ...presentJob(row, names.get(row.client_id)), isFeatured: featuredSet.has(row.id) }))
+        });
+      } catch {
+        if (active) setResult({ key: requestKey, error: true });
+      }
+    }
+
+    load();
+    return () => { active = false; };
+  }, [requestKey, userId]);
+
+  const current = result?.key === requestKey ? result : null;
+  const jobs = current?.jobs || [];
+  const categories = getJobCategories(jobs);
+  const filters = readJobFilters(params, current?.jobs ? categories : undefined);
+  const canUseAdvanced = canCheckAdvanced && access?.userId === userId && access?.allowed;
+  const advanced = canUseAdvanced && filters.advanced;
+  const hasFilters = Boolean(filters.query || filters.category || (advanced && (filters.minBudget || filters.maxBudget)));
+  const visible = filterJobs(jobs, filters, canUseAdvanced);
+  const invalidBudgetRange = advanced && filters.minBudget && filters.maxBudget && Number(filters.minBudget) > Number(filters.maxBudget);
+  const search = writeJobFilters(filters).toString();
+  function changeFilters(changes) {
+    setParams(writeJobFilters(readJobFilters(writeJobFilters({ ...filters, ...changes }), current?.jobs ? categories : undefined)));
+  }
+
+  return <JobJourney user={user}>
+    <header className="journey-intro">
+      <div><h1>Find your next project</h1><p>Explore open jobs by skill, title or client.</p></div>
+      <JobSearch query={filters.query} onSearch={(query) => changeFilters({ query })} />
+    </header>
+    <div className="journey-browse">
+      <aside className="journey-panel journey-filters" aria-labelledby="jobs-filter-heading">
+        <h2 id="jobs-filter-heading">Filters</h2>
+        <label htmlFor="jobs-category">Category</label>
+        <select id="jobs-category" value={filters.category || "All"} onChange={(event) => changeFilters({ category: event.target.value })}>
+          {filters.category && !categories.includes(filters.category) && <option>{filters.category}</option>}
+          {categories.map((category) => <option key={category}>{category}</option>)}
+        </select>
+        {canUseAdvanced && <button type="button" className="journey-button journey-secondary"
+          aria-expanded={Boolean(advanced)} onClick={() => changeFilters({ advanced: !advanced })}>
+          {advanced ? "Hide advanced filters" : "Advanced search"}
+        </button>}
+        {advanced && <BudgetFilters key={filters.minBudget + ":" + filters.maxBudget} filters={filters} onApply={changeFilters} />}
+        {invalidBudgetRange && <p role="alert" className="journey-error">Minimum budget must be less than or equal to the maximum.</p>}
+        {hasFilters && <button type="button" className="journey-clear" onClick={() => changeFilters({
+          query: "", category: "", minBudget: "", maxBudget: ""
+        })}>Clear filters</button>}
+      </aside>
+
+      <section className="journey-results" aria-labelledby="jobs-results-heading" aria-busy={!current}>
+        <div className="journey-results-header">
+          <div><h2 id="jobs-results-heading">Open jobs</h2>
+            {current?.jobs && <p role="status" className="journey-muted">{visible.length} {visible.length === 1 ? "job" : "jobs"} found</p>}
+          </div>
+          <div className="journey-sort">
+            <label htmlFor="jobs-sort">Sort by</label>
+            <select id="jobs-sort" value={filters.sort} onChange={(event) => changeFilters({ sort: event.target.value })}>
+              <option value="newest">Most recent</option>
+              <option value="title">Title A to Z</option>
+            </select>
+          </div>
+        </div>
+        {!current ? <JobState title="Loading opportunities" status="loading">Fetching open jobs…</JobState>
+          : current.error ? <JobState title="Jobs unavailable" status="error" onRetry={() => setAttempt((value) => value + 1)}>
+            We couldn’t load jobs right now.
+          </JobState>
+          : visible.length > 0 ? <div className="journey-job-list">{visible.map((job) => <JobCard key={job.id} job={job} search={search} user={user} />)}</div>
+          : jobs.length ? <JobState title="No matching jobs">Try another keyword or change your filters.</JobState>
+          : <JobState title="No open jobs yet">New opportunities will appear here when clients publish them.</JobState>}
+      </section>
+    </div>
+  </JobJourney>;
+}

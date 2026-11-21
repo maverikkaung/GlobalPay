@@ -1,220 +1,49 @@
-import { useState, useEffect } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
-import { supabase } from "./supabase.js";
-import { parseSkills } from "./marketplace.js";
-import DashboardNav from "./DashboardNav.jsx";
-import "./App.css";
+import { useJob } from "./useJob.js";
+import { formatJobBudget, jobJourneyPath } from "./job-discovery.js";
+import { JobBackLink, JobJourney, JobSkills, JobState } from "./JobJourney.jsx";
 
-function JobDetails() {
+export default function JobDetails() {
   const { id } = useParams();
+  const { search } = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isAuthenticated = Boolean(user);
-  const currentUserId = user?.id;
+  const [attempt, setAttempt] = useState(0);
+  const { status, job } = useJob(id, user?.id, attempt, true);
+  const open = job?.status === "open";
+  const canApply = !user || user.accountType === "Freelancer";
 
-  const [job, setJob] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(function() {
-    let active = true;
-    async function loadJob() {
-      if (active) setLoading(true);
-      try {
-        const result = await supabase.from("jobs").select("*").eq("id", id).maybeSingle();
-        if (result.error) throw result.error;
-        if (!result.data) {
-          if (active) setJob(null);
-          return;
-        }
-
-        const item = result.data;
-        let company = "TechKarvo Client";
-        if (isAuthenticated && item.client_id) {
-          const clientResult = await supabase.from("client_public_profiles")
-            .select("full_name").eq("id", item.client_id).maybeSingle();
-          if (clientResult.error) {
-            console.error("Client profile lookup failed:", clientResult.error.message);
-          } else if (clientResult.data?.full_name) {
-            company = clientResult.data.full_name;
-          }
-        }
-
-        if (!active) return;
-        setJob({
-          id: item.id,
-          clientId: item.client_id,
-          title: item.title,
-          company,
-          location: "Remote",
-          type: item.payment_type || "Freelance",
-          category: item.category || "Other",
-          salary: String(item.currency || "USD") + " " + String(item.budget),
-          description: item.description,
-          details: item.description,
-          status: item.status,
-          skills: parseSkills(item.skills)
-        });
-      } catch (error) {
-        console.error("Job loading error:", error);
-        if (active) setJob(null);
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    loadJob();
-    return () => { active = false; };
-  }, [id, isAuthenticated, currentUserId]);
-
-  function handleApply() {
-    if (!user) {
-      navigate("/login", { state: { from: "/apply/" + job.id } });
-      return;
-    }
-
-    if (user.accountType !== "Freelancer") {
-      navigate("/client-dashboard");
-      return;
-    }
-
-    navigate("/apply/" + job.id);
-  }
-
-  if (loading) {
-    return (
-      <div className="job-details-page">
-        <h2>Loading Project...</h2>
-      </div>
-    );
-  }
-
-  if (!job) {
-    return (
-      <div className="job-details-page">
-        <h2>Project Not Found</h2>
-        <Link to="/jobs">Back to Jobs</Link>
-      </div>
-    );
-  }
-
-  let dashboardLink = "/";
-
-  if (user) {
-    if (user.accountType === "Client") {
-      dashboardLink = "/client-dashboard";
-    } else {
-      dashboardLink = "/freelancer-dashboard";
-    }
-  }
-
-  return (
-    <div className="job-details-page">
-
-      {user ? <DashboardNav user={user} /> : <header className="jobs-navbar">
-        <Link to="/" className="logo">
-          TechKarvo
-        </Link>
-
-        <div className="jobs-nav-links">
-          <Link to="/">Home</Link>
-          <Link to="/jobs" className="active">
-            Find Jobs
-          </Link>
-
-          {user ? (
-            <Link to={dashboardLink}>
-              Dashboard
-            </Link>
-          ) : (
-            <>
-              <Link to="/login">Login</Link>
-              <Link to="/signup">Sign Up</Link>
-            </>
-          )}
-        </div>
-      </header>}
-
-      <main className="job-details-container">
-
-        <Link to="/jobs" className="back-jobs">
-          Back to Jobs
-        </Link>
-
-        <section className="job-details-card">
-             <div className="details-top">
-            <div>
-              <span className="job-category">
-                {job.category}
-              </span>
-
-              <h1>{job.title}</h1>
-
-              <p className="details-company">
-                {user && job.clientId
-                  ? <Link to={"/profiles/" + job.clientId}>{job.company}</Link>
-                  : job.company}
-              </p>
-            </div>
-
-            <span className="job-type">
-              {job.type || "Freelance"}
-            </span>
-          </div>
-
-          <div className="details-info">
-
-            <div>
-              <span>Location</span>
-              <strong>{job.location || "Remote"}</strong>
-            </div>
-
-            <div>
-              <span>Project Budget / Salary</span>
-              <strong>{job.salary || "Negotiable"}</strong>
-            </div>
-
-          </div>
-
-          <div className="details-description">
-            <h2>About This Opportunity</h2>
-            <p>{job.details || job.description}</p>
-          </div>
-
-          <div className="details-skills">
-            <h2>Required Skills</h2>
-
-            <div className="skills-list">
-              {job.skills.map(function(skill, index) {
-                return (
-                  <span key={index}>
-                    {skill}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-
-          {job.status === "open" && (!user || user.accountType === "Freelancer") && (
-            <div className="details-actions">
-              <button
-                type="button"
-                onClick={handleApply}
-              >
-                Apply for This Job
-              </button>
-            </div>
-          )}
-
-        </section>
-      </main>
-
-      <footer className="jobs-footer">
-        © 2026 TechKarvo. All rights reserved.
-      </footer>
-
-    </div>
-  );
+  return <JobJourney user={user}>
+    <JobBackLink />
+    {status === "loading" && <JobState title="Loading job details" status="loading">Fetching the project…</JobState>}
+    {status === "missing" && <JobState title="Job unavailable">This posting may have been removed or may no longer be visible to you.</JobState>}
+    {status === "error" && <JobState title="We couldn’t load this job" status="error" onRetry={() => setAttempt((value) => value + 1)}>
+      Your search is saved. Try loading the same job again.
+    </JobState>}
+    {job && <div className="journey-detail">
+      <article className="journey-panel journey-job-detail">
+        <p className="journey-card-meta"><span>{job.category || "Other"}</span><span>{open ? "Accepting applications" : "Closed"}</span></p>
+        <h1>{job.title}</h1>
+        <p className="journey-muted">
+          {job.company ? <Link to={"/profiles/" + job.clientId}>{job.company}</Link> : "TechKarvo client"}
+        </p>
+        <h2>About this project</h2>
+        <p className="journey-detail-description">{job.description}</p>
+        {job.skills.length > 0 && <><h2>Required skills</h2><JobSkills skills={job.skills} /></>}
+      </article>
+      <aside className="journey-panel journey-summary" aria-label="Project terms">
+        <h2>Project terms</h2>
+        <dl><dt>Budget</dt><dd>{formatJobBudget(job)}</dd>
+          {job.paymentType && <><dt>Payment type</dt><dd>{job.paymentType}</dd></>}
+        </dl>
+        {!open ? <p role="status">This job is closed and no longer accepting applications.</p>
+          : canApply ? <button className="journey-button" type="button"
+            onClick={() => navigate(jobJourneyPath("/apply/" + job.id, search))}>Apply for This Job</button>
+          : <p>Applications are available to freelancer accounts.</p>}
+        {user?.id && user.id === job.clientId && <Link className="journey-button journey-secondary" to="/my-projects">Manage project</Link>}
+      </aside>
+    </div>}
+  </JobJourney>;
 }
-
-export default JobDetails;

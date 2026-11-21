@@ -1,0 +1,132 @@
+.job-journey {
+  --journey-canvas: #f5f7fb;
+  --journey-surface: #fff;
+  --journey-raised: #eef3f9;
+  --journey-text: #14243a;
+  --journey-muted: #40546b;
+  --journey-border: #ccd7e4;
+  --journey-control: #667b91;
+  --journey-accent: #1455cc;
+  --journey-on-accent: #fff;
+  --journey-error: #a52a40;
+  --journey-success: #0f6849;
+  min-height: 100vh;
+  background: var(--journey-canvas);
+  color: var(--journey-text);
+  font-family: system-ui, "Noto Sans Myanmar", "Myanmar Text", sans-serif;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+html[data-theme="dark"] .job-journey {
+  --journey-canvas: #0b1424;
+  --journey-surface: #101d30;
+  --journey-raised: #18283c;
+  --journey-text: #f2f6fc;
+  --journey-muted: #adc0d7;
+  --journey-border: #314760;
+  --journey-control: #7289a6;
+  --journey-accent: #8bb5ff;
+  --journey-on-accent: #0b1a34;
+  --journey-error: #ffadb9;
+  --journey-success: #77ddb4;
+}
+
+.job-journey :focus-visible { outline: 3px solid var(--journey-accent); outline-offset: 3px; }
+.job-journey h1 { font-size: clamp(1.75rem, 1.32rem + 2vw, 2.55rem); line-height: 1.18; letter-spacing: -.03em; }
+.job-journey h2 { font-size: 1.1875rem; line-height: 1.4; }
+.job-journey h3 { font-size: 1.125rem; line-height: 1.4; }
+.job-journey .journey-muted { color: var(--journey-muted); }
+.job-journey .journey-error { color: var(--journey-error); }
+.job-journey .journey-success { color: var(--journey-success); }
+.job-journey .journey-width { width: min(100% - 32px, 1160px); margin-inline: auto; }
+.job-journey .journey-main { padding-block: clamp(24px, 4vw, 48px) 64px; }
+.journey-public-header { background: var(--journey-surface); border-bottom: 1px solid var(--journey-border); }
+.journey-public-header nav { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 24px; padding-block: 8px; }
+.journey-public-header a { display: inline-flex; align-items: center; min-height: 44px; text-underline-offset: 3px; }
+.journey-public-header [aria-current="page"], .journey-brand span { color: var(--journey-accent); }
+.journey-public-header .journey-brand { font-size: 1.25rem; font-weight: 750; letter-spacing: -.03em; text-decoration: none; }
+.journey-public-account { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-inline-start: auto; }
+.journey-skip { position: absolute; top: 8px; left: 8px; z-index: 50; padding: 10px; background: var(--journey-surface); transform: translateY(-150%); }
+.journey-skip:focus { transform: none; }
+
+.job-journey .journey-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--journey-accent);
+  color: var(--journey-on-accent);
+  font-weight: 650;
+  text-align: center;
+  text-decoration: none;
+}
+.job-journey .journey-button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.job-journey .journey-secondary { color: var(--journey-text); background: var(--journey-surface); border-color: var(--journey-control); }
+.job-journey .journey-button:disabled { color: var(--journey-muted); background: var(--journey-raised); border-color: var(--journey-border); cursor: default; text-decoration: none; }
+.job-journey .journey-clear { min-height: 44px; text-align: start; color: var(--journey-accent); background: none; border: 0; text-decoration: underline; }
+.job-journey :is(input, select, textarea) {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--journey-control);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--journey-text);
+  background: var(--journey-surface);
+}
+.job-journey :is(input, textarea)::placeholder { color: var(--journey-muted); opacity: 1; }
+.job-journey label { font-size: .875rem; font-weight: 650; }
+.job-journey .journey-panel, .job-journey .journey-job-card {
+  min-width: 0;
+  padding: clamp(16px, 2.5vw, 28px);
+  border: 1px solid var(--journey-border);
+  border-radius: 12px;
+  background: var(--journey-surface);
+  color: var(--journey-text);
+}
+.job-journey .journey-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: end; margin-bottom: 32px; }
+.journey-intro p { margin-top: 8px; color: var(--journey-muted); }
+.journey-search > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 6px; }
+.job-journey .journey-browse { display: grid; grid-template-columns: minmax(190px, 238px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.journey-filters, .journey-budget-form { display: grid; gap: 8px; }
+.journey-filters h2 { margin-bottom: 6px; }
+.journey-filters > .journey-button { margin-top: 8px; }
+.journey-budget-form { padding-block: 8px; }
+.journey-budget-form button { margin-top: 4px; }
+.journey-results-header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.journey-sort { display: grid; gap: 4px; }
+.journey-job-list { display: grid; gap: 12px; }
+.job-journey .journey-job-card { display: grid; gap: 8px; box-shadow: none; transition: none; }
+.job-journey .journey-job-card:hover { transform: none; box-shadow: none; border-color: var(--journey-control); }
+.journey-card-meta, .journey-actions, .journey-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.journey-card-meta { font-size: .875rem; font-weight: 650; color: var(--journey-muted); }
+.journey-featured, .journey-tags li { padding: 3px 9px; border-radius: 6px; background: var(--journey-raised); }
+.journey-featured { color: var(--journey-accent); }
+.journey-tags { list-style: none; font-size: .875rem; color: var(--journey-muted); }
+.journey-card-heading { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; justify-content: space-between; }
+.journey-card-heading a, .journey-muted a { text-underline-offset: 3px; }
+.journey-budget { font-weight: 750; font-variant-numeric: tabular-nums; }
+.journey-job-description { color: var(--journey-muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.journey-actions { margin-top: 8px; }
+.journey-state { display: grid; gap: 8px; justify-items: start; }
+.journey-state p { color: var(--journey-muted); }
+.journey-back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-bottom: 12px; color: var(--journey-accent); text-underline-offset: 3px; }
+.journey-detail { display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); align-items: start; gap: 24px; }
+.journey-job-detail, .journey-summary { display: grid; gap: 12px; }
+.journey-job-detail h2 { margin-top: 12px; }
+.journey-detail-description { white-space: pre-wrap; max-width: 72ch; }
+.journey-summary dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; border-block: 1px solid var(--journey-border); padding-block: 10px; }
+.journey-summary dt { color: var(--journey-muted); }
+.journey-summary dd { font-weight: 650; text-align: end; }
+
+@media (max-width: 767px) {
+  .job-journey .journey-intro, .job-journey .journey-browse, .journey-detail { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .job-journey .journey-intro { margin-bottom: 20px; }
+  .journey-public-header nav { gap: 4px 12px; }
+  .journey-public-account { margin-inline-start: 0; }
+}
