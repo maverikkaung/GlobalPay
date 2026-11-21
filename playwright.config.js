@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 import process from "node:process";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { QA_CHROME_ARGS } from "./scripts/staging-qa-session.js";
 
 const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL;
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
@@ -25,7 +26,7 @@ export default defineConfig({
     baseURL: externalBaseURL || "http://127.0.0.1:5173",
     actionTimeout: 15_000,
     navigationTimeout: 60_000,
-    launchOptions: executablePath ? { executablePath } : {},
+    launchOptions: executablePath ? { executablePath, args: QA_CHROME_ARGS } : { args: QA_CHROME_ARGS },
     trace: "off"
   },
   // `npm run test:e2e` owns the local Vite process so Windows can shut it down

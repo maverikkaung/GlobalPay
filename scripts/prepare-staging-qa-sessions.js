@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import process from "node:process";
-import { navigateToStagingLogin } from "./staging-qa-session.js";
+import { navigateToStagingLogin, prepareSequentialLoginPages, QA_CHROME_ARGS } from "./staging-qa-session.js";
 
 const projectRef = "ntucgiieksrwebwvcmun";
 const stagingOrigin = "https://techkarvo-staging.vercel.app";
@@ -32,8 +32,8 @@ let freelancer;
 let prompt;
 
 async function openLogin(context, role) {
-  const page = context.pages()[0] || await context.newPage();
-  await navigateToStagingLogin(page, `${stagingOrigin}/login`);
+  let page = context.pages()[0] || await context.newPage();
+  page = await navigateToStagingLogin(page, `${stagingOrigin}/login`);
   await page.evaluate((title) => { document.title = title; }, `TechKarvo Staging QA ${role} Login`);
   const authenticated = await page.evaluate(() => Object.keys(localStorage).some((key) => {
     if (!key.includes("auth-token")) return false;
@@ -112,14 +112,16 @@ try {
   browser = await chromium.launch({
     executablePath: chromePath,
     headless: false,
-    args: ["--no-first-run", "--no-default-browser-check"]
+    args: QA_CHROME_ARGS
   });
   client = await browser.newContext({ viewport: { width: 1440, height: 960 } });
   freelancer = await browser.newContext({ viewport: { width: 1440, height: 960 } });
 
   // Prepare and validate both login forms before handing either window to the user.
-  const clientPage = await openLogin(client, "Client");
-  const freelancerPage = await openLogin(freelancer, "Freelancer");
+  const [clientPage, freelancerPage] = await prepareSequentialLoginPages(
+    [client, freelancer],
+    (context) => openLogin(context, context === client ? "Client" : "Freelancer")
+  );
   prompt = createInterface({ input: stdin, output: stdout });
   process.stdout.write("Зориулалтын staging Client болон Freelancer QA аккаунтаар тус тусын цонхонд нэвтэрнэ үү. Нууц үг, token-ийг чат эсвэл terminal-д бүү оруул. Хоёулаа dashboard-д орсны дараа энд `READY` гэж бичнэ үү.\n");
 
