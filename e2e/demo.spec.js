@@ -1,12 +1,20 @@
 import { test, expect } from "@playwright/test";
 
 test("owner dashboard route stays behind authentication for public visitors", async ({ page }) => {
+  await page.addInitScript(() => {
+    const getItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key) {
+      if (key === "TechKarvo_remembered_email") throw new DOMException("Storage unavailable", "SecurityError");
+      return getItem.call(this, key);
+    };
+  });
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
   await page.goto("/support");
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
+  await expect(page.getByLabel("Email Address")).toBeEditable();
 });
 
 test("visitor can complete a sample client-to-freelancer hiring journey without Supabase", async ({ page }) => {

@@ -57,6 +57,7 @@ function ForgotPassword() {
               <input
                 type="email"
                 id="reset-email"
+                autoComplete="username"
                 placeholder="Enter your registered email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}

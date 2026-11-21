@@ -65,6 +65,7 @@ function ResetPassword() {
               <input
                 type="password"
                 id="new-password"
+                autoComplete="new-password"
                 placeholder="Enter new password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -77,6 +78,7 @@ function ResetPassword() {
               <input
                 type="password"
                 id="confirm-new-password"
+                autoComplete="new-password"
                 placeholder="Confirm new password"
                 value={confirmPassword}
                 onChange={(event) =>

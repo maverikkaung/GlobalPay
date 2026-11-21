@@ -79,6 +79,7 @@ function Signup() {
           <input
             type="text"
             id="signup-name"
+            autoComplete="name"
             placeholder="Enter your full name"
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -89,6 +90,7 @@ function Signup() {
           <input
             type="email"
             id="signup-email"
+            autoComplete="username"
             placeholder="Enter your email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -100,6 +102,7 @@ function Signup() {
             <input
               type={showPassword ? "text" : "password"}
               id="signup-password"
+              autoComplete="new-password"
               placeholder="Create a password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -122,6 +125,7 @@ function Signup() {
             <input
               type={showConfirmPassword ? "text" : "password"}
               id="signup-confirm-password"
+              autoComplete="new-password"
               placeholder="Confirm your password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}

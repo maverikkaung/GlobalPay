@@ -3,11 +3,21 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "./supabase.js";
 import { getAuthErrorMessage } from "./auth-errors.js";
 
+const REMEMBERED_EMAIL_KEY = "TechKarvo_remembered_email";
+
+function readRememberedEmail() {
+  try {
+    return localStorage.getItem(REMEMBERED_EMAIL_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [savedEmail] = useState(() => localStorage.getItem("TechKarvo_remembered_email"));
+  const [savedEmail] = useState(readRememberedEmail);
   const [email, setEmail] = useState(savedEmail || "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -51,10 +61,11 @@ function Login() {
         return;
       }
 
-      if (rememberMe) {
-        localStorage.setItem("TechKarvo_remembered_email", cleanEmail);
-      } else {
-        localStorage.removeItem("TechKarvo_remembered_email");
+      try {
+        if (rememberMe) localStorage.setItem(REMEMBERED_EMAIL_KEY, cleanEmail);
+        else localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+      } catch {
+        // The remembered email is optional on browsers with restricted storage.
       }
 
       const returnLocation = location.state?.from;

@@ -16,13 +16,17 @@ test("Supabase Auth retryable fetch errors use the network explanation", () => {
   );
 });
 
-test("auth server errors retain their useful message", () => {
+test("known auth error codes return fixed guidance", () => {
   assert.equal(
-    getAuthErrorMessage("Signup", new Error("Email address is invalid")),
-    "Signup failed: Email address is invalid"
+    getAuthErrorMessage("Signup", { code: "weak_password", message: "Raw provider details" }),
+    "Choose a stronger password and try again."
   );
+  const invalid = getAuthErrorMessage("Login", { code: "invalid_credentials" });
+  assert.match(invalid, /Check your email and password/);
+  assert.equal(getAuthErrorMessage("Login", { code: "email_not_confirmed" }), invalid);
 });
 
 test("unexpected auth errors receive a safe fallback", () => {
   assert.equal(getAuthErrorMessage("Login", null), "Login failed: Please try again.");
+  assert.equal(getAuthErrorMessage("Signup", new Error("Internal database details")), "Signup failed: Please try again.");
 });
