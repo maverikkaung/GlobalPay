@@ -470,11 +470,46 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await expect(client.getByText("Verified", { exact: true })).toBeVisible();
     const clientEmail = await authenticatedEmailFor(client);
     expect(clientEmail).toBeTruthy();
-    await expect(client.getByText(clientEmail, { exact: true }).first()).toBeVisible();
-    await client.locator("#settings-new-email").fill(clientEmail);
-    await client.locator("#settings-email-password").fill("");
-    await client.getByRole("button", { name: "Request verified email change" }).click();
+    const accountEmail = client.getByText(clientEmail, { exact: true }).first();
+    await expect(accountEmail).toBeVisible();
+    const emailChangeAuthRequests = [];
+    client.on("request", (request) => {
+      const url = new URL(request.url());
+      const isPasswordReauthentication = url.pathname.endsWith("/auth/v1/token")
+        && url.searchParams.get("grant_type") === "password"
+        && request.method() === "POST";
+      const isUserMutation = url.pathname.endsWith("/auth/v1/user") && request.method() !== "GET";
+      if (isPasswordReauthentication || isUserMutation) {
+        emailChangeAuthRequests.push({ method: request.method(), path: url.pathname });
+      }
+    });
+
+    const newEmailInput = client.locator("#settings-new-email");
+    const emailPasswordInput = client.locator("#settings-email-password");
+    const requestEmailChange = client.getByRole("button", { name: "Request verified email change" });
+
+    // Empty required fields are stopped by native constraint validation before React onSubmit.
+    await newEmailInput.fill("");
+    await emailPasswordInput.fill("");
+    await requestEmailChange.click();
+    expect(await newEmailInput.evaluate((input) => input.validity.valueMissing)).toBe(true);
+    expect(await emailPasswordInput.evaluate((input) => input.validity.valueMissing)).toBe(true);
+    expect(emailChangeAuthRequests).toHaveLength(0);
+
+    // A malformed address is likewise rejected by the native email input validation.
+    await newEmailInput.fill("not-an-email");
+    await emailPasswordInput.fill("qa-placeholder-not-submitted");
+    await requestEmailChange.click();
+    expect(await newEmailInput.evaluate((input) => input.validity.typeMismatch)).toBe(true);
+    expect(emailChangeAuthRequests).toHaveLength(0);
+
+    // With valid required controls, the app's duplicate-email check must be accessible.
+    // This placeholder is not an account password and React returns before any Auth call.
+    await newEmailInput.fill(clientEmail);
+    await requestEmailChange.click();
     await expect(client.getByRole("alert").filter({ hasText: "Enter a different email address." })).toBeVisible();
+    expect(emailChangeAuthRequests).toHaveLength(0);
+    await expect(accountEmail).toHaveText(clientEmail);
     if (process.env.TK_QA_CLIENT_NEXT_PASSWORD) {
       await client.locator("#settings-current-password").fill(clientCredentials.password);
       await client.locator("#settings-new-password").fill(process.env.TK_QA_CLIENT_NEXT_PASSWORD);
