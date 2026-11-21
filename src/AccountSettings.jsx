@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import DashboardNav from "./DashboardNav.jsx";
 import { getRequestErrorMessage } from "./request-errors.js";
+import { getEmailVerificationLabel, getEmailVerificationStatus } from "./account-verification.js";
 
 function formatDate(value) {
   if (!value) return "Not available";
@@ -14,7 +15,7 @@ function formatDate(value) {
 function AccountSettings() {
   const { user } = useAuth();
   const [email, setEmail] = useState(user.email || "");
-  const [emailVerified, setEmailVerified] = useState(Boolean(user.emailConfirmedAt));
+  const [emailVerificationStatus, setEmailVerificationStatus] = useState("loading");
   const [createdAt, setCreatedAt] = useState(user.createdAt);
   const [nextEmail, setNextEmail] = useState("");
   const [emailPassword, setEmailPassword] = useState("");
@@ -31,44 +32,51 @@ function AccountSettings() {
   useEffect(() => {
     let active = true;
     async function loadAccountDetails() {
-      const result = await supabase.auth.getUser();
-      if (!active) return;
-      if (result.error) {
-        setError(getRequestErrorMessage("Unable to load account details", result.error));
-        setLoading(false);
-        return;
-      }
-      setEmail(result.data.user?.email || user.email || "");
-      setEmailVerified(Boolean(result.data.user?.email_confirmed_at));
-      setCreatedAt(result.data.user?.created_at || user.createdAt || null);
+      let verificationResolved = false;
+      try {
+        const result = await supabase.auth.getUser();
+        if (!active) return;
+        if (result.error) {
+          setEmailVerificationStatus("unavailable");
+          setError(getRequestErrorMessage("Unable to load account details", result.error));
+          setLoading(false);
+          return;
+        }
+        const authUser = result.data.user;
+        setEmailVerificationStatus(getEmailVerificationStatus(authUser));
+        verificationResolved = true;
+        setEmail(authUser?.email || user.email || "");
+        setCreatedAt(authUser?.created_at || user.createdAt || null);
 
-      const blocks = await supabase.from("user_blocks")
-        .select("blocked_id, created_at")
-        .eq("blocker_id", user.id)
-        .order("created_at", { ascending: false });
-      if (!active) return;
-      if (blocks.error && !["PGRST205", "42P01"].includes(blocks.error.code)) {
-        setError(getRequestErrorMessage("Unable to load your safety list", blocks.error));
-      } else if (!blocks.error) {
-        setBlockListAvailable(true);
-        const blockedIds = (blocks.data || []).map((row) => row.blocked_id);
-        if (blockedIds.length) {
-          const [freelancers, clients] = await Promise.all([
-            supabase.from("freelancer_public_profiles").select("id, full_name").in("id", blockedIds),
-            supabase.from("client_public_profiles").select("id, full_name").in("id", blockedIds)
-          ]);
-          if (!active) return;
-          const names = Object.fromEntries([...(freelancers.data || []), ...(clients.data || [])].map((profile) => [profile.id, profile.full_name]));
-          setBlocked((blocks.data || []).map((row) => ({ ...row, displayName: names[row.blocked_id] || "TechKarvo member" })));
-        } else setBlocked([]);
+        const blocks = await supabase.from("user_blocks")
+          .select("blocked_id, created_at")
+          .eq("blocker_id", user.id)
+          .order("created_at", { ascending: false });
+        if (!active) return;
+        if (blocks.error && !["PGRST205", "42P01"].includes(blocks.error.code)) {
+          setError(getRequestErrorMessage("Unable to load your safety list", blocks.error));
+        } else if (!blocks.error) {
+          setBlockListAvailable(true);
+          const blockedIds = (blocks.data || []).map((row) => row.blocked_id);
+          if (blockedIds.length) {
+            const [freelancers, clients] = await Promise.all([
+              supabase.from("freelancer_public_profiles").select("id, full_name").in("id", blockedIds),
+              supabase.from("client_public_profiles").select("id, full_name").in("id", blockedIds)
+            ]);
+            if (!active) return;
+            const names = Object.fromEntries([...(freelancers.data || []), ...(clients.data || [])].map((profile) => [profile.id, profile.full_name]));
+            setBlocked((blocks.data || []).map((row) => ({ ...row, displayName: names[row.blocked_id] || "TechKarvo member" })));
+          } else setBlocked([]);
+        }
+        setLoading(false);
+      } catch (loadError) {
+        if (!active) return;
+        if (!verificationResolved) setEmailVerificationStatus("unavailable");
+        setError(getRequestErrorMessage("Unable to load account details", loadError));
+        setLoading(false);
       }
-      setLoading(false);
     }
-    loadAccountDetails().catch((loadError) => {
-      if (!active) return;
-      setError(getRequestErrorMessage("Unable to load account details", loadError));
-      setLoading(false);
-    });
+    loadAccountDetails();
     return () => { active = false; };
   }, [user.createdAt, user.email, user.id]);
 
@@ -155,12 +163,12 @@ function AccountSettings() {
       {error && <p className="account-settings-alert account-settings-alert--error" role="alert">{error}</p>}
       {notice && <p className="account-settings-alert account-settings-alert--success" role="status">{notice}</p>}
 
-      <section className="account-settings-card" aria-labelledby="account-overview-heading">
+      <section className="account-settings-card" aria-labelledby="account-overview-heading" aria-busy={loading}>
         <div><span className="dashboard-tag">PRIVATE ACCOUNT DETAILS</span><h2 id="account-overview-heading">Account information</h2></div>
         {loading ? <p role="status">Loading account details…</p> : <dl className="account-details-grid">
           <div><dt>Name</dt><dd>{user.name || "TechKarvo member"}</dd></div>
           <div><dt>Email</dt><dd>{email || "Not available"}</dd></div>
-          <div><dt>Email status</dt><dd>{emailVerified ? "Verified" : "Not verified"}</dd></div>
+          <div><dt>Email status</dt><dd>{getEmailVerificationLabel(emailVerificationStatus)}</dd></div>
           <div><dt>Account type</dt><dd>{user.accountType}</dd></div>
           <div><dt>Member since</dt><dd>{formatDate(createdAt)}</dd></div>
         </dl>}

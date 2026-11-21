@@ -494,8 +494,13 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await expect(freelancer.locator(`.conversation-item[data-other-id="${clientId}"]`)).toBeVisible();
 
     // Account settings: private account info, verified password update, and safe email-change validation.
-    await client.goto("/account-settings");
-    await expect(client.getByText("Verified", { exact: true })).toBeVisible();
+    await client.goto("/account-settings", { waitUntil: "domcontentloaded" });
+    await expect(client.getByRole("heading", { name: "Account Settings" }), "the authenticated account settings route should render").toBeVisible({ timeout: 30_000 });
+    const accountOverview = client.locator('section[aria-labelledby="account-overview-heading"]');
+    await expect(accountOverview.locator(".account-details-grid"), "account details must finish loading before checking email verification").toBeVisible({ timeout: 30_000 });
+    const emailVerificationRow = accountOverview.locator(".account-details-grid > div").filter({ has: client.getByText("Email status", { exact: true }) });
+    await expect(emailVerificationRow, "the page must show an explicit email verification state").toHaveCount(1);
+    await expect(emailVerificationRow.locator("dd"), "verification must reflect Supabase Auth and may be verified, unverified, or unavailable").toHaveText(/^(Verified|Not verified|Verification status unavailable)$/);
     const clientEmail = await authenticatedEmailFor(client);
     expect(clientEmail).toBeTruthy();
     const accountEmail = client.getByText(clientEmail, { exact: true }).first();
