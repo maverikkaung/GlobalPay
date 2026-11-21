@@ -20,7 +20,7 @@ function isNewInsert(response, pathname) {
     && !/resolution\s*=/i.test(headers.prefer || "") && headers["x-upsert"] !== "true";
 }
 
-export async function guardQaDeletions(page, accountId, otherId, fixtureImage, blocked) {
+export async function guardQaDeletions(page, accountId, otherId, fixtureImage, blocked, verifyPostDependencies) {
   const media = new Set();
   const posts = new Set();
   const messages = new Set();
@@ -65,7 +65,8 @@ export async function guardQaDeletions(page, accountId, otherId, fixtureImage, b
     } else if (url.pathname === "/rest/v1/posts") {
       category = "post";
       const postId = url.searchParams.get("id")?.slice(3);
-      allowed = posts.has(postId) && eq("author_id", accountId) && eq("id", postId);
+      allowed = posts.has(postId) && eq("author_id", accountId) && eq("id", postId)
+        && Boolean(await verifyPostDependencies?.(postId));
     } else if (url.pathname === "/rest/v1/muted_users" || url.pathname === "/rest/v1/user_blocks") {
       category = "temporary safety setting";
       const fields = url.pathname.endsWith("muted_users") ? ["user_id", "muted_user_id"] : ["blocker_id", "blocked_id"];
@@ -87,6 +88,7 @@ export async function guardQaDeletions(page, accountId, otherId, fixtureImage, b
       const { id } = await response.json();
       if (!uuid.test(id)) throw new Error("Created QA post did not return an ID.");
       posts.add(id);
+      return id;
     },
     async recordMessage(insert, read, body) {
       const data = requestJson(insert.request());
@@ -100,7 +102,7 @@ export async function guardQaDeletions(page, accountId, otherId, fixtureImage, b
         && row.conversation_id === data.conversation_id);
       if (matching.length !== 1 || !uuid.test(matching[0].id)) throw new Error("Created QA message could not be identified.");
       messages.add(matching[0].id);
-      return data.conversation_id;
+      return { conversationId: data.conversation_id, messageId: matching[0].id };
     }
   };
 }

@@ -1,5 +1,46 @@
 # TechKarvo staging verification and migration runbook
 
+## Milestone 3 ပြီးဆုံးမှု · Staging Playwright ၈/၈
+
+ခွင့်ပြုထားသည့် အပြည့်အစုံ တစ်ကြိမ်တွင် **၈ အောင်၊ ၀ ကျ၊ ၀ ကျော်** ဖြစ်သည်။ ကြာချိန် ၃ မိနစ် ၄၉ စက္ကန့် ဖြစ်သည်။ `techkarvo-staging` (`ntucgiieksrwebwvcmun`) ကို authenticated နည်းဖြင့် အတည်ပြုပြီး သီးခြား QA အကောင့်အသစ် နှစ်ခုကို သီးခြား session ဖိုင်တွဲတွင် သုံးသည်။ Run မစမီ အကောင့်နှစ်ခုလုံး လက်ရှိ Free quota ရှိပြီး ယခင် conversation၊ hide၊ usage event နှင့် ledger transaction မရှိကြောင်း၊ သတ်မှတ် run ID အတွက် ငွေလွှဲမှတ်တမ်း ၀ ခု ဖြစ်ကြောင်း စစ်သည်။ စမ်းသပ်မှုအတွင်း အလိုအလျောက် retry ၀ ခု ဖြစ်သည်။
+
+အများသုံး စမ်းသပ်မှု ၄ ခုနှင့် အကောင့်ဝင် စမ်းသပ်မှု ၄ ခု အားလုံး အောင်သည်။ အသစ်ဖွင့်သည့် personal conversation တွင် Client/Freelancer စာပို့၊ လက်ခံ၊ ဖတ်ပြီးမှတ်သားမှုနှင့် ခွင့်ပြုထားသည့် စာဖုံးအုပ်မှု အောင်သည်။ Hide မှတ်တမ်း အသစ် ၁ ခု သာ ထပ်တိုးပြီး ယခင် hide၊ post၊ message၊ profile နှင့် သိုလှောင်ပုံဖိုင် မှတ်တမ်းများကို မူလ fingerprint နှင့် ပြန်တိုက်စစ်ရာ တူညီသည်။ QA စမ်းသပ်မှုတွင် တားထားသည့် ဖယ်ရှားမှု မတွေ့ပါ။
+
+Client Premium `39.99 KAV` နှင့် Freelancer Plus `4.99 KAV` တစ်ကြိမ်စီ မှတ်တမ်းတင်သည်။ Client quota ၁/၁၀၀၊ Freelancer quota ၁/၃၀ သုံးထားပြီး နှစ်ဖက်လုံး simulated renewal ပိတ်ထားသည်။ Plan activation event ၂ ခု၊ job post နှင့် application quota event တစ်ခုစီ ရှိသည်။ မူလ membership၊ အသုံးပြုမှုမှတ်တမ်း၊ catalog နှင့် sandbox သတ်မှတ်ချက် မပြောင်းလဲပါ။
+
+Ledger မူလ row **၁၀၀/၁၀၀** အတိအကျ တူသည်။ ခွင့်ပြုထားသည့် account **၆ ခု**၊ simulated transaction **၈ ခု** (deposit ၄၊ membership purchase ၂၊ withdrawal ၂) နှင့် journal entry **၁၆ ခု** ထပ်တိုးပြီး စုစုပေါင်း **၂၂ account၊ ၃၆ transaction၊ ၇၂ entry** ဖြစ်သည်။ ခွင့်ပြုချက်ပြင်ပ transaction၊ journal မညီမှု၊ အနုတ် wallet၊ orphan၊ ထပ်နေသည့် idempotency key နှင့် simulated အမှတ်အသားမပါသော transaction အားလုံး ၀ ဖြစ်သည်။ Remote history **000–017**၊ RLS policy **၁၇၅**၊ RLS flag နှင့် table/column/function grant fingerprint များ မပြောင်းလဲပါ။
+
+ပိတ်သိမ်းစဉ် staging ကို ဖတ်ရှုရုံ ပြန်စစ်ရာ migration **၁၈ ခု**၊ RLS နှင့် မူလ ledger row **၁၀၀** အားလုံး ဆက်လက်တူညီပြီး ledger စည်းမျဉ်းချိုးဖောက်မှု **၀ ခု** ဖြစ်သည်။ စက်တွင်း lint နှင့် production build အောင်သည်။ ယူနစ်နှင့် နောက်ကြောင်းပြန် စမ်းသပ်မှု **၈၀ အောင်၊ ၀ ကျ၊ ၀ ကျော်**၊ သီးခြား PostgreSQL 16 စမ်းသပ်မှု **၁၁ အောင်၊ ၀ ကျ၊ ၀ ကျော်** ဖြစ်သည်။ အထက်ပါ ၈/၈ သည် ခွင့်ပြုခဲ့သည့် staging run ၏ ရလဒ်ဖြစ်သည်။ ပိတ်သိမ်းစဉ် staging ဒေတာရေးသည့် စမ်းသပ်မှု ထပ်မလုပ်ခဲ့ပါ။
+
+ပိတ်သိမ်းထားသည့် ဖိုင်များတွင် သီးခြား QA role နှင့် session ပြင်ဆင်မှု၊ run ID အလိုက် simulated ငွေလွှဲကန့်သတ်မှု၊ ပို့စ်ဖယ်ရှားမီ ပိုင်ဆိုင်မှုနှင့် ဆက်စပ်မှတ်တမ်းများကို ဖတ်ရှုစစ်ဆေးမှု၊ ၎င်းတို့၏ စမ်းသပ်မှုနှင့် ဤမှတ်တမ်းတို့ ပါဝင်သည်။ နောက်ထပ် staging ဒေတာရေးသည့် run အတွက် သီးခြားခွင့်ပြုချက်၊ အတည်ပြုထားသော QA အကောင့် ID နှစ်ခု၊ `TK_QA_RUN_ID` နှင့် ပို့စ်ဆက်စပ်မှုကို ဖတ်ရှုစစ်ဆေးနိုင်သော staging Supabase CLI လိုသည်။
+
+## နောက်ဆုံး authenticated Playwright ၈ ခုအတွက် ခွင့်ပြုချက်မတိုင်မီ စစ်ဆေးချက်
+
+`2d273d3` မှ `--list` ဖြင့် staging စမ်းသပ်မှု ၈ ခုကို ရေတွက်ထားသည်။ လက်ရှိ session အစုတွင် အသုံးပြုနိုင်သည့် Client/Freelancer အတွဲ တစ်တွဲသာရှိသည်။ အဲဒီအတွဲမှာ connection နှင့် ယခင် personal conversation hide ရှိသည်။ `connections_unique_pair` နှင့် `connection:<id>` စည်းမျဉ်းကြောင့် ယခင်အတွဲအတွက် သီးခြား personal thread ဒုတိယခု မဖွင့်နိုင်ပါ။
+
+အဆိုပြုထားသည့် သီးခြားစမ်းသပ်မှုသည် staging အတွက်သာ အသစ်ပြင်ဆင်မည့် Client/Freelancer QA အတွဲနှင့် repository ပြင်ပ session ဖိုင်တွဲအသစ်ကို သုံးမည်။ ပုံမှန် signup နှင့် အတည်ပြုခြင်းကို သီးခြားခွင့်ပြုချက်ရမှ အသုံးပြုမည်။ ၎င်းတို့ကြောင့် `auth.users`၊ `auth.identities`၊ `profiles` နှင့် Free `membership_entitlements` နှစ်ခုစီ၊ အတည်ပြုခြင်းနှင့် လော့ဂ်အင်ဆိုင်ရာ Auth မှတ်တမ်းများ ဖန်တီးနိုင်သည်။ မူလ အကောင့်၊ စကားဝိုင်း၊ ဖိုင်တွဲများကို ထိန်းထားမည်။ စမ်းသပ်မှုမစမီ အတွဲအသစ်တွင် connection၊ thread၊ hide၊ ကျန်နေသည့် test job/post/message/safety setting နှင့် ယခင်စမ်းသပ်ငွေလွှဲ မှတ်တမ်း မရှိကြောင်း၊ quota period လက်ရှိဖြစ်ကြောင်းနှင့် renewal ပိတ်ထားကြောင်း read-only စစ်မည်။ #၅ မှ အသစ်ဖွင့်သည့် personal thread ကို #၆ အတွက် သုံးမည်။ #၆ ၏ application က သီးခြား job thread ဖွင့်ပြီး #၇ အတွက် လျှောက်လွှာရရှိစေမည်။
+
+| စမ်းသပ်မှု | ခွင့်ပြုချက်တောင်းသည့် အတိအကျ အတိုင်းအတာ |
+| --- | --- |
+| ၁။ အများသုံး admin/support ဝင်ခွင့် | Supabase ရေးသားမှုနှင့် ဖယ်ရှားမှု ၀ ခု။ |
+| ၂။ အများသုံး demo marketplace | အလုပ်၊ လျှောက်လွှာ၊ အပ်နှံမှု၊ review၊ post၊ တုံ့ပြန်မှု၊ comment၊ စာနှင့် demo reset အားလုံး browser ထဲတွင်သာ ဖြစ်သည်။ Supabase ၀ ခု။ |
+| ၃။ အများသုံး demo wallet | Membership၊ reward၊ deposit၊ milestone၊ dispute၊ release နှင့် demo reset အားလုံး browser ထဲတွင်သာ ဖြစ်သည်။ Supabase ၀ ခု။ |
+| ၄။ အများသုံး theme နှင့် responsive layout | Browser theme preference သာ။ Supabase ၀ ခု။ |
+| ၅။ ချိတ်ဆက်မှု | Client စမ်းသပ် post ၁ ခု၊ connection `Pending` ၁ ခုနှင့် ထို row ကို `Accepted` သို့ပြောင်းခြင်း။ Trigger မှ personal conversation ၁ ခု၊ notification ၂ ခု။ Post ကို ထိန်းထားမည်။ |
+| ၆။ Marketplace အပြည့်အစုံ | QA profile နှစ်ခုကို ပြင်ပြီး ပုံဖိုင်အသစ် ၄ ခု တင်မည်။ Job ၁ ခု၊ application ၁ ခု၊ လက်ခံရာမှ contract ၁ ခု၊ job thread ၁ ခု၊ အလုပ်ပြီးဆုံးချိန် job/contract status ပြောင်းခြင်း၊ quota အသုံးပြုမှု ၁ credit နှင့် event ၁ ခုစီ။ Job စာ ၁ စောင်နှင့် personal share စာ ၁ စောင်၊ ၎င်းတို့၏ receipt၊ ပုံပါ social post ၁ ခု၊ အဲဒီပို့စ်ကို တစ်ကြိမ်ပြင်ခြင်း၊ like နှင့် comment တစ်ခုစီ။ Trigger notification ၆ ခုအထိ၊ run မှ ထုတ်သော notification များအတွက်သာ `read_at` ပြောင်းခြင်း။ `muted_users` ၁ ခု၊ contract စည်းမျဉ်းခွင့်ပြုမှ `user_blocks` ၁ ခု၊ `user_reports` ၁ ခု၊ `conversation_hides` ၁ ခု အသစ်ထည့်မည်။ Wallet/account နှင့် plan ရေးသားမှု အောက်တွင် သီးခြားဖော်ပြထားသည်။ Live review ရေးသားမှု ၀ ခု။ |
+| ၇။ Client လျှောက်ထားသူ စစ်ထုတ်မှု | #၆ ဖန်တီးသည့် လျှောက်လွှာကို ဖတ်ရုံ။ Supabase ရေးသားမှု ၀ ခု။ |
+| ၈။ ငွေကြေး sandbox | အကောင့်တစ်ခုစီအတွက် simulated deposit `0.01` နှင့် withdrawal `0.01` တစ်ကြိမ်စီ။ Transaction ၄ ခုနှင့် entry ၈ ခု။ ဖယ်ရှားမှု ၀ ခု။ |
+
+#၆ ၏ ဖယ်ရှားမှုကို ယခု run မှ အောင်မြင်သော ရေးသားမှုအထောက်အထား၊ ပိုင်ရှင်နှင့် row ID ကို တိုက်စစ်ပြီးမှ ခွင့်ပြုမည်။ ကန့်သတ်ထားသည်မှာ social post ၁ ခု၊ ဆက်နွှယ်သည့် စမ်းသပ် like/comment တစ်ခုစီ၊ post ပုံဖိုင် ၁ ခု၊ run မှ အသစ်တင်ပြီး save ပျက်သည့် ပုံများနှင့် အသစ်ဖန်တီးထားသော mute/block တစ်ခုစီ ဖြစ်သည်။ Post ဖျက်ချိန် FK သည် အဲဒီ post ကိုညွှန်းသည့် စမ်းသပ်စာ၏ share reference ကို ရှင်းမည်။ ဆက်နွှယ်နေသော အခြားပိုင်ရှင်၏ record သို့မဟုတ် ယခု run ပြင်ပ record မရှိကြောင်း စစ်နိုင်မှ ရှင်းလင်းမည်။ ယင်းကို သီးသန့်စမ်းသပ်ချိန်အတွင်း အတည်မပြုနိုင်ပါက ဖယ်ရှားမှုကို တားပြီး အကြောင်းရင်းမှတ်တမ်းတင်မည်။ Personal စာ ၁ စောင်ကို ပို့သူက `techkarvo_delete_message_for_everyone` ဖြင့် ဖုံးအုပ်ကာ စာ row နှင့် ကန့်သတ် audit row ကို ထိန်းထားမည်။ `Delete for Me` က လက်ရှိ run အတွက် hide row အသစ်တစ်ခု ထည့်သွင်းခြင်းဖြစ်သည်။ Hide ဖျက်သည့် request အားလုံးကို တားမည်။
+
+#၆ ၏ wallet RPC က အကောင့်တစ်ခုစီအတွက် ledger account ၃ ခုအထိ ဖန်တီးနိုင်သည်။ Free fixture အတွဲအတွက် Client Premium `39.99 KAV`၊ Freelancer Plus `4.99 KAV` စမ်းသပ်ရွေးချယ်မှု တစ်ကြိမ်စီနှင့် လိုသလောက် top-up တစ်ကြိမ်စီ ကန့်သတ်မည်။ #၈ ပါ ပေါင်းလျှင် ledger account အသစ် အများဆုံး **၆**၊ simulated transaction **၈** နှင့် entry **၁၆** ဖြစ်သည်။ ဤ scope တွင် renewal၊ reward၊ milestone၊ dispute၊ payout အစစ်၊ password/email ပြောင်းခြင်းနှင့် လက်ရှိ ledger history ကို ပြင်ခြင်း မပါဝင်ပါ။
+
+စက်တွင်း guard သည် run ID၊ အကောင့် role၊ စမ်းသပ်အဆင့်နှင့် transfer အမျိုးအစားအလိုက် တူညီသည့် idempotency key ကို သုံးပြီး အပိုတောင်းဆိုမှုနှင့် သတ်မှတ်ပမာဏလွန်မှုကို တားသည်။ Staging sandbox ၏ ပမာဏကန့်သတ်ချက်နှင့် QA plan များက အဆိုပြု scope နှင့် ကိုက်ညီသည်။ အတည်ပြုထားသော run တွင် worker တစ်ခု၊ အလိုအလျောက် retry ၀ ခုဖြစ်မည်။ Run ID အတွက် ledger entry တစ်ခုခု ရှိပြီးသား၊ ပုံမှန်မဟုတ်သော ပထမအကြိမ်ရလဒ် သို့မဟုတ် ဖြတ်တောက်မှုတွေ့လျှင် ဖတ်ရှုရုံ ပြန်တိုက်စစ်ပြီး ရပ်မည်။ ID အသစ်ထုတ်ကာ ထပ်ငွေသွင်းခြင်း၊ trial balance ကို reset လုပ်ခြင်းတို့ မလုပ်ရပါ။
+
+ဖတ်ရှုရုံ baseline အချိန် `2026-11-21 20:02:58 UTC` တွင် migration **000–017**၊ RLS policy **၁၇၅**၊ plan **၈**၊ entitlement နှင့် လစဉ် quota **၂၁ စီ**၊ usage event **၂၅**၊ sandbox configuration **၁** ရှိသည်။ Ledger **၁၆ account / ၂၈ transaction / ၅၆ entry** ဖြစ်သည်။ အထက်ပါ scope ကို အသုံးမပြုမီ ပုံမှန်မဟုတ်သော journal၊ negative wallet၊ orphan entry၊ real-money flag၊ duplicate key နှင့် entitlement role mismatch အားလုံး **၀** ဖြစ်သည်။ Membership/ledger SHA-256 ခြောက်ခုသည် ယခင် post-017 စမ်းသပ်ပြီး baseline နှင့် အတိအကျ တူသည်။ ခွင့်ပြုချက်ရပြီးနောက် အတွဲအသစ်ပြင်ဆင်မှုမတိုင်မီနှင့် suite မစမီ snapshot ပြန်ယူမည်။ Suite ပြီးလျှင် မူလ ledger row ၁၀၀၊ ခွင့်ပြု run မှသာ ထပ်တိုးသည့် row များ၊ QA အသုံးပြုမှုနှင့် grant/migration များကို တိုက်စစ်မည်။
+
+Post-016 backup ဖိုင်သုံးခုလုံး SHA-256 ကိုက်ညီပြီး schema DDL ကို authenticated read-only stream နဲ့ တိုက်စစ်သည်။ `public`/`storage` တွင် policy definition **၁၇၅**၊ RLS flag statement **၄၄** နှင့် table/function/sequence grant/revoke statement **၁၉၅** တူပြီး ကွာခြားချက် **၀** ဖြစ်သည်။ ထိုအချိန်က စက်တွင်း unit/regression **၇၈ အောင်၊ ၀ ကျ၊ ၀ ကျော်** ဖြစ်ပြီး staging suite ကို စာရင်းထုတ်စစ်ခဲ့သည်။
+
 ## Milestone 3.2 · စာလက်ခံမှု ပြန်လည်အတည်ပြုခြင်း
 
 ယခင် ၇/၈ ရလဒ်တွင် personal conversation စာဝင်ခဲ့သည်။ အရင်က ဖျောက်ထားသည့် Client စကားဝိုင်းကို ပြန်ပြရန် browser က `conversation_hides` မှတ်တမ်းကို ဖယ်ရှားရန် ကြိုးစားပြီး စမ်းသပ်မှု၏ guard က တားခဲ့သည်။ ဖယ်ရှားမှုကျသည်နှင့် စကားဝိုင်းစာရင်း ဖတ်ရှုမှုတစ်ခုလုံး ရပ်သွားသော အက်ပ်ပြဿနာနှင့် ယခင် hide ပါသော QA စကားဝိုင်းကို ပြန်သုံးသည့် စမ်းသပ်ဒေတာပြဿနာ နှစ်ခုရှိသည်။ Guard က ယခင်မှတ်တမ်းကို ကာကွယ်ခဲ့သည်။

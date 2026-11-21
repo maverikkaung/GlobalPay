@@ -25,7 +25,7 @@ function response(method, path, { payload, status = 201, headers = {}, json } = 
   };
 }
 
-async function setup() {
+async function setup(verifyPostDependencies = async () => true) {
   let handle;
   let observe;
   const blocked = [];
@@ -33,7 +33,7 @@ async function setup() {
     on(_event, listener) { observe = listener; },
     route(_matches, handler) { handle = handler; }
   };
-  const guard = await guardQaDeletions(page, owner, other, fixture, blocked);
+  const guard = await guardQaDeletions(page, owner, other, fixture, blocked, verifyPostDependencies);
   const send = (method, path, data) => handle({
     request: () => ({ method: () => method, url: () => origin + path, postDataJSON: () => data }),
     fallback: () => "allowed",
@@ -62,6 +62,12 @@ test("QA guard rejects unverified records and requires the recorded post owner",
   assert.equal(await deletePost(owner), "allowed");
   assert.equal(await removeMessage(), "allowed");
   assert.deepEqual(blocked, ["post", "message", "post"]);
+});
+
+test("QA guard preserves a current-run post if its cascade cannot be verified", async () => {
+  const { guard, send } = await setup(async () => false);
+  await guard.recordPost(response("POST", "/rest/v1/posts", { payload: { author_id: owner, body }, json: { id: post } }), body);
+  assert.equal(await send("DELETE", `/rest/v1/posts?id=eq.${post}&author_id=eq.${owner}`), 403);
 });
 
 test("QA guard removes only QA fixture media created without upsert in this run", async () => {

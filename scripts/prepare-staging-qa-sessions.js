@@ -11,6 +11,8 @@ import { qaSessionPaths, stagingOrigin, stagingProjectRef as projectRef } from "
 const sessionDir = resolve(qaSessionPaths(process.env).directory);
 const chromePath = process.env.TK_QA_CHROME_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const repoRelativeSessionPath = relative(resolve(process.cwd()), sessionDir);
+const freshSignup = process.argv.includes("--signup");
+const backend = `https://${projectRef}.supabase.co`;
 
 if (!stdin.isTTY) {
   throw new Error("Run the staging QA session setup in an interactive PowerShell or terminal window.");
@@ -43,8 +45,37 @@ async function openLogin(context, role) {
     }
   }));
   if (authenticated) throw new Error(`The fresh ${role} browser context unexpectedly has an existing login.`);
-  process.stdout.write(`${role} нэвтрэх цонх staging дээр нээлттэй, login form бэлэн байна.\n`);
+  if (freshSignup) {
+    await page.getByRole("link", { name: "Sign Up", exact: true }).click();
+    await page.waitForURL(`${stagingOrigin}/signup`);
+    await page.locator("#signup-email").waitFor({ state: "visible" });
+    await page.getByRole("button", { name: new RegExp(`^${role}\\b`, "i") }).click();
+    await page.evaluate((title) => { document.title = title; }, `TechKarvo Staging QA ${role} Signup`);
+  }
+  process.stdout.write(`${role} staging ဖောင် အသင့်ဖြစ်ပါပြီ။\n`);
   return page;
+}
+
+async function guardFreshSignup(context, role) {
+  let signupForwarded = false;
+  await context.route((url) => /^\/(auth|rest|storage)\/v1\//.test(url.pathname), (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.origin !== backend) return route.abort();
+    const method = request.method();
+    if (["GET", "HEAD", "OPTIONS"].includes(method)) return route.fallback();
+    if (method === "POST" && ["/auth/v1/token", "/auth/v1/verify", "/rest/v1/rpc/techkarvo_is_platform_admin"].includes(url.pathname)) return route.fallback();
+    if (method === "POST" && url.pathname === "/auth/v1/signup" && !signupForwarded) {
+      let data;
+      try { data = request.postDataJSON()?.data; } catch { data = null; }
+      if (data?.account_type === role.toLowerCase() && /\bQA\b/i.test(data.full_name || "")) {
+        signupForwarded = true;
+        return route.fallback();
+      }
+    }
+    return route.fulfill({ status: 403, json: { message: "Staging QA account setup scope exceeded." } });
+  });
+  return () => signupForwarded;
 }
 
 async function verifySession(page, role) {
@@ -112,8 +143,11 @@ try {
     headless: false,
     args: QA_CHROME_ARGS
   });
-  client = await browser.newContext({ viewport: { width: 1440, height: 960 } });
-  freelancer = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  client = await browser.newContext({ viewport: { width: 1440, height: 960 }, serviceWorkers: "block" });
+  freelancer = await browser.newContext({ viewport: { width: 1440, height: 960 }, serviceWorkers: "block" });
+  const signupChecks = freshSignup ? await Promise.all([
+    guardFreshSignup(client, "Client"), guardFreshSignup(freelancer, "Freelancer")
+  ]) : [];
 
   // Prepare and validate both login forms before handing either window to the user.
   const [clientPage, freelancerPage] = await prepareSequentialLoginPages(
@@ -121,21 +155,23 @@ try {
     (context) => openLogin(context, context === client ? "Client" : "Freelancer")
   );
   prompt = createInterface({ input: stdin, output: stdout });
-  process.stdout.write("Зориулалтын staging Client болон Freelancer QA аккаунтаар тус тусын цонхонд нэвтэрнэ үү. Нууц үг, token-ийг чат эсвэл terminal-д бүү оруул. Хоёулаа dashboard-д орсны дараа энд `READY` гэж бичнэ үү.\n");
+  process.stdout.write(freshSignup
+    ? "သက်ဆိုင်ရာ role ဖြင့် staging QA အကောင့်အသစ်ဖွင့်ပြီး အတည်ပြုပါ။ အမည်တွင် QA ထည့်ပြီး စကားဝှက်ကို browser ဖောင်ထဲတွင်သာ ထည့်ပါ။\n"
+    : "QA အကောင့်နှစ်ခုဖြင့် သက်ဆိုင်ရာ staging dashboard သို့ ဝင်ပါ။ စကားဝှက်ကို browser ဖောင်ထဲတွင်သာ ထည့်ပါ။\n");
 
   while (true) {
-    await prompt.question("Хоёр QA session бэлэн болсны дараа READY-г оруулна уу: ");
+    await prompt.question("Dashboard နှစ်ခုလုံး ပေါ်ပြီးလျှင် READY ဟု ရိုက်ပါ။ ");
     const clientOk = await verifySession(clientPage, "Client");
     const freelancerOk = await verifySession(freelancerPage, "Freelancer");
-    if (clientOk && freelancerOk) break;
-    process.stdout.write("Нэг эсвэл хоёр цонх зөв role-ийн staging dashboard/session-д хараахан ороогүй байна. Login-оо дуусгаад дахин READY гэж бичнэ үү.\n");
+    if (clientOk && freelancerOk && signupChecks.every((didSubmit) => didSubmit())) break;
+    process.stdout.write("သတ်မှတ် role နှစ်ခုလုံး၏ staging dashboard အဆင်သင့် ဖြစ်ရပါမည်။\n");
   }
 
   saveSessions(
     JSON.stringify(await client.storageState()),
     JSON.stringify(await freelancer.storageState())
   );
-  process.stdout.write("Хоёр staging session тусгаарлагдсан local temporary storage-д хадгалагдлаа. Нууц мэдээлэл дэлгэцэнд хэвлэгдээгүй.\n");
+  process.stdout.write("QA session နှစ်ခုကို သီးခြား ကာကွယ်ထားသော ဖိုင်တွဲတွင် သိမ်းပြီးပါပြီ။\n");
 } finally {
   prompt?.close();
   await Promise.allSettled([client?.close(), freelancer?.close()].filter(Boolean));

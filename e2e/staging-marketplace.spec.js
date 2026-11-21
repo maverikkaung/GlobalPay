@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { persistRotatedSession, qaSessionPaths, sessionStatus, stagingOrigin } from "../scripts/staging-qa-storage.js";
 import { guardQaDeletions, isStagingBackend } from "./qa-deletion-guard.js";
+import { guardSandboxTransfers, requireQaRunId } from "./staging-financial-guard.js";
+import { hasOnlyQaPostDependencies } from "./staging-post-cleanup.js";
 
 const stagingBase = process.env.PLAYWRIGHT_BASE_URL || "";
 const clientCredentials = { email: process.env.TK_QA_CLIENT_EMAIL, password: process.env.TK_QA_CLIENT_PASSWORD };
@@ -16,6 +18,7 @@ const sessionPaths = qaSessionPaths(process.env);
 const savedSessions = new WeakMap();
 
 async function openQaContext(browser, role, options = {}) {
+  options = { ...options, serviceWorkers: "block" };
   if (credentialLoginAvailable) return restrictQaBackend(await browser.newContext(options));
   const path = sessionPaths[role];
   let state;
@@ -92,6 +95,10 @@ async function signIn(page, credentials, role) {
       + `Auth response: ${[...authStatuses].join(", ") || "none observed"}.`);
   } finally {
     page.off("response", recordAuthStatus);
+  }
+  if (process.env.TK_QA_RUN_ID) {
+    const expected = process.env[role === "Client" ? "TK_QA_RUN_CLIENT_ID" : "TK_QA_RUN_FREELANCER_ID"];
+    if (!expected || await profileIdFor(page) !== expected) throw new Error("Staging session does not match the isolated QA run identity.");
   }
   if (saved) saved.verified = true;
   await saveQaSession(context);
@@ -229,6 +236,7 @@ function readUnreadCount(label) {
 
 test("staging Client acceptance makes the personal connection visible to both members", async ({ browser }) => {
   test.skip(!isStaging, "Set staging-only QA account variables to run authenticated staging browser coverage.");
+  requireQaRunId(process.env.TK_QA_RUN_ID);
   const clientContext = await openQaContext(browser, "Client");
   const freelancerContext = await openQaContext(browser, "Freelancer");
   const client = await clientContext.newPage();
@@ -257,6 +265,7 @@ test("staging Client acceptance makes the personal connection visible to both me
 });
 test("staging Client and Freelancer workflows: media, jobs, social, messaging, safety, contracts, reviews and settings", async ({ browser }) => {
   test.skip(!isStaging, "Set staging-only QA account variables to run authenticated staging browser coverage.");
+  const runId = requireQaRunId(process.env.TK_QA_RUN_ID);
   test.setTimeout(300_000);
 
   const clientContext = await openQaContext(browser, "Client", { viewport: { width: 1440, height: 960 } });
@@ -282,13 +291,17 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
   try {
     await signIn(client, clientCredentials, "Client");
     await signIn(freelancer, freelancerCredentials, "Freelancer");
+    await guardSandboxTransfers(client, { runId, role: "Client", phase: "setup" });
+    await guardSandboxTransfers(freelancer, { runId, role: "Freelancer", phase: "setup" });
     // Use ordinary sandbox flows to give these dedicated QA accounts enough monthly credits.
     // This is conditional and never resets balances, membership history, or ledger entries.
     await ensureQaMarketplacePlan(client, "Client", "premium", 39.99, 100);
     await ensureQaMarketplacePlan(freelancer, "Freelancer", "plus", 4.99, 30);
     const clientId = await profileIdFor(client);
     const freelancerId = await profileIdFor(freelancer);
-    const clientDeletions = await guardQaDeletions(client, clientId, freelancerId, tinyPng, blockedDeletions);
+    let postCleanupProof;
+    const clientDeletions = await guardQaDeletions(client, clientId, freelancerId, tinyPng, blockedDeletions,
+      (postId) => postCleanupProof?.postId === postId && hasOnlyQaPostDependencies(postCleanupProof));
     const freelancerDeletions = await guardQaDeletions(freelancer, freelancerId, clientId, tinyPng, blockedDeletions);
 
     // Role-specific dashboard menu, keyboard close, theme persistence, and mobile menu fit.
@@ -422,7 +435,7 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
       return data?.author_id === clientId && data?.body === postBody;
     });
     await client.getByRole("button", { name: "Publish", exact: true }).click();
-    await clientDeletions.recordPost(await createdPost, postBody);
+    const postId = await clientDeletions.recordPost(await createdPost, postBody);
     await expect(client.getByText("Your professional post is live.")).toBeVisible();
     const ownPost = client.locator("article.social-card").filter({ hasText: postBody }).first();
     await expect(ownPost.locator("img.social-post-image")).toBeVisible();
@@ -433,9 +446,10 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     const socialActionStartedAt = Date.now() - 1000;
     await otherPost.getByRole("button", { name: "Like" }).click();
     await otherPost.getByRole("button", { name: "Comment", exact: true }).first().click();
-    await otherPost.getByLabel("Write a comment").fill("QA staging notification and comment check.");
+    const qaComment = `QA staging notification and comment check ${randomUUID()}.`;
+    await otherPost.getByLabel("Write a comment").fill(qaComment);
     await otherPost.getByRole("button", { name: "Comment", exact: true }).last().click();
-    await expect(otherPost.getByText("QA staging notification and comment check.")).toBeVisible();
+    await expect(otherPost.getByText(qaComment)).toBeVisible();
     await notificationButton.click();
     const preview = client.getByRole("region", { name: "Recent notifications" });
     await expect(preview).toBeVisible();
@@ -490,7 +504,8 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     });
     await freelancer.getByRole("button", { name: "Share in conversation" }).click();
     const [insertion, messageRows] = await Promise.all([messageInsert, createdMessage]);
-    const personalThread = `/messages?conversation=${await freelancerDeletions.recordMessage(insertion, messageRows, personalMessage)}`;
+    const { conversationId, messageId } = await freelancerDeletions.recordMessage(insertion, messageRows, personalMessage);
+    const personalThread = `/messages?conversation=${conversationId}`;
     const sentPersonalMessage = freelancer.locator(".message-bubble").filter({ hasText: personalMessage });
     await expect(sentPersonalMessage.locator(".message-shared-post")).toBeVisible();
     await client.goto(personalThread);
@@ -500,6 +515,7 @@ test("staging Client and Freelancer workflows: media, jobs, social, messaging, s
     await expect(receivedPersonalMessage.locator(".message-shared-post")).toBeVisible();
     await expect.poll(async () => readUnreadCount(await client.getByRole("link", { name: /^Messages,/ }).getAttribute("aria-label")), { timeout: 30_000 }).toBeLessThanOrEqual(unreadMessagesBeforePersonalChat);
     await expect(sentPersonalMessage.getByText("Seen", { exact: true })).toBeVisible({ timeout: 30_000 });
+    postCleanupProof = { postId, authorId: clientId, memberId: freelancerId, messageId, comment: qaComment };
     await client.goto("/social");
     const postToDelete = client.locator("article.social-card").filter({ hasText: `${postBody} edited` }).first();
     await postToDelete.getByRole("button", { name: "Delete", exact: true }).click();
@@ -672,6 +688,7 @@ test("staging Client applicant job, status, and search filters work on existing 
 
 test("staging financial sandbox shows role-specific plans, nets simulated transfers, and fits all viewports", async ({ browser }) => {
   test.skip(!isStaging, "Set staging-only QA account variables to run authenticated financial browser coverage.");
+  const runId = requireQaRunId(process.env.TK_QA_RUN_ID);
   test.setTimeout(180_000);
 
   const cases = [
@@ -707,6 +724,7 @@ test("staging financial sandbox shows role-specific plans, nets simulated transf
     const page = await context.newPage();
     try {
       await signIn(page, account.credentials, account.role);
+      await guardSandboxTransfers(page, { runId, role: account.role, phase: "verify" });
       await page.goto("/financial-sandbox");
       await expect(page.getByRole("heading", { name: "Membership & KAV Sandbox" })).toBeVisible({ timeout: 60_000 });
       await expect(page.getByText("SIMULATED — NO FUNDS MOVED")).toBeVisible();
