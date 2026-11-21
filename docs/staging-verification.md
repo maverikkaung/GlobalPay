@@ -1,5 +1,33 @@
 # TechKarvo staging verification and migration runbook
 
+## အဆင့် ၃.၁ · Migration မတင်မီ အတည်ပြုချက်
+
+**ရလဒ်။** `6fe270a` ၏ migration 015 → 016 → 017 ကို staging မှ ရယူထားသော အမည်ဖယ် projection ပြန်ထည့်ထားသည့် သီးခြား PostgreSQL တွင် အစီအစဉ်အတိုင်း စမ်းသပ်ပြီး အောင်မြင်သည်။ Remote staging migration history က 000–014 အထိ ဖြစ်သည်။ အပြည့်အစုံ backup နှင့် restore မအတည်ပြုရသေးသဖြင့် deployment ဆက်လုပ်ရန် အဆင်သင့်အဖြစ် မသတ်မှတ်ရသေးပါ။
+
+### အရန်သိမ်းမှုနှင့် ပြန်ထည့်စမ်းသပ်မှု
+
+- Auth နှင့် Storage ဒေတာပါဝင်သည့် အပြည့်အစုံ logical dump ကို အလိုအလျောက် ခွင့်ပြုချက်စစ်ဆေးမှုက တားခဲ့သည်။ ရှိပြီးသား backup များကို မဖွင့်ဘဲ ထိန်းထားသည်။
+- Staging reference `ntucgiieksrwebwvcmun` ကို အတိအကျသတ်မှတ်ပြီး read-only transaction တစ်ခုဖြင့် migration version များ၊ membership/usage၊ sandbox configuration နှင့် simulated ledger တို့၏ အမည်ဖယ် projection ကို ရယူသည်။ Account ID များအစား စဉ်နံပါတ် သုံးထားပြီး Auth row၊ Storage object၊ အမည်၊ စာသားမှတ်ချက်၊ မူလ reference နှင့် idempotency key များ မပါဝင်ပါ။
+- Projection နှင့် SHA-256 ကို repository ပြင်ပ `LOCALAPPDATA` အောက်ရှိ Windows အသုံးပြုသူတစ်ဦးသာ ဝင်ရောက်နိုင်သော ဖိုလ်ဒါအသစ်တွင် သိမ်းပြီး မူလ byte များနှင့် checksum ကို ပြန်တိုက်စစ်သည်။ PostgreSQL ကို memory ထဲတွင် စတင်၍ migration 000–014 နှင့် Auth/Storage စမ်းသပ်ပုံစံကို တည်ဆောက်ပြီး projection ကို ပြန်ထည့်သည်။ စစ်ထားသော အချက်အလက်အုပ်စုများသည် staging projection နှင့် တူညီသည်။
+- စစ်ဆေးထားသည့် membership/configuration/ledger ဇယား ၇ ခု၏ column အမျိုးအစား၊ RLS policy၊ anonymous/authenticated ခွင့်ပြုချက်နှင့် သက်ဆိုင်ရာ function ၅ ခု၏ definition hash နှင့် execute ခွင့်တို့ ကိုက်ညီသည်။ Migration version ၁၅ ခု၊ plan ၈ ခု၊ entitlement ၂၁ ခု၊ usage event ၂၂ ခု၊ ledger account ၁၆ ခု၊ transaction ၂၄ ခုနှင့် entry ၄၈ ခု ကိုက်ညီသည်။ စာရင်းမညီသည့် transaction ၀ ခုနှင့် လက်ကျန်အနုတ်ဖြစ်သော အသုံးပြုသူ ledger account ၀ ခု ဖြစ်သည်။
+
+### Migration တစ်ခုချင်းစီ၏ ပြောင်းလဲမှု
+
+| Migration | သီးခြား database တွင် အတည်ပြုခဲ့သော ပြောင်းလဲမှု |
+| --- | --- |
+| 015 | `techkarvo_sandbox_activate_plan` ကို အစားထိုးပြီး plan ရွေးချိန် လက်ရှိလ quota သုံးစွဲမှုကို ဆက်တွက်သည်။ |
+| 016 | `techkarvo_membership_benefit_until` နှင့် `techkarvo_current_featured_job_ids` ကို ထည့်သည်။ `techkarvo_enforce_feature_entitlements`၊ `techkarvo_has_membership_feature`၊ `techkarvo_sandbox_claim_ad_reward`၊ `techkarvo_set_profile_boost`၊ `techkarvo_user_analytics` နှင့် `freelancer_public_profiles` view ကို အစားထိုးသည်။ ပထမ helper ကို browser role များအား execute ခွင့်မပေးဘဲ ဖွင့်ထားသည့် အလုပ်များ၏ badge စစ်သည့် RPC ကို anonymous/authenticated အတွက် သတ်မှတ်ထားသည်။ |
+| 017 | `techkarvo_consume_usage_credit` နှင့် `techkarvo_sandbox_activate_plan` ကို အစားထိုးသည်။ Quota ပြောင်းလဲမှု၊ sandbox ပိတ်ချိန် debit၊ လတစ်လတည်း ထပ်ဖြတ်ခြင်းတို့ကို ထိန်းချုပ်သည်။ |
+
+အဆင့်တိုင်းပြီးနောက် plan၊ entitlement၊ usage event၊ ledger account၊ transaction၊ entry၊ sandbox configuration နှင့် စမ်းသပ်အတွက် ပြန်ထည့်ထားသည့် migration history row များ၏ snapshot တူညီသည်။ Function သို့မဟုတ် view ဖယ်ရှားခြင်း မရှိပါ။ Hosted migration runner ၏ history record ထည့်ခြင်းကို ဤသီးခြား SQL စမ်းသပ်မှုတွင် မလုပ်ပါ။
+
+### ဆက်မလုပ်မီ ဖြေရှင်းရမည့်အချက်
+
+1. Staging အပြည့်အစုံ backup ကို ပိုင်ရှင်ခွင့်ပြုထားသည့် နည်းလမ်းဖြင့် ဖန်တီးပြီး အသုံးချနိုင်ကြောင်း သီးခြား database တွင် restore စမ်းသပ်ရန် လိုသည်။ Projection သည် မူလ Auth၊ Storage၊ application ဒေတာ၊ မူလ identifier နှင့် journal reference များကို ပြန်မတည်ဆောက်နိုင်ပါ။ Backup ဖိုင်များ သို့မဟုတ် credentials ကို Git၊ CI သို့မဟုတ် ချတ်တွင် မတင်ရပါ။
+2. လက်တွေ့အသုံးချမည့်အချိန် staging reference၊ migration history၊ ရှိပြီးသားလ သုံးစွဲမှုနှင့် ledger အခြေအနေကို ပြန်စစ်ရပါမည်။ စစ်ဆေးမှုနောက်ပိုင်း staging data ပြောင်းနိုင်ပြီး snapshot သည် ထုတ်ယူချိန်အခြေအနေကိုသာ ပြသည်။
+3. Migration **015 တစ်ခုတည်း** အတွက် သီးခြားအတည်ပြုချက် မရမချင်း remote မတင်ရပါ။ 016/017 အတွက် သီးခြားအတည်ပြုချက် လိုပြီး 015 တင်ထားရုံဖြင့် entitlement နှင့် sandbox pause ပြင်ဆင်ချက်များ အသက်မဝင်သေးပါ။
+4. Authenticated staging workflow များက staging data သို့မဟုတ် QA session ကို ပြောင်းနိုင်သဖြင့် public Playwright စမ်းသပ်မှုကိုသာ run ခဲ့သည်။ Local lint၊ production build၊ unit/regression ၇၄ ခု၊ သီးခြား SQL စမ်းသပ်ချက် ၁၁ ခုနှင့် public staging Playwright ၄ ခု အောင်မြင်သည်။
+
 ## အဆင့် ၃ · Staging migration အဆင်သင့်ဖြစ်မှု
 
 ၂၀၂၆-၁၁-၂၁ ရက်တွင် သတ်မှတ်ထားသော `techkarvo-staging` project ကို read-only transaction ဖြင့် စစ်ဆေးခဲ့သည်။ PostgreSQL 17.12 တွင် migration 000–014 ကို မှတ်တမ်းတင်ထားပြီး 015 ကို မတွေ့ပါ။ အစီအစဉ် ၈ ခုနှင့် entitlement ၂၁ ခုရှိပြီး role မကိုက်ညီမှု ၀ ခု ဖြစ်သည်။ Simulated ledger transaction ၂၄ ခုနှင့် journal entry ၄၈ ခုရှိပြီး စုစုပေါင်း မညီသည့် transaction ၀ ခု ဖြစ်သည်။ စစ်ဆေးခဲ့သော membership၊ configuration နှင့် ledger ဇယားများတွင် RLS ဖွင့်ထားသည်။ Ledger balance trigger နှစ်ခုလုံး deferred ဖြစ်ပြီး အတွင်းသုံး balance/quota function များကို browser role က တိုက်ရိုက် ခေါ်ခွင့်မရှိပါ။
@@ -31,7 +59,7 @@
 - Region: Tokyo (`ap-northeast-1`)
 - Staging site: `https://techkarvo-staging.vercel.app`
 - Staging Vercel deployment branch: `codex/marketplace-data-foundation`
-- Migration history was verified through `202611150012` on this staging project. Migration 012 was applied after exact project-reference, migration-history, schema, and single-migration dry-run checks. Post-apply checks confirmed RLS, grants, fixed search paths, seeded simulation-only catalog entries, and unchanged marketplace data counts. A temporary staging QA Admin was granted only after its exact Auth UID and email-confirmed identity were verified; its authenticated UI tests and privilege/session revocation remain pending a browser session. Migration 013 is currently a branch-only candidate and has not been applied. Production remains a separate system and is outside this runbook.
+- အဆင့် ၃.၁ ၏ read-only စစ်ဆေးမှုအရ migration history သည် `202611150014` အထိ ဖြစ်သည်။ 013 ၏ simulation-only membership/ledger schema နှင့် 014 ၏ deferred ledger balance ပြင်ဆင်ချက် တင်ထားပြီး 015–017 သည် feature branch ပေါ်တွင် ရှိသည်။ လက်ရှိအခြေအနေ၊ backup ကန့်သတ်ချက်နှင့် deployment အတည်ပြုချက်ကို အထက်ပါ အဆင့် ၃.၁ တွင် ကြည့်ပါ။
 
 The values above identify the development environment only. Before each operation, confirm the current target in the Supabase/Vercel dashboard or authenticated CLI. Never infer a target from a local link file alone. No migration in this runbook is pre-approved for a future change.
 
