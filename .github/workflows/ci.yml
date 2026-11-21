@@ -66,6 +66,7 @@ jobs:
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150014_fix_deferred_ledger_balance_trigger.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150015_preserve_membership_cycle_usage.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150016_enforce_current_membership_benefits.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150017_harden_membership_quota_and_sandbox_pause.sql
         env:
           PGPASSWORD: postgres
       - name: Assert marketplace RLS and write boundaries
@@ -94,5 +95,6 @@ jobs:
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/financial_contract_rls_workflows.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/financial_ledger_balance_trigger.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/membership_benefit_workflows.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/membership_sandbox_pause_workflows.sql
         env:
           PGPASSWORD: postgres

@@ -135,7 +135,8 @@ select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','a1111111-1111-4111-8111-111111111111',true);
 select public.techkarvo_set_membership_auto_renew(true);
 reset role;
-update public.membership_entitlements set period_ends_at=now()-interval '1 second'
+update public.membership_entitlements set period_started_at=date_trunc('month',now())-interval '1 month',
+  period_ends_at=now()-interval '1 second'
   where user_id='a1111111-1111-4111-8111-111111111111';
 set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
