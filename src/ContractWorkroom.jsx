@@ -3,6 +3,8 @@ import { Link, useParams } from "react-router-dom";
 import { supabase } from "./supabase.js";
 import { useAuth } from "./useAuth.js";
 import { JobJourney, JobState } from "./JobJourney.jsx";
+import ContractDeliveries from "./ContractDeliveries.jsx";
+import { isCompletedReviewContext } from "./delivery-workflow.js";
 import { buildContractTimeline, contractStates, isContractParticipant, matchesContractContext, milestoneStates } from "./contract-workroom.js";
 import "./ContractWorkroom.css";
 
@@ -43,7 +45,7 @@ function formatDate(value) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-function Overview({ data }) {
+function Overview({ data, userId }) {
   const { contract, job, client, freelancer, application, thread, milestones, events } = data;
   const [status, description] = contractStates[contract.status] || ["Status unavailable", "Check again later for the contract status."];
   const timeline = buildContractTimeline(contract, milestones || [], events || []);
@@ -55,6 +57,8 @@ function Overview({ data }) {
       <nav className="journey-actions" aria-label="Contract links">
         {thread && <Link className="journey-button" to={`/messages?conversation=${encodeURIComponent(thread.id)}`}>Related Messages</Link>}
         {job && <Link className="journey-button journey-secondary" to={`/jobs/${encodeURIComponent(contract.job_id)}`}>Related Job</Link>}
+        {isCompletedReviewContext(contract, application, job, userId) && <Link className="journey-button journey-secondary"
+          to={`/reviews?contract=${encodeURIComponent(contract.id)}`}>Review this project</Link>}
         {["active", "disputed"].includes(contract.status) && <Link className="journey-button journey-secondary"
           to={`/financial-sandbox?contract=${encodeURIComponent(contract.id)}#milestones`}>Milestone Sandbox</Link>}
       </nav>
@@ -79,6 +83,7 @@ function Overview({ data }) {
         {milestones?.length === 50 && <p>Showing the latest 50 milestones.</p>}
       </section>
     </div>
+    <ContractDeliveries key={`${contract.id}:${userId}`} contract={contract} userId={userId} />
     <section className="journey-panel workroom-section" aria-labelledby="workroom-activity">
       <h2 id="workroom-activity">Recent activity</h2>
       {events === null && <p>Milestone activity is unavailable. Contract dates are shown below.</p>}
@@ -109,6 +114,6 @@ export default function ContractWorkroom() {
     {!current ? <JobState title="Loading contract" status="loading" />
       : current.error ? <JobState title="Could not load the workroom" status="error" onRetry={() => setAttempt((count) => count + 1)} />
       : !current.data ? <JobState title="Contract unavailable">This contract does not exist or is not available to your account.</JobState>
-      : <Overview data={current.data} />}
+      : <Overview data={current.data} userId={userId} />}
   </JobJourney>;
 }

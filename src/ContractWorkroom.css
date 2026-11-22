@@ -8,4 +8,19 @@
 .workroom-list { display: grid; gap: 8px; list-style: none; }
 .workroom-list li { display: flex; flex-wrap: wrap; gap: 4px 14px; padding-block: 8px; border-top: 1px solid var(--journey-border); }
 .workroom-list li strong { flex: 1 1 12rem; }
+.workroom-deliveries { margin-block: 16px; min-width: 0; }
+.delivery-form, .delivery-version { display: grid; gap: 8px; min-width: 0; }
+.delivery-form, .delivery-feedback { background: var(--journey-raised); border: 1px solid var(--journey-border); border-radius: 10px; padding: 14px; }
+.delivery-form label { font-weight: 650; }
+.delivery-form :is(input, textarea) {
+  width: 100%; min-width: 0; color: inherit; background: var(--journey-surface);
+  border: 1px solid var(--journey-control); border-radius: 8px; padding: 10px; font: inherit;
+}
+.delivery-form textarea { resize: vertical; }
+.delivery-form input::file-selector-button { font: inherit; margin-inline-end: 8px; }
+.delivery-history, .delivery-files { display: grid; gap: 10px; list-style: none; padding: 0; }
+.delivery-version { border-top: 1px solid var(--journey-border); padding-block: 12px; }
+.delivery-version-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.delivery-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+.workroom-deliveries > button { justify-self: start; }
 @media (max-width: 767px) { .workroom-grid { grid-template-columns: minmax(0, 1fr); } }

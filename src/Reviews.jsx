@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { getRequestErrorMessage } from "./request-errors.js";
 import DashboardNav from "./DashboardNav.jsx";
+import { isCompletedReviewContext } from "./delivery-workflow.js";
 
-function Reviews() {
+const contractIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+
+function ReviewList({ contractId }) {
   const { user } = useAuth();
   const [eligibleJobs, setEligibleJobs] = useState([]);
   const [ratings, setRatings] = useState({});
@@ -13,16 +17,41 @@ function Reviews() {
   const [savingId, setSavingId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const saving = useRef(false);
   useEffect(() => {
     let active = true;
     async function loadEligibleJobs() {
       const column = user.accountType === "Client" ? "client_id" : "freelancer_id";
-      const applicationsResult = await supabase.from("job_applications")
+      if (contractId !== null && !contractIdPattern.test(contractId)) {
+        if (active) setLoading(false);
+        return;
+      }
+      let contract = null;
+      if (contractId !== null) {
+        const result = await supabase.from("contracts").select("id,application_id,job_id,client_id,freelancer_id,status")
+          .eq("id", contractId).eq(column, user.id).eq("status", "completed").maybeSingle();
+        if (result.error) throw result.error;
+        contract = result.data;
+        if (contract?.id !== contractId || contract.status !== "completed" || contract[column] !== user.id) {
+          if (active) setLoading(false);
+          return;
+        }
+      }
+      let applicationQuery = supabase.from("job_applications")
         .select("id, job_id, client_id, freelancer_id, full_name, status")
         .eq(column, user.id).eq("status", "Accepted");
+      if (contract) applicationQuery = applicationQuery.eq("id", contract.application_id);
+      const applicationsResult = await applicationQuery;
       if (applicationsResult.error) throw applicationsResult.error;
 
       const applications = applicationsResult.data || [];
+      let contractsByApplication = {};
+      if (!contract && applications.length) {
+        const result = await supabase.from("contracts").select("id,application_id,job_id,client_id,freelancer_id,status")
+          .eq(column, user.id).in("application_id", applications.map((item) => item.id));
+        if (result.error) throw result.error;
+        contractsByApplication = Object.fromEntries((result.data || []).map((item) => [item.application_id, item]));
+      }
       const jobIds = [...new Set(applications.map((item) => item.job_id))];
       let jobsById = {};
       if (jobIds.length) {
@@ -39,7 +68,9 @@ function Reviews() {
       if (!active) return;
       setEligibleJobs(applications.filter((item) => {
         const job = jobsById[String(item.job_id)];
-        return job?.status === "completed" && !alreadyReviewed.has(String(item.id));
+        const linkedContract = contract || contractsByApplication[item.id];
+        return job?.status === "completed" && !alreadyReviewed.has(String(item.id))
+          && (!linkedContract || isCompletedReviewContext(linkedContract, item, job, user.id));
       }).map((item) => ({
         ...item,
         jobTitle: jobsById[String(item.job_id)]?.title || "Completed project",
@@ -55,10 +86,12 @@ function Reviews() {
       setLoading(false);
     });
     return () => { active = false; };
-  }, [user.id, user.accountType]);
+  }, [contractId, user.id, user.accountType]);
 
   async function submitReview(event, application) {
     event.preventDefault();
+    if (saving.current) return;
+    saving.current = true;
     const rating = ratings[application.id] || 5;
     setSavingId(application.id);
     setError("");
@@ -74,18 +107,18 @@ function Reviews() {
       });
 
       if (result.error) {
-        console.error("Review submission failed:", result.error.message);
+        if (result.error.code === "23505") setEligibleJobs((items) => items.filter((item) => item.id !== application.id));
         setError(result.error.code === "23505"
-          ? "You have already reviewed this project. Refresh to update the list."
+          ? "You have already reviewed this project."
           : "Unable to submit your review. Please try again.");
         return;
       }
       setEligibleJobs((items) => items.filter((item) => item.id !== application.id));
       setNotice("Your review was submitted.");
-    } catch (submitError) {
-      console.error("Review submission failed:", submitError);
+    } catch {
       setError("A network error interrupted review submission. Please try again.");
     } finally {
+      saving.current = false;
       setSavingId("");
     }
   }
@@ -98,6 +131,7 @@ function Reviews() {
           <span className="dashboard-tag">COMMUNITY FEEDBACK</span>
           <h1>Reviews</h1>
           <p>Share a fair, useful review after a project is marked complete.</p>
+          {contractIdPattern.test(contractId ?? "") && <Link to={`/contracts/${contractId}`}>Back to Contract Workroom</Link>}
         </div>
         {error && <p role="alert">{error}</p>}
         {notice && <p role="status">{notice}</p>}
@@ -119,7 +153,7 @@ function Reviews() {
                   </select>
                   <label htmlFor={`review-${application.id}`}>Written review (optional)</label>
                   <textarea id={`review-${application.id}`} maxLength={3000} rows={4} value={comments[application.id] || ""} onChange={(event) => setComments((current) => ({ ...current, [application.id]: event.target.value }))} placeholder="Share clear, respectful feedback…" />
-                  <button type="submit" className="primary-btn" disabled={savingId === application.id}>{savingId === application.id ? "Submitting…" : "Submit Review"}</button>
+                  <button type="submit" className="primary-btn" disabled={Boolean(savingId)}>{savingId === application.id ? "Submitting…" : "Submit Review"}</button>
                 </form>
               </article>
             ))}
@@ -128,6 +162,13 @@ function Reviews() {
       </main>
     </div>
   );
+}
+
+function Reviews() {
+  const [params] = useSearchParams();
+  const { user } = useAuth();
+  const contractId = params.get("contract")?.toLowerCase() ?? null;
+  return <ReviewList key={`${user.id}:${contractId ?? "all"}`} contractId={contractId} />;
 }
 
 export default Reviews;
