@@ -34,6 +34,7 @@ const DemoMode = lazy(() => import("./DemoMode.jsx"));
 const AdminDashboard = lazy(() => import("./AdminDashboard.jsx"));
 const SupportCenter = lazy(() => import("./SupportCenter.jsx"));
 const FinancialSandbox = lazy(() => import("./FinancialSandbox.jsx"));
+const ContractWorkroom = lazy(() => import("./ContractWorkroom.jsx"));
 
 
 function Home() {
@@ -430,6 +431,7 @@ function App() {
       <Route path="/account-settings" element={<RequireAuth roles={["Client", "Freelancer"]}><AccountSettings /></RequireAuth>} />
       <Route path="/support" element={<RequireAuth roles={["Client", "Freelancer"]}><SupportCenter /></RequireAuth>} />
       <Route path="/financial-sandbox" element={<RequireAuth roles={["Client", "Freelancer"]}><FinancialSandbox /></RequireAuth>} />
+      <Route path="/contracts/:id" element={<RequireAuth roles={["Client", "Freelancer"]}><ContractWorkroom /></RequireAuth>} />
       <Route path="/admin" element={<RequireAuth roles={["Client", "Freelancer"]}><AdminDashboard /></RequireAuth>} />
       <Route path="/notifications" element={<RequireAuth roles={["Client", "Freelancer"]}><Notifications /></RequireAuth>} />
       <Route path="/reviews" element={<RequireAuth roles={["Client", "Freelancer"]}><Reviews /></RequireAuth>} />

@@ -1,0 +1,11 @@
+.workroom-header, .workroom-section { display: grid; gap: 12px; }
+.workroom-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); align-items: start; gap: 16px; margin-block: 16px; }
+.workroom-section dl { display: grid; grid-template-columns: minmax(0, .75fr) minmax(0, 1fr); gap: 8px 16px; }
+.workroom-section dt, .workroom-list span, .workroom-list time { color: var(--journey-muted); }
+.workroom-section dd { font-weight: 650; }
+.workroom-section small { display: block; font-weight: 400; }
+.workroom-badge { display: inline-block; border: 1px solid var(--journey-border); padding: 2px 10px; border-radius: 6px; color: var(--journey-accent); background: var(--journey-raised); }
+.workroom-list { display: grid; gap: 8px; list-style: none; }
+.workroom-list li { display: flex; flex-wrap: wrap; gap: 4px 14px; padding-block: 8px; border-top: 1px solid var(--journey-border); }
+.workroom-list li strong { flex: 1 1 12rem; }
+@media (max-width: 767px) { .workroom-grid { grid-template-columns: minmax(0, 1fr); } }

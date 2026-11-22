@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import DashboardNav from "./DashboardNav.jsx";
 import { supabase } from "./supabase.js";
 import { useAuth } from "./useAuth.js";
 
 const money = (value) => `${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KAV`;
+const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 
 export default function FinancialSandbox() {
   const { user } = useAuth();
+  const [params] = useSearchParams();
+  const requestedContract = params.get("contract")?.toLowerCase();
+  const milestonesSection = useRef(null);
   const [wallet, setWallet] = useState(null);
   const [plans, setPlans] = useState([]);
   const [entitlement, setEntitlement] = useState(null);
@@ -23,12 +27,16 @@ export default function FinancialSandbox() {
 
   const refresh = useCallback(async () => {
     setError("");
+    const contractsQuery = supabase.from("contracts").select("id, job_id, client_id, freelancer_id, status")
+      .in("status", ["active", "disputed"]);
+    const contractRequest = !requestedContract ? contractsQuery.order("created_at", { ascending: false }).limit(50)
+      : uuid.test(requestedContract) ? contractsQuery.eq("id", requestedContract) : Promise.resolve({ data: [] });
     const [walletResult, planResult, entitlementResult, profileResult, contractsResult] = await Promise.all([
       supabase.rpc("techkarvo_sandbox_wallet"),
       supabase.from("membership_plans").select("id, account_type, slug, display_name, description, included_usage_credits, simulated_price_usdt, fee_bps, features, entitlements, is_active").eq("account_type", user?.accountType?.toLowerCase()).eq("is_active", true).order("display_order"),
       supabase.from("membership_entitlements").select("plan_id, period_started_at, period_ends_at, period_credit_limit, credits_used, auto_renew").eq("user_id", user?.id).maybeSingle(),
       supabase.from("profiles").select("profile_boost_until").eq("id", user?.id).maybeSingle(),
-      supabase.from("contracts").select("id, job_id, client_id, freelancer_id, status").in("status", ["active", "disputed"]).order("created_at", { ascending: false }).limit(50)
+      contractRequest
     ]);
     const failure = [walletResult, planResult, entitlementResult, contractsResult].find((item) => item.error);
     if (failure) {
@@ -47,9 +55,14 @@ export default function FinancialSandbox() {
       if (milestoneResult.error) { setError("Milestone sandbox is not available. Review the required database setup before using contracts here."); return; }
       setMilestones(milestoneResult.data || []);
     } else setMilestones([]);
-  }, [user?.accountType, user?.id]);
+  }, [requestedContract, user?.accountType, user?.id]);
 
   useEffect(() => { const timer = window.setTimeout(refresh, 0); return () => window.clearTimeout(timer); }, [refresh]);
+  const sandboxReady = Boolean(wallet);
+  useEffect(() => {
+    if (requestedContract && sandboxReady) milestonesSection.current?.focus();
+  }, [requestedContract, sandboxReady]);
+  const visibleContracts = requestedContract ? contracts.filter((contract) => contract.id === requestedContract) : contracts;
 
   async function run(operation, success) {
     setBusy(true); setError(""); setNotice("");
@@ -131,9 +144,9 @@ export default function FinancialSandbox() {
         <section className="financial-section"><header><div><span className="admin-eyebrow">MEMBERSHIP BENEFITS</span><h2>Profile boost and analytics</h2></div><p>Benefits are verified against your active plan by the database.</p></header>{user?.accountType === "Freelancer" && <div className="financial-milestone-actions"><span>{profileBoostUntil && new Date(profileBoostUntil) > new Date() ? `Boost active until ${new Date(profileBoostUntil).toLocaleDateString()}` : hasProfileBoost ? "Profile boost is inactive" : "Profile boost requires Gold or Premium"}</span>{hasProfileBoost && <button type="button" disabled={busy} onClick={() => toggleProfileBoost(!(profileBoostUntil && new Date(profileBoostUntil) > new Date()))}>{profileBoostUntil && new Date(profileBoostUntil) > new Date() ? "Turn off profile boost" : "Enable profile boost"}</button>}</div>}<button type="button" disabled={busy || !hasAnalytics} onClick={loadAnalytics}>{hasAnalytics ? "Load membership analytics" : "Analytics require Gold or Premium"}</button>{analytics && <dl className="financial-analytics">{Object.entries(analytics).map(([key, value]) => <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{value}</dd></div>)}</dl>}</section>
         <section className="financial-section"><header><div><span className="admin-eyebrow">SIMULATION JOURNAL</span><h2>Recent wallet activity</h2></div></header>{wallet.transactions?.length ? <div className="financial-transaction-list">{wallet.transactions.map((item) => <article key={item.id}><div><strong>{item.transaction_type.replaceAll("_", " ")}</strong><span>{new Date(item.created_at).toLocaleString()}</span></div><strong>{money(item.amount_kav)}</strong></article>)}</div> : <p className="financial-empty">No simulated ledger entries yet. Actions above only create non-redeemable sandbox records.</p>}</section>
         <section className="financial-section"><header><div><span className="admin-eyebrow">SIMULATED ONLY</span><h2>Advertisement reward credits</h2></div><p>No ad network is connected. Reward credits are separate from withdrawable KAV.</p></header>{hasAdRewards ? <button className="financial-reward-button" type="button" disabled={busy} onClick={() => run(() => supabase.rpc("techkarvo_sandbox_claim_ad_reward"), "Sample reward credit recorded without an ad network or payment.")}>Claim sample reward</button> : <p className="financial-empty">An eligible paid membership is required to claim sample reward credits.</p>}</section>
-        <section className="financial-section"><header><div><span className="admin-eyebrow">CONTRACT WORKFLOW</span><h2>Simulated milestones</h2></div><p>These records test state transitions only; they are not escrow, payment guarantees, or payout instructions.</p></header>
-          {!contracts.length && <p className="financial-empty">No active contracts are available for sandbox milestones.</p>}
-          {contracts.map((contract) => { const mine = milestones.filter((item) => item.contract_id === contract.id); const isClient = contract.client_id === user?.id; return <article className="financial-contract-card" key={contract.id}><h3>Contract {contract.id.slice(0, 8)} · {contract.status}</h3>
+        <section className="financial-section" id="milestones" ref={milestonesSection} tabIndex={-1} aria-labelledby="sandbox-milestones-heading"><header><div><span className="admin-eyebrow">CONTRACT WORKFLOW</span><h2 id="sandbox-milestones-heading">Simulated milestones</h2></div><p>These records test state transitions only; they are not escrow, payment guarantees, or payout instructions.</p></header>
+          {!visibleContracts.length && <p className="financial-empty">{requestedContract ? "This contract is unavailable for sandbox milestones." : "No active contracts are available for sandbox milestones."}</p>}
+          {visibleContracts.map((contract) => { const mine = milestones.filter((item) => item.contract_id === contract.id); const isClient = contract.client_id === user?.id; return <article className="financial-contract-card" key={contract.id}><h3>Contract {contract.id.slice(0, 8)} · {contract.status}</h3>
             {isClient && contract.status === "active" && <form className="financial-milestone-form" onSubmit={(event) => { event.preventDefault(); addMilestone(contract.id, event.currentTarget); }}><label>Milestone title<input name="title" minLength="3" maxLength="160" required /></label><label>Amount (KAV)<input name="amount" type="number" min="0.01" max="1000000000" step="0.01" required /></label><button disabled={busy}>Add simulated milestone</button></form>}
             {mine.map((milestone) => <div className="financial-milestone-row" key={milestone.id}><div><strong>{milestone.title}</strong><span>{money(milestone.amount_kav)} · {milestone.status}</span></div><div className="financial-milestone-actions">
               {isClient && milestone.status === "draft" && <button disabled={busy} onClick={() => milestoneAction(milestone.id,"fund")}>Simulate hold</button>}
