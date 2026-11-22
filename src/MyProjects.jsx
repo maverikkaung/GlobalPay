@@ -64,11 +64,11 @@ function MyProjects() {
         const contractByApplication = {};
         if (accepted.length) {
           const contractsResult = await supabase.from("contracts")
-            .select("application_id, status").in("application_id", accepted.map((item) => item.id));
+            .select("id, application_id, status").in("application_id", accepted.map((item) => item.id));
           if (!active) return;
           if (!contractsResult.error) {
             (contractsResult.data || []).forEach((contract) => {
-              contractByApplication[String(contract.application_id)] = contract.status;
+              contractByApplication[String(contract.application_id)] = contract;
             });
           } else if (!isOptionalContractSchemaMissing(contractsResult.error)) {
             setWorkflowError("Project details loaded, but contract status is temporarily unavailable.");
@@ -79,7 +79,8 @@ function MyProjects() {
           const application = acceptedByJob[String(project.id)];
           return [String(project.id), {
             applicationStatus: application?.status || null,
-            contractStatus: application ? contractByApplication[String(application.id)] || null : null
+            contractStatus: application ? contractByApplication[String(application.id)]?.status || null : null,
+            contractId: application ? contractByApplication[String(application.id)]?.id : null
           }];
         })));
       } catch (error) {
@@ -439,10 +440,11 @@ function MyProjects() {
 
               {projects.map(function(project) {
                 const status = project.status || "unknown";
+                const workflow = workflowByJob[String(project.id)];
                 const presentation = getAcceptedWorkPresentation({
-                  applicationStatus: workflowByJob[String(project.id)]?.applicationStatus,
+                  applicationStatus: workflow?.applicationStatus,
                   jobStatus: status,
-                  contractStatus: workflowByJob[String(project.id)]?.contractStatus
+                  contractStatus: workflow?.contractStatus
                 });
 
                 return (
@@ -463,6 +465,7 @@ function MyProjects() {
                     {presentation && <div className="project-work-status" aria-label="Hiring and contract status">
                       <strong>{presentation.label}</strong>
                       <p>{presentation.detail}</p>
+                      {workflow?.contractId && <Link to={`/contracts/${encodeURIComponent(workflow.contractId)}`}>Open Contract Workroom</Link>}
                     </div>}
 
                     <p className="my-project-description">

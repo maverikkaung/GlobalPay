@@ -70,12 +70,12 @@ function MyApplications() {
         const contractByApplication = {};
         if (acceptedApplications.length) {
           const contractsResult = await supabase.from("contracts")
-            .select("application_id, status")
+            .select("id, application_id, status")
             .in("application_id", acceptedApplications.map((item) => item.id));
           if (!active) return;
           if (!contractsResult.error) {
             (contractsResult.data || []).forEach((contract) => {
-              contractByApplication[String(contract.application_id)] = contract.status;
+              contractByApplication[String(contract.application_id)] = contract;
             });
           } else if (!isOptionalContractSchemaMissing(contractsResult.error)) {
             setError("Your applications loaded, but contract status is temporarily unavailable.");
@@ -92,7 +92,8 @@ function MyApplications() {
             company: job?.category || "Client",
             status: item.status,
             jobStatus: job?.status || null,
-            contractStatus: contractByApplication[String(item.id)] || null,
+            contractStatus: contractByApplication[String(item.id)]?.status || null,
+            contractId: contractByApplication[String(item.id)]?.id,
             expectedSalary: item.expected_salary,
             salaryType: item.salary_type,
             appliedAt: item.applied_at
@@ -402,6 +403,8 @@ function MyApplications() {
                           Message Client
                         </Link>
                       )}
+                      {item.status === "Accepted" && item.contractId && <Link to={`/contracts/${encodeURIComponent(item.contractId)}`}
+                        className="application-view-button">Open Contract Workroom</Link>}
                       {item.clientId && <Link to={`/profiles/${item.clientId}`} className="application-view-button">View Client Reviews</Link>}
                       {item.status === "Pending" && (
                         <button

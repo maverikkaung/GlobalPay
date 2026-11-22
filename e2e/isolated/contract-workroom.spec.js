@@ -43,6 +43,8 @@ async function fixture(page, baseURL, { user = client, status = "active", noThre
       job_applications: [{ ...thread, id: applicationId, full_name: "Design Freelancer", status: "Accepted", applied_at: "2026-11-19T12:00:00Z" }],
       jobs: [{ id: jobId, title: "Design a storefront", status: "open" }],
       conversations: noThread ? [] : [thread],
+      messages: [{ id: "message", conversation_id: threadId, sender_id: freelancer, body: "Original conversation history",
+        created_at: "2026-11-20T12:00:00Z", read_at: "2026-11-20T12:04:00Z" }],
       contract_milestones: noMilestones ? [] : [{ id: "milestone", contract_id: id, title: "Prototype", status: "submitted", amount_kav: 50 }],
       milestone_events: [{ id: 1, milestone_id: "milestone", event_type: "submitted", created_at: "2026-11-21T10:00:00Z" }]
     };
@@ -50,6 +52,49 @@ async function fixture(page, baseURL, { user = client, status = "active", noThre
   });
   return requests;
 }
+
+test("accepted client and freelancer applications open the same workroom and existing conversation", async ({ browser, baseURL }) => {
+  for (const [user, path] of [[client, "/job-applicants"], [freelancer, "/my-applications"]]) {
+    const page = await browser.newPage({ baseURL });
+    const requests = await fixture(page, baseURL, { user });
+    await page.goto(path);
+    await page.getByRole("link", { name: "Open Contract Workroom" }).click();
+    await expect(page).toHaveURL(workroom);
+    await page.getByRole("link", { name: "Related Messages" }).click();
+    await expect(page).toHaveURL(`/messages?conversation=${threadId}`);
+    await expect(page.getByText("Original conversation history")).toBeVisible();
+    await page.getByRole("link", { name: "Open Contract Workroom" }).click();
+    await expect(page).toHaveURL(workroom);
+    expect(requests.filter(({ method, table }) => method === "POST" && table === "conversations")).toEqual([]);
+    await page.close();
+  }
+});
+
+test("an unavailable explicit chat link does not open or mark another conversation read", async ({ page, baseURL }) => {
+  const requests = await fixture(page, baseURL);
+  await page.goto("/messages?conversation=30000000-0000-4000-8000-000000000099");
+  await expect(page.getByRole("alert")).toContainText("This conversation is unavailable or hidden.");
+  await expect(page.getByText("Original conversation history")).toHaveCount(0);
+  expect(requests.filter(({ method, table }) => method === "PATCH" && ["messages", "notifications"].includes(table))).toEqual([]);
+});
+
+test("workroom navigation is keyboard reachable and fits responsive widths in both themes", async ({ page, baseURL }) => {
+  await fixture(page, baseURL);
+  await page.goto(workroom);
+  const chat = page.getByRole("link", { name: "Related Messages" });
+  await expect(chat).toBeVisible();
+  for (const theme of ["dark", "light"]) {
+    await page.evaluate((value) => { document.documentElement.dataset.theme = value; }, theme);
+    await expect(page.locator(".job-journey")).toHaveCSS("background-color", theme === "dark" ? "rgb(11, 20, 36)" : "rgb(245, 247, 251)");
+    for (const width of [320, 390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 800 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    }
+  }
+  await chat.focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "Related Job" })).toBeFocused();
+});
 
 for (const [role, user] of [["Client", client], ["Freelancer", freelancer]]) {
   test(`${role} can read contract context and existing chat links without mutating the workroom`, async ({ page, baseURL }) => {

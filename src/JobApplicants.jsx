@@ -90,6 +90,8 @@ function ApplicantCard({ application, profile, portfolio, rating, busy, onDecisi
         {status === "Pending" || status === "Accepted"
           ? <Link className="applicant-action applicant-action--secondary" to={`/messages?application=${encodeURIComponent(application.id)}`}>Message</Link>
           : null}
+        {status === "Accepted" && application.contractId && <Link className="applicant-action applicant-action--secondary"
+          to={`/contracts/${encodeURIComponent(application.contractId)}`}>Open Contract Workroom</Link>}
         {status === "Pending" && <>
           <button className="applicant-action applicant-action--primary" type="button" disabled={busy} onClick={() => onDecision(application, "Accepted")}>
             {busy ? "Saving…" : "Accept"}
@@ -131,7 +133,8 @@ function JobApplicants() {
       const rows = result.data || [];
       const jobIds = [...new Set(rows.map((item) => item.job_id))];
       const freelancerIds = [...new Set(rows.map((item) => item.freelancer_id))];
-      const [jobsResult, profilesResult, portfolioResult, reviewsResult] = await Promise.all([
+      const acceptedIds = rows.filter((item) => item.status === "Accepted").map((item) => item.id);
+      const [jobsResult, profilesResult, portfolioResult, reviewsResult, contracts] = await Promise.all([
         jobIds.length ? supabase.from("jobs").select("id, title").in("id", jobIds).eq("client_id", userId) : Promise.resolve({ data: [], error: null }),
         freelancerIds.length ? supabase.from("freelancer_public_profiles")
           .select("*")
@@ -140,7 +143,9 @@ function JobApplicants() {
           .select("id, freelancer_id, title, project_url, image_url, created_at")
           .in("freelancer_id", freelancerIds).order("created_at", { ascending: false }) : Promise.resolve({ data: [], error: null }),
         freelancerIds.length ? supabase.from("reviews_public").select("id, reviewee_id, rating")
-          .in("reviewee_id", freelancerIds) : Promise.resolve({ data: [], error: null })
+          .in("reviewee_id", freelancerIds) : Promise.resolve({ data: [], error: null }),
+        acceptedIds.length ? supabase.from("contracts").select("id,application_id").eq("client_id", userId)
+          .in("application_id", acceptedIds).then(({ data, error }) => error ? [] : data || [], () => []) : []
       ]);
       for (const extra of [jobsResult, profilesResult, portfolioResult, reviewsResult]) {
         if (extra.error) throw extra.error;
@@ -154,7 +159,9 @@ function JobApplicants() {
       const reviewsById = {};
       for (const item of reviewsResult.data || []) (reviewsById[item.reviewee_id] ||= []).push(item);
 
-      setApplications(rows.map((item) => ({ ...item, job_title: jobsById[String(item.job_id)] || "Job no longer available" })));
+      const contractByApplication = new Map(contracts.map((contract) => [contract.application_id, contract.id]));
+      setApplications(rows.map((item) => ({ ...item, contractId: contractByApplication.get(item.id),
+        job_title: jobsById[String(item.job_id)] || "Job no longer available" })));
       setProfiles(profilesById);
       setPortfolios(portfolioById);
       setRatings(Object.fromEntries(freelancerIds.map((id) => [id, summarizeRatings(reviewsById[id] || [])])));
@@ -193,6 +200,7 @@ function JobApplicants() {
         .select("id, status").single();
       if (result.error) throw result.error;
       setApplications((current) => current.map((item) => item.id === application.id ? { ...item, status: result.data.status } : item));
+      if (result.data.status === "Accepted") await loadApplications();
     } catch (updateError) {
       setError(getRequestErrorMessage("Unable to update this application", updateError));
       await loadApplications();

@@ -32,9 +32,21 @@ function Messages() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [contractLink, setContractLink] = useState(null);
   const selectedConversation = useMemo(() => conversations.find((item) => item.id === selectedId), [conversations, selectedId]);
+  const selectedApplication = selectedConversation?.messageFolder === "job" ? selectedConversation.application_id : null;
+  const contractKey = `${user.id}:${selectedApplication}`;
   const folderConversations = useMemo(() => getConversationsForFolder(conversations, activeFolder), [activeFolder, conversations]);
   const folderUnread = useMemo(() => countUnreadByFolder(conversations), [conversations]);
+
+  useEffect(() => {
+    if (!selectedApplication) return;
+    let active = true;
+    supabase.from("contracts").select("id").eq("application_id", selectedApplication).maybeSingle().then(({ data, error: contractError }) => {
+      if (active) setContractLink({ key: contractKey, id: contractError ? null : data?.id });
+    }, () => {});
+    return () => { active = false; };
+  }, [contractKey, selectedApplication]);
 
   useEffect(() => {
     const refreshTime = () => setCurrentTime(Date.now());
@@ -219,12 +231,13 @@ function Messages() {
         ? requestedConversationId
         : "";
       const requestedApplicationThread = formatted.some((item) => item.id === requestedId) ? requestedId : "";
-      const initialId = requestedApplicationThread || requestedThread || formatted[0]?.id || "";
+      const explicitThread = Boolean(requestedApplicationId || requestedConversationId);
+      const initialId = requestedApplicationThread || requestedThread || (!explicitThread && formatted[0]?.id) || "";
       const initialConversation = formatted.find((item) => item.id === initialId);
       setActiveFolder(initialConversation?.messageFolder || "job");
       setSelectedId(initialId);
       setLoading(false);
-      setError("");
+      setError(explicitThread && !initialId ? "This conversation is unavailable or hidden." : "");
     }
 
     loadConversations().catch((loadError) => {
@@ -434,7 +447,10 @@ function Messages() {
           {selectedConversation ? (
             <>
               <div className="thread-heading">
-                <div><span>{selectedConversation.jobTitle}</span><h2>{selectedConversation.otherName}</h2></div>
+                <div><span>{selectedConversation.jobTitle}</span><h2>{selectedConversation.otherName}</h2>
+                  {selectedApplication && contractLink?.key === contractKey && contractLink.id && <Link
+                    to={`/contracts/${encodeURIComponent(contractLink.id)}`}>Open Contract Workroom</Link>}
+                </div>
                 <div className="thread-heading-actions"><small>{selectedConversation.otherTitle}</small><button type="button" disabled={sending} onClick={hideSelectedConversation}>Delete for Me</button></div>
               </div>
               {selectedConversation.otherId && <MemberSafetyActions user={user} memberId={selectedConversation.otherId}
