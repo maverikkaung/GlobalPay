@@ -104,3 +104,30 @@ jobs:
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/contract_delivery_rls_workflows.sql
         env:
           PGPASSWORD: postgres
+      - name: Assert profile and bilateral block authorization
+        run: |
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150019_enforce_profile_visibility.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/profile_privacy_rls_workflows.sql
+        env:
+          PGPASSWORD: postgres
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Exercise role authorization through isolated PostgREST
+        run: |
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/profile_privacy_fixture.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          create role profile_api_fixture login noinherit password 'local-api-fixture';
+          grant anon, authenticated to profile_api_fixture;
+          SQL
+          export TK_PROFILE_TEST_JWT_SECRET="$(node -p "require('node:crypto').randomBytes(32).toString('hex')")"
+          docker run --rm --detach --name profile-privacy-api --network host \
+            -e PGRST_DB_URI=postgres://profile_api_fixture:local-api-fixture@127.0.0.1:5432/postgres \
+            -e PGRST_DB_ANON_ROLE=anon -e PGRST_DB_SCHEMAS=public \
+            -e PGRST_JWT_SECRET="$TK_PROFILE_TEST_JWT_SECRET" \
+            -e PGRST_SERVER_HOST=127.0.0.1 -e PGRST_SERVER_PORT=5188 postgrest/postgrest:v13.0.8
+          trap 'docker stop profile-privacy-api >/dev/null' EXIT
+          curl --silent --show-error --fail --retry 15 --retry-delay 1 --retry-connrefused http://127.0.0.1:5188/ -o /dev/null
+          node --test supabase/tests/profile-privacy-api.mjs
+        env:
+          PGPASSWORD: postgres

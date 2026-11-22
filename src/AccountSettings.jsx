@@ -59,13 +59,20 @@ function AccountSettings() {
           setBlockListAvailable(true);
           const blockedIds = (blocks.data || []).map((row) => row.blocked_id);
           if (blockedIds.length) {
-            const [freelancers, clients] = await Promise.all([
-              supabase.from("freelancer_public_profiles").select("id, full_name").in("id", blockedIds),
-              supabase.from("client_public_profiles").select("id, full_name").in("id", blockedIds)
-            ]);
+            const labels = await supabase.rpc("techkarvo_my_blocked_member_labels");
             if (!active) return;
-            const names = Object.fromEntries([...(freelancers.data || []), ...(clients.data || [])].map((profile) => [profile.id, profile.full_name]));
-            setBlocked((blocks.data || []).map((row) => ({ ...row, displayName: names[row.blocked_id] || "TechKarvo member" })));
+            let namedMembers = labels.data || [];
+            // Keep Safety Settings usable on deployments preceding migration 019.
+            if (["PGRST202", "42883"].includes(labels.error?.code)) {
+              const [freelancers, clients] = await Promise.all([
+                supabase.from("freelancer_public_profiles").select("id, full_name").in("id", blockedIds),
+                supabase.from("client_public_profiles").select("id, full_name").in("id", blockedIds)
+              ]);
+              namedMembers = [...(freelancers.data || []), ...(clients.data || [])];
+            }
+            if (!active) return;
+            const names = new Map(namedMembers.map((profile) => [profile.id, profile.full_name]));
+            setBlocked((blocks.data || []).map((row) => ({ ...row, displayName: names.get(row.blocked_id) || "TechKarvo member" })));
           } else setBlocked([]);
         }
         setLoading(false);

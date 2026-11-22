@@ -14,7 +14,10 @@ const unsafeProject = {
   project_url: "javascript:alert(1)", image_url: "https://person:password@work.example.test/preview.png"
 };
 
-async function mockProfile(page, baseURL, { viewer = client, blocked = false, ownBlock = false, failBlock = false, failReviews = false, accepted = false } = {}) {
+async function mockProfile(page, baseURL, {
+  viewer = client, blocked = false, ownBlock = false, failBlock = false, failReviews = false, accepted = false,
+  labelError
+} = {}) {
   const origin = new URL(baseURL).origin;
   const requests = [];
   if (viewer) await page.addInitScript(({ origin, viewer }) => {
@@ -30,10 +33,17 @@ async function mockProfile(page, baseURL, { viewer = client, blocked = false, ow
     if (url.origin === origin) return route.continue();
     if (url.href === safeProject.image_url) return route.fulfill({ status: 404 });
     if (url.origin !== backend) return route.abort();
+    if (url.pathname === "/auth/v1/user") {
+      return route.fulfill({ json: { id: viewer, email: "fixture@example.test", email_confirmed_at: "2026-11-20T12:00:00Z" } });
+    }
     const table = url.pathname.replace("/rest/v1/", "");
     requests.push({ method: request.method(), table, select: url.searchParams.get("select") });
     if (request.method() === "HEAD") return route.fulfill({ status: 200, headers: { "content-range": "*/0" } });
     if (table === "rpc/techkarvo_is_platform_admin") return route.fulfill({ json: false });
+    if (table === "rpc/techkarvo_my_blocked_member_labels") {
+      return labelError ? route.fulfill({ status: labelError === "PGRST202" ? 404 : 403, json: { code: labelError } })
+        : route.fulfill({ json: [{ id: owner, full_name: "Safety list name" }] });
+    }
     if (table === "rpc/techkarvo_is_blocked_with") {
       expect(request.postDataJSON()).toEqual({ p_other_user_id: owner });
       return failBlock ? route.fulfill({ status: 500, json: { message: "Fixture unavailable" } })
@@ -143,3 +153,19 @@ test("an accepted connection opens the existing thread without a connection writ
   await expect(page).toHaveURL(/\/messages\?conversation=fixture-thread$/);
   expect(requests.filter(({ table, method }) => table === "connections" && method !== "GET")).toEqual([]);
 });
+
+for (const { scenario, labelError, label, readsProfile } of [
+  { scenario: "scoped API", label: "Safety list name", readsProfile: false },
+  { scenario: "rolling deployment", labelError: "PGRST202", label: "Nadi Design", readsProfile: true },
+  { scenario: "permission denial", labelError: "42501", label: "TechKarvo member", readsProfile: false }
+]) {
+  test(`the owner can identify or remove their block in Safety Settings after ${scenario}`, async ({ page, baseURL }) => {
+    const requests = await mockProfile(page, baseURL, { ownBlock: true, labelError });
+    await page.goto("/account-settings");
+    const list = page.getByRole("region", { name: "Privacy & blocked members" });
+    await expect(list.getByText(label, { exact: true })).toBeVisible();
+    await expect(list.getByRole("button", { name: "Unblock" })).toBeEnabled();
+    expect(requests.some(({ table }) => table === "rpc/techkarvo_my_blocked_member_labels")).toBe(true);
+    expect(requests.some(({ table }) => /public_profiles/.test(table))).toBe(readsProfile);
+  });
+}

@@ -5,14 +5,14 @@ import { supabase } from "./supabase.js";
 import { getRequestErrorMessage } from "./request-errors.js";
 import { toSafeExternalUrl } from "./external-urls.js";
 import { MARKETPLACE_MEDIA_BUCKET } from "./social-marketplace.js";
+import { profileMediaPath } from "./profile-preview.js";
 import DashboardNav from "./DashboardNav.jsx";
 
+const CONNECTION_PROFILE_FIELDS = "id,full_name,professional_title,country,avatar_path";
+
 function avatarFor(profile) {
-  if (!profile) return "";
-  return toSafeExternalUrl(profile.avatar_url)
-    || (profile.avatar_path
-      ? toSafeExternalUrl(supabase.storage.from(MARKETPLACE_MEDIA_BUCKET).getPublicUrl(profile.avatar_path).data?.publicUrl)
-      : "");
+  const path = profileMediaPath(profile?.avatar_path, profile?.id);
+  return path ? toSafeExternalUrl(supabase.storage.from(MARKETPLACE_MEDIA_BUCKET).getPublicUrl(path).data?.publicUrl) : "";
 }
 
 function Connections() {
@@ -36,8 +36,8 @@ function Connections() {
       const rows = result.data || [];
       const memberIds = [...new Set(rows.flatMap((item) => [item.requester_id, item.recipient_id]))];
       const [freelancers, clients] = await Promise.all([
-        memberIds.length ? supabase.from("freelancer_public_profiles").select("*").in("id", memberIds) : Promise.resolve({ data: [], error: null }),
-        memberIds.length ? supabase.from("client_public_profiles").select("*").in("id", memberIds) : Promise.resolve({ data: [], error: null })
+        memberIds.length ? supabase.from("freelancer_public_profiles").select(CONNECTION_PROFILE_FIELDS).in("id", memberIds) : Promise.resolve({ data: [], error: null }),
+        memberIds.length ? supabase.from("client_public_profiles").select(CONNECTION_PROFILE_FIELDS).in("id", memberIds) : Promise.resolve({ data: [], error: null })
       ]);
       if (freelancers.error) throw freelancers.error;
       if (clients.error) throw clients.error;
