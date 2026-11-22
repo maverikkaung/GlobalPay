@@ -98,3 +98,9 @@ jobs:
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/membership_sandbox_pause_workflows.sql
         env:
           PGPASSWORD: postgres
+      - name: Assert contract delivery, storage, and review boundaries
+        run: |
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/202611150018_contract_deliveries.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/contract_delivery_rls_workflows.sql
+        env:
+          PGPASSWORD: postgres
