@@ -40,6 +40,16 @@ async function mockMarketplace(page, baseURL, options = {}) {
     }
     if (table === "profiles") return route.fulfill({ json: [profile] });
     if (table === "client_public_profiles") return route.fulfill({ json: [{ id: client, full_name: "Fixture Studio" }] });
+    if (table === "membership_entitlements") return route.fulfill({ json: [{ plan_id: "fixture-plan", period_credit_limit: 5, credits_used: 1,
+      period_started_at: new Date(Date.now() - 3600000).toISOString(), period_ends_at: new Date(Date.now() + 3600000).toISOString() }] });
+    if (table === "membership_plans") return route.fulfill({ json: [{ id: "fixture-plan", is_active: true, is_simulation_only: true,
+      account_type: "freelancer", included_usage_credits: 5 }] });
+    if (table === "job_applications" && method === "POST") {
+      return options.onApply ? options.onApply(route, request.postDataJSON()) : route.fulfill({ status: 201 });
+    }
+    if (table === "job_applications" && (typeof options.existing === "function" ? options.existing() : options.existing)) {
+      return route.fulfill({ json: [{ id: "prior-application" }] });
+    }
     return route.fulfill({ json: [] });
   });
   return requests;
@@ -50,6 +60,7 @@ test("job filters survive Back, Forward, detail navigation and refresh", async (
   await page.goto("/jobs");
   await page.getByRole("searchbox", { name: "Search open jobs" }).fill("React");
   await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page).toHaveURL(/\?q=React$/);
   await page.getByLabel("Category").selectOption("Web Development");
   await page.getByLabel("Sort by").selectOption("title");
   await expect(page.locator(".job-card").first()).toContainText("Audit React components");
@@ -100,4 +111,119 @@ test("job details distinguish a retryable response, a closed posting and a missi
   await expect(page.getByRole("button", { name: "Apply for This Job" })).toHaveCount(0);
   await page.goto("/jobs/" + secondId);
   await expect(page.getByRole("heading", { name: "Job unavailable" })).toBeVisible();
+});
+
+test("a visitor who signs in as a freelancer returns to the intended proposal with its search", async ({ page, baseURL }) => {
+  await mockMarketplace(page, baseURL);
+  await page.goto(`/jobs/${jobId}?q=React&sort=title`);
+  await page.getByRole("button", { name: "Apply for This Job" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel("Email Address").fill("qa@example.invalid");
+  await page.locator("#login-password").fill("fixture-password");
+  await page.getByRole("button", { name: "Login", exact: true }).click();
+  await expect(page).toHaveURL(`/apply/${jobId}?q=React&sort=title`);
+  await expect(page.getByRole("heading", { name: "Apply for " + job.title })).toBeVisible();
+  await expect(page.getByText("4 applications remaining")).toBeVisible();
+  await page.getByRole("link", { name: "Back to Job Details" }).click();
+  await expect(page).toHaveURL(`/jobs/${jobId}?q=React&sort=title`);
+});
+
+test("a client following a direct proposal URL is refused before any application request", async ({ page, baseURL }) => {
+  const requests = await mockMarketplace(page, baseURL, { role: "client" });
+  await page.goto(`/apply/${jobId}`);
+  await expect(page).toHaveURL(/\/client-dashboard$/);
+  await expect(page.getByRole("button", { name: "Submit Application" })).toHaveCount(0);
+  expect(requests.filter((item) => item.path === "/rest/v1/job_applications" && item.method === "POST")).toEqual([]);
+});
+
+test("proposal validation, repeated submits and network retry preserve the draft", async ({ page, baseURL }) => {
+  const attempts = [];
+  await mockMarketplace(page, baseURL, { role: "freelancer", onApply: async (route, payload) => {
+    attempts.push(payload);
+    if (attempts.length === 1) return route.fulfill({ status: 503, json: { message: "Fixture disconnected" } });
+    return route.fulfill({ status: 201 });
+  } });
+  await page.goto(`/apply/${jobId}`);
+  const send = page.getByRole("button", { name: "Submit Application" });
+  await expect(page.getByText("4 applications remaining")).toBeVisible();
+  await send.click();
+  await expect(page.getByRole("alert")).toBeFocused();
+  await expect(page.getByLabel("Cover Letter")).toHaveAttribute("aria-invalid", "true");
+  expect(attempts).toHaveLength(0);
+  await page.getByLabel("Cover Letter").fill("I can preserve the draft while the network recovers.");
+  await page.getByLabel("Expected Salary (USD)").fill("240.50");
+  await page.locator("form.journey-proposal-form").evaluate((form) => {
+    form.requestSubmit();
+    form.requestSubmit();
+  });
+  await expect(page.getByRole("alert")).toContainText("We couldn’t confirm submission");
+  expect(attempts).toHaveLength(1);
+  await expect(page.getByLabel("Cover Letter")).toHaveValue("I can preserve the draft while the network recovers.");
+  await expect(page.getByLabel("Expected Salary (USD)")).toHaveValue("240.50");
+  await send.click();
+  await expect(page.getByText("Application submitted.")).toBeVisible();
+  expect(attempts).toHaveLength(2);
+  expect(attempts[1]).toMatchObject({ job_id: jobId, freelancer_id: freelancer, client_id: client,
+    expected_salary: 240.5, status: "Pending" });
+  await expect(page.getByRole("link", { name: "View your applications" })).toBeVisible();
+});
+
+test("an existing application is shown without a duplicate POST", async ({ page, baseURL }) => {
+  const requests = await mockMarketplace(page, baseURL, { role: "freelancer", existing: true });
+  await page.goto(`/apply/${jobId}`);
+  await expect(page.getByRole("alert")).toContainText("You've already applied for this job");
+  await expect(page.getByRole("button", { name: "Submit Application" })).toBeDisabled();
+  expect(requests.filter((item) => item.path === "/rest/v1/job_applications" && item.method === "POST")).toEqual([]);
+});
+
+test("a lost response after the server saves a proposal is recovered by checking the existing application", async ({ page, baseURL }) => {
+  let saved = false;
+  const requests = await mockMarketplace(page, baseURL, {
+    role: "freelancer", existing: () => saved, onApply: (route) => {
+      saved = true;
+      return route.fulfill({ status: 503, json: { message: "Fixture response lost" } });
+    }
+  });
+  await page.goto(`/apply/${jobId}`);
+  await expect(page.getByLabel("Professional Title")).toHaveValue("Frontend Developer");
+  await page.getByLabel("Cover Letter").fill("A proposal saved before the response was lost.");
+  await page.getByLabel("Expected Salary (USD)").fill("240");
+  const submit = page.getByRole("button", { name: "Submit Application" });
+  await submit.click();
+  await expect(page.getByRole("alert")).toContainText("You've already applied for this job");
+  await expect(submit).toBeDisabled();
+  await expect(page.getByRole("link", { name: "View your applications" })).toBeVisible();
+  expect(requests.filter((item) => item.path === "/rest/v1/job_applications" && item.method === "POST")).toHaveLength(1);
+});
+
+test("the server quota response is actionable and leaves the proposal intact", async ({ page, baseURL }) => {
+  await mockMarketplace(page, baseURL, { role: "freelancer", onApply: (route) => route.fulfill({ status: 400,
+    json: { code: "23514", message: "No usage credits remain in this simulated membership cycle" } }) });
+  await page.goto(`/apply/${jobId}`);
+  await expect(page.getByLabel("Professional Title")).toHaveValue("Frontend Developer");
+  await page.getByLabel("Cover Letter").fill("A proposal with a concurrent quota change.");
+  await page.getByLabel("Expected Salary (USD)").fill("240");
+  await page.getByRole("button", { name: "Submit Application" }).click();
+  await expect(page.getByRole("alert")).toContainText("Your monthly application limit has been reached");
+  await expect(page.getByLabel("Cover Letter")).toHaveValue("A proposal with a concurrent quota change.");
+});
+
+test("proposal and discovery fit supported widths in both themes and expose keyboard focus", async ({ page, baseURL }) => {
+  await mockMarketplace(page, baseURL, { role: "freelancer" });
+  for (const [path, heading] of [["/jobs", "Find your next project"], [`/jobs/${jobId}`, job.title], [`/apply/${jobId}`, "Apply for " + job.title]]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+    for (const theme of ["light", "dark"]) {
+      await page.evaluate((mode) => { document.documentElement.dataset.theme = mode; }, theme);
+      await expect(page.locator(".job-journey")).toHaveCSS("background-color", theme === "light" ? "rgb(245, 247, 251)" : "rgb(11, 20, 36)");
+      for (const width of [320, 390, 768, 1280]) {
+        await page.setViewportSize({ width, height: 860 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      }
+    }
+  }
+  const cover = page.getByLabel("Cover Letter");
+  await cover.focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByLabel("Expected Salary (USD)")).toBeFocused();
 });

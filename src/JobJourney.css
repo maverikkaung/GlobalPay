@@ -117,16 +117,42 @@ html[data-theme="dark"] .job-journey {
 .journey-state p { color: var(--journey-muted); }
 .journey-back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-bottom: 12px; color: var(--journey-accent); text-underline-offset: 3px; }
 .journey-detail { display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); align-items: start; gap: 24px; }
-.journey-job-detail, .journey-summary { display: grid; gap: 12px; }
+.journey-job-overview { grid-template-areas: "intro summary" "detail summary"; }
+.journey-proposal { grid-template-areas: "form summary"; }
+.journey-detail-intro { grid-area: intro; }
+.journey-job-detail { grid-area: detail; }
+.journey-summary { grid-area: summary; }
+.journey-proposal-form { grid-area: form; }
+.journey-job-detail, .journey-summary, .journey-detail-intro { display: grid; gap: 12px; }
 .journey-job-detail h2 { margin-top: 12px; }
 .journey-detail-description { white-space: pre-wrap; max-width: 72ch; }
 .journey-summary dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; border-block: 1px solid var(--journey-border); padding-block: 10px; }
 .journey-summary dt { color: var(--journey-muted); }
 .journey-summary dd { font-weight: 650; text-align: end; }
+.journey-proposal-heading { margin-bottom: 20px; }
+.journey-proposal-heading h1 { margin-top: 4px; }
+.journey-proposal-form, .journey-fieldset, .journey-field { display: grid; gap: 8px; min-width: 0; }
+.journey-proposal-form { gap: 24px; }
+.journey-fieldset { padding: 12px 0 0; border: 0; border-top: 1px solid var(--journey-border); gap: 16px; }
+.journey-fieldset legend { font-weight: 700; padding-inline-end: 10px; }
+.journey-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.journey-field p { font-size: .875rem; }
+.journey-field textarea { resize: vertical; }
+.journey-field [aria-invalid="true"] { border-color: var(--journey-error); }
+.journey-field input[readonly] { background: var(--journey-raised); }
+.journey-feedback { border-inline-start: 3px solid currentColor; background: var(--journey-raised); padding: 12px; border-radius: 6px; }
+.journey-feedback a { display: inline-flex; min-height: 44px; align-items: center; text-underline-offset: 3px; }
+.journey-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 
 @media (max-width: 767px) {
   .job-journey .journey-intro, .job-journey .journey-browse, .journey-detail { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .journey-job-overview { grid-template-areas: "intro" "summary" "detail"; }
+  .journey-proposal { grid-template-areas: "summary" "form"; }
   .job-journey .journey-intro { margin-bottom: 20px; }
   .journey-public-header nav { gap: 4px 12px; }
   .journey-public-account { margin-inline-start: 0; }
+}
+
+@media (max-width: 480px) {
+  .journey-field-grid { grid-template-columns: minmax(0, 1fr); }
 }

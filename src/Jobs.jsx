@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
@@ -7,16 +7,16 @@ import { JOB_FIELDS, filterJobs, formatJobBudget, jobJourneyPath, presentJob, re
 import { JobJourney, JobSkills, JobState } from "./JobJourney.jsx";
 
 function JobSearch({ query, onSearch }) {
-  const input = useRef(null);
-  useEffect(() => { input.current.value = query; }, [query]);
+  const [input, setInput] = useState({ query, draft: query });
+  if (input.query !== query) setInput({ query, draft: query });
   return <form className="journey-search" role="search" onSubmit={(event) => {
     event.preventDefault();
-    onSearch(new FormData(event.currentTarget).get("query"));
+    onSearch(input.draft);
   }}>
     <label htmlFor="jobs-search-input">Search open jobs</label>
     <div>
-      <input ref={input} id="jobs-search-input" name="query" type="search"
-        defaultValue={query} maxLength={120} placeholder="Try React, design or writing" />
+      <input id="jobs-search-input" type="search" value={input.draft} maxLength={120}
+        onChange={(event) => setInput({ query, draft: event.target.value })} placeholder="Try React, design or writing" />
       <button className="journey-button" type="submit">Search</button>
     </div>
   </form>;
@@ -127,7 +127,11 @@ export default function Jobs() {
   const invalidBudgetRange = advanced && filters.minBudget && filters.maxBudget && Number(filters.minBudget) > Number(filters.maxBudget);
   const search = writeJobFilters(filters).toString();
   function changeFilters(changes) {
-    setParams(writeJobFilters(readJobFilters(writeJobFilters({ ...filters, ...changes }), current?.jobs ? categories : undefined)));
+    const knownCategories = current?.jobs ? categories : undefined;
+    // A second control can change while the router is still rendering the first navigation.
+    const latest = readJobFilters(new URLSearchParams(window.location.search), knownCategories);
+    const next = readJobFilters(writeJobFilters({ ...latest, ...changes }), knownCategories);
+    setParams(writeJobFilters(next));
   }
 
   return <JobJourney user={user}>

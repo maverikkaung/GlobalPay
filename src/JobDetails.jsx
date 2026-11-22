@@ -22,17 +22,14 @@ export default function JobDetails() {
     {status === "error" && <JobState title="We couldn’t load this job" status="error" onRetry={() => setAttempt((value) => value + 1)}>
       Your search is saved. Try loading the same job again.
     </JobState>}
-    {job && <div className="journey-detail">
-      <article className="journey-panel journey-job-detail">
+    {job && <div className="journey-detail journey-job-overview">
+      <header className="journey-panel journey-detail-intro">
         <p className="journey-card-meta"><span>{job.category || "Other"}</span><span>{open ? "Accepting applications" : "Closed"}</span></p>
         <h1>{job.title}</h1>
         <p className="journey-muted">
           {job.company ? <Link to={"/profiles/" + job.clientId}>{job.company}</Link> : "TechKarvo client"}
         </p>
-        <h2>About this project</h2>
-        <p className="journey-detail-description">{job.description}</p>
-        {job.skills.length > 0 && <><h2>Required skills</h2><JobSkills skills={job.skills} /></>}
-      </article>
+      </header>
       <aside className="journey-panel journey-summary" aria-label="Project terms">
         <h2>Project terms</h2>
         <dl><dt>Budget</dt><dd>{formatJobBudget(job)}</dd>
@@ -44,6 +41,11 @@ export default function JobDetails() {
           : <p>Applications are available to freelancer accounts.</p>}
         {user?.id && user.id === job.clientId && <Link className="journey-button journey-secondary" to="/my-projects">Manage project</Link>}
       </aside>
+      <article className="journey-panel journey-job-detail">
+        <h2>About this project</h2>
+        <p className="journey-detail-description">{job.description}</p>
+        {job.skills.length > 0 && <><h2>Required skills</h2><JobSkills skills={job.skills} /></>}
+      </article>
     </div>}
   </JobJourney>;
 }
