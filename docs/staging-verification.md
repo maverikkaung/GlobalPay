@@ -1,5 +1,42 @@
 # TechKarvo staging verification and migration runbook
 
+<a name="milestone-43-staging-verified"></a>
+
+## Milestone 4.3 · Staging အတည်ပြုပြီး
+
+ခွင့်ပြုထားသည့် Real Storage API QA run တစ်ကြိမ်တွင် **၁၂ အောင်၊ ၀ မအောင်၊ ၀ ကျော်** ဖြစ်သည်။ ပစ်မှတ်မှာ `techkarvo-staging` (`ntucgiieksrwebwvcmun`) ဖြစ်သည်။ Migration history သည် **000–018၊ စုစုပေါင်း ၁၉ ခု** ဖြစ်ပြီး နောက်ဆုံး version သည် [`202611150018_contract_deliveries.sql`](../supabase/migrations/202611150018_contract_deliveries.sql) ဖြစ်သည်။ Bucket `techkarvo-contract-deliveries` ကို `public: false`၊ `file_size_limit: 5242880` bytes နှင့် MIME allowlist `application/pdf`၊ `image/png`၊ `image/jpeg` ဟု ဖတ်ရှုအတည်ပြုခဲ့သည်။
+
+| စစ်ဆေးချက် | အတည်ပြုရလဒ် |
+|---|---|
+| App database insert | ၉ ခု။ Job ၁၊ application ၁၊ contract ၁၊ delivery ၂၊ notification ၂၊ quota usage event ၂။ |
+| App database update | ၇ ကြိမ်။ Job completion ၁၊ application acceptance ၁၊ contract completion ၁၊ delivery decision ၂၊ entitlement usage update ၂။ |
+| Storage | Upload တောင်းဆိုမှု ၆ ကြိမ်၊ ထိန်းထားသော private file ၃ ခု၊ မပြီးဆုံးသော upload ၀။ |
+| မျှော်မှန်းပယ်ချမှု | Access နှင့် validation ပယ်ချမှု ၂၀။ |
+| ဖျက်မှုနှင့် scope ပြင်ပ ရေးသားမှု | Database delete ၀၊ Storage delete ၀။ Ledger၊ review၊ chat၊ profile ရေးသားမှု ၀။ |
+
+စမ်းသပ်မှုတွင် ပါဝင်သူသီးသန့်ဝင်ခွင့်၊ outsider/anonymous ပိတ်ပင်မှု၊ MIME နှင့် အရွယ်အစားကန့်သတ်ချက်၊ delivery မတင်သွင်းရသေးသော ဖိုင်များ၏ ဖတ်ခွင့်၊ မူလ request ID တူညီသော retry၊ private download၊ signed URL သက်တမ်းကုန်မှု၊ revision နှင့် version history တို့ အောင်မြင်သည်။ V1 တွင် revision တောင်းထားပြီး V2 ကို လက်ခံထားသည်။ Approval သည် စာချုပ်ပြီးဆုံးမှုကို တစ်ပါတည်း မပြောင်းခဲ့ပါ။ သီးခြား job completion လုပ်ဆောင်ချက်အပြီး နှစ်ဖက် review တင်ခွင့် ပေါ်လာကြောင်း ဖတ်ရှုစစ်ဆေးခဲ့သည်။
+
+### မတိုင်မီနှင့် ပြီးနောက် ဒေတာတည်ငြိမ်မှု
+
+- **မတိုင်မီ** — QA Client၊ Freelancer နှင့် outsider တို့၏ session နှင့် role သုံးခုလုံး အတည်ပြုခဲ့သည်။ မူလပြီးဆုံးစာချုပ်တစ်ခုရှိပြီး reserved fixture row၊ outsider ဆက်နွယ်မှုနှင့် delivery object အားလုံး ၀။ Marketplace လက်ဗွေအုပ်စု ၁၀/၁၀၊ ယခင် schema နှင့် privilege လက်ဗွေအုပ်စု ၃၁/၃၁ ကိုက်ညီသည်။ RLS policy စုစုပေါင်း ၁၈၈ ခုတွင် Storage policy ၁၁ ခု ပါဝင်သည်။
+- **ပြီးနောက်** — မူလပြီးဆုံးစာချုပ်၊ သမိုင်းမှတ်တမ်း၊ RLS၊ grants၊ Storage မူဝါဒနှင့် ရှိပြီးသား object များ၏ လက်ဗွေများ မပြောင်းလဲကြောင်း တိုက်စစ်ခဲ့သည်။ QA Client နှင့် Freelancer တစ်ဦးစီ quota credit ၁ ခု သုံးခဲ့ပြီး usage event ၂၉ → ၃၁ ဖြစ်လာသည်။ အခြား membership row များ၊ plan နှင့် sandbox setting မပြောင်းလဲပါ။ Ledger account ၂၂၊ transaction ၃၆၊ journal entry ၇၂ မပြောင်းလဲဘဲ စစ်ဆေးထားသည့် ledger စည်းမျဉ်းချိုးဖောက်မှု ၀ ဖြစ်သည်။ လက်ရှိ ဖတ်ရှုအတည်ပြုချက်တွင် migration၊ bucket၊ ledger နှင့် ထိန်းထားသည့် ဖိုင်အရေအတွက်တို့ ကိုက်ညီနေသည်။
+
+| ထိန်းထားသော QA ဖိုင် | Delivery | အရွယ်အစား | ပိုင်ဆိုင်မှုနှင့် ထိန်းသိမ်းမှု |
+|---|---|---:|---|
+| PDF | V1 | ၅,၂၄၂,၈၈၀ bytes | QA Freelancer ပိုင်၊ private အဖြစ် ထိန်းထားသည်။ |
+| PNG | V2 | ၁၂၃ bytes | QA Freelancer ပိုင်၊ private အဖြစ် ထိန်းထားသည်။ |
+| JPEG | V2 | ၆၆၄ bytes | QA Freelancer ပိုင်၊ private အဖြစ် ထိန်းထားသည်။ |
+
+ဖိုင်သုံးခုလုံး သက်ဆိုင်ရာ version နှင့် ချိတ်ဆက်ပြီးဖြစ်သည်။ Private object path၊ account ID နှင့် signed URL များကို ဤမှတ်တမ်းတွင် မသိမ်းထားပါ။ Cleanup လုပ်ဆောင်ရန် သီးခြားခွင့်ပြုချက်နှင့် QA fixture ပိုင်ဆိုင်မှု အတည်ပြုချက် လိုသည်။ [QA အတိုင်းအတာနှင့် စစ်ဆေးစာရင်း](techkarvo-delivery-storage-staging-qa.md) · [Migration နှင့် လည်ပတ်ရေး](techkarvo-deliveries-deployment.md)
+
+### အကန့်အသတ်နှင့် နောက်အဆင့်
+
+ရလဒ်သည် staging နှင့် ခွင့်ပြုထားသည့် QA run ကိုသာ အကျုံးဝင်သည်။ Review eligibility ကို ဖတ်ရှုစစ်ဆေးခဲ့သည်။ Malware စစ်ဆေးမှု၊ orphan ဖိုင်များ၏ retention/cleanup၊ အသုံးပြုနှုန်း ကန့်သတ်မှုနှင့် production ဖြန့်ချိမှုအတွက် သီးခြားစစ်ဆေးချက်များ ကျန်သည်။
+
+ပိတ်သိမ်းစဉ် စက်တွင်း unit ၉၂ ခု၊ သီးခြား PostgreSQL စမ်းသပ်ဖိုင် ၁၂ ခုနှင့် local Playwright ၃၀ ခု အားလုံး အောင်မြင်ပြီး သုံးမျိုးစလုံး မအောင် ၀၊ ကျော် ၀ ဖြစ်သည်။ Lint နှင့် production build အောင်မြင်သည်။ Staging ရေးသားမှုပါ QA run ကို ထပ်မလုပ်ခဲ့ပါ။
+
+**အဆိုပြုချက် 4.4A · ပရိုဖိုင် preview နှင့် မြင်ခွင့် စစ်ဆေးမှု။** ရှိပြီးသား schema ဖြင့် ပိုင်ရှင်နှင့် အများမြင်ရမည့် profile/portfolio ကို read-only preview ပြရန် အရင်လုပ်ပါ။ Public၊ member၊ owner နှင့် blocked viewer အလိုက် မြင်ခွင့်၊ လျှို့ဝှက် field ချန်ထားမှု၊ keyboard နှင့် မြန်မာ/အင်္ဂလိပ် စာသားများကို local mock ဖြင့် စစ်ပါ။ [Milestone 4.4 လမ်းပြမြေပုံ](techkarvo-implementation-roadmap.md)
+
 ## Milestone 3 ပြီးဆုံးမှု · Staging Playwright ၈/၈
 
 ခွင့်ပြုထားသည့် အပြည့်အစုံ တစ်ကြိမ်တွင် **၈ အောင်၊ ၀ ကျ၊ ၀ ကျော်** ဖြစ်သည်။ ကြာချိန် ၃ မိနစ် ၄၉ စက္ကန့် ဖြစ်သည်။ `techkarvo-staging` (`ntucgiieksrwebwvcmun`) ကို authenticated နည်းဖြင့် အတည်ပြုပြီး သီးခြား QA အကောင့်အသစ် နှစ်ခုကို သီးခြား session ဖိုင်တွဲတွင် သုံးသည်။ Run မစမီ အကောင့်နှစ်ခုလုံး လက်ရှိ Free quota ရှိပြီး ယခင် conversation၊ hide၊ usage event နှင့် ledger transaction မရှိကြောင်း၊ သတ်မှတ် run ID အတွက် ငွေလွှဲမှတ်တမ်း ၀ ခု ဖြစ်ကြောင်း စစ်သည်။ စမ်းသပ်မှုအတွင်း အလိုအလျောက် retry ၀ ခု ဖြစ်သည်။
