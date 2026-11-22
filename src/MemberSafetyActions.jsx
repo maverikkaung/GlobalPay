@@ -26,7 +26,8 @@ export default function MemberSafetyActions({ user, memberId, memberName, applic
       if (schemaMissing) { setAvailable(false); setLoading(false); return; }
       if (!schemaMissing && (blockResult.error || muteResult.error)) setError("Safety controls could not be loaded.");
       const nextBlocked = Boolean(blockResult.data);
-      setBlocked(nextBlocked); setMuted(Boolean(muteResult.data)); onBlockedChange?.(nextBlocked);
+      setBlocked(nextBlocked); setMuted(Boolean(muteResult.data));
+      if (!blockResult.error) onBlockedChange?.(nextBlocked);
       setLoading(false);
     }
     loadSafetyState().catch((loadError) => {

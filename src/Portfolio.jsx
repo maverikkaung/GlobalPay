@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { toSafeExternalUrl } from "./external-urls.js";
 import { getRequestErrorMessage } from "./request-errors.js";
 import DashboardNav from "./DashboardNav.jsx";
+import PortfolioProject from "./PortfolioProject.jsx";
 
 function Portfolio() {
   const { user } = useAuth();
@@ -124,6 +126,7 @@ function Portfolio() {
           <span className="dashboard-tag">SHOW YOUR WORK</span>
           <h1>Portfolio</h1>
           <p>Add selected projects so clients can see what you do best.</p>
+          <Link to={`/profiles/${user.id}#portfolio-projects`}>Preview portfolio</Link>
         </div>
         <section className="dashboard-section portfolio-editor">
           <h2>{editingId ? "Edit project" : "Add a project"}</h2>
@@ -143,19 +146,18 @@ function Portfolio() {
             </div>
           </form>
         </section>
-        <section className="portfolio-grid" aria-label="Portfolio projects">
-          {loading ? <p>Loading portfolio…</p> : items.length === 0 ? <div className="no-jobs"><h3>Your portfolio is ready to grow</h3><p>Add your first project above.</p></div> : items.map((item) => (
-            <article className="portfolio-card" key={item.id}>
-              {toSafeExternalUrl(item.image_url) && <img src={toSafeExternalUrl(item.image_url)} alt="" loading="lazy" />}
-              <div>
-                <h2>{item.title}</h2><p>{item.description}</p>{toSafeExternalUrl(item.project_url) && <a href={toSafeExternalUrl(item.project_url)} target="_blank" rel="noopener noreferrer">View project ↗</a>}
+        <section aria-labelledby="portfolio-owner-projects">
+          <h2 id="portfolio-owner-projects">Portfolio projects</h2>
+          <div className="portfolio-grid">
+            {loading ? <p role="status">Loading portfolio…</p> : items.length === 0 ? <p>No portfolio projects yet.</p> : items.map((item) => (
+              <PortfolioProject project={item} key={item.id}>
                 <div className="portfolio-card-actions">
                   <button type="button" className="portfolio-edit-button" disabled={saving || Boolean(deletingId)} onClick={() => editItem(item)}>Edit</button>
                   <button type="button" className="portfolio-delete-button" disabled={saving || Boolean(deletingId)} onClick={() => deleteItem(item)}>{deletingId === item.id ? "Deleting…" : "Delete"}</button>
                 </div>
-              </div>
-            </article>
-          ))}
+              </PortfolioProject>
+            ))}
+          </div>
         </section>
       </main>
     </div>

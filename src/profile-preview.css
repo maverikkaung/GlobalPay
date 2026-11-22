@@ -1,0 +1,108 @@
+.profile-preview {
+  display: grid;
+  gap: 18px;
+  max-width: 1120px;
+  color: var(--tk-text);
+}
+
+.profile-preview-link {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 44px;
+  gap: 6px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--tk-text);
+  font: inherit;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.profile-preview-link:hover { color: var(--tk-blue-soft); }
+.profile-preview-hero, .profile-preview-section, .profile-preview-state {
+  min-width: 0;
+  border: 1px solid var(--tk-border);
+  border-radius: 18px;
+  background: var(--tk-card);
+  overflow-wrap: anywhere;
+}
+
+.profile-preview-hero { overflow: hidden; }
+.profile-preview-cover {
+  height: clamp(76px, 13vw, 156px);
+  background: linear-gradient(112deg, var(--tk-hover), var(--tk-card-raised) 66%, var(--tk-page-soft));
+}
+.profile-preview-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.profile-preview-hero-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, auto);
+  align-items: start;
+  gap: 18px;
+  padding: clamp(14px, 3vw, 28px);
+}
+.profile-preview-avatar {
+  display: grid;
+  width: clamp(64px, 10vw, 96px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid var(--tk-border);
+  border-radius: 50%;
+  background: var(--tk-hover);
+  color: var(--tk-text);
+  font-size: 26px;
+  font-weight: 700;
+  object-fit: cover;
+}
+.profile-preview-identity h1 { margin: 3px 0 8px; color: var(--tk-text); font-size: clamp(24px, 4vw, 38px); line-height: 1.16; }
+.profile-preview-identity p { margin: 4px 0; line-height: 1.4; }
+.profile-preview-role, .profile-preview-location { color: var(--tk-muted); }
+.profile-preview-role { font-weight: 650; font-size: 14px; }
+.profile-preview-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.profile-preview-actions .social-primary-button { min-height: 44px; text-decoration: none; }
+.profile-preview-nav { display: flex; flex-wrap: wrap; gap: 4px 18px; border-bottom: 1px solid var(--tk-border); }
+.profile-preview-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--tk-text);
+  font-weight: 650;
+  text-underline-offset: 4px;
+}
+.profile-preview-nav a:hover { color: var(--tk-blue-soft); }
+.profile-preview-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: start; gap: 18px; }
+.profile-preview-details { min-width: 0; display: grid; gap: 18px; }
+.profile-preview-section, .profile-preview-state { padding: clamp(14px, 2.5vw, 24px); }
+.profile-preview-section { scroll-margin-top: 90px; }
+.profile-preview-section:focus-visible { outline: 3px solid var(--tk-blue-soft); outline-offset: 2px; }
+.profile-preview-section h2, .profile-preview-state h1 { margin: 0 0 12px; color: var(--tk-text); }
+.profile-preview-section h3 { margin: 16px 0 8px; color: var(--tk-text); }
+.profile-preview-section p, .profile-preview-state p { margin: 0 0 10px; color: var(--tk-muted); line-height: 1.65; white-space: pre-wrap; }
+.profile-preview-skills { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.profile-preview-skills li {
+  min-width: 0;
+  padding: 5px 10px;
+  border: 1px solid var(--tk-border);
+  border-radius: 8px;
+  background: var(--tk-page-soft);
+  font-size: 14px;
+}
+.profile-preview-projects { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px; }
+.profile-project { min-width: 0; overflow-wrap: anywhere; }
+.profile-project .profile-project-image { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: var(--tk-page-soft); }
+.profile-project .profile-project-body { padding: 14px; }
+.profile-project h3 { margin: 0 0 8px; }
+.profile-project p { white-space: pre-wrap; }
+.profile-preview-rating strong { color: var(--tk-text); font-size: 21px; margin-right: 6px; }
+.profile-preview-reviews { display: grid; gap: 12px; list-style: none; margin: 14px 0 0; padding: 0; }
+.profile-preview-reviews li { padding: 12px 0 0; border-top: 1px solid var(--tk-border); }
+.profile-preview-reviews time { margin-left: 8px; color: var(--tk-muted); font-size: 13px; }
+.profile-preview-reviews p { margin: 4px 0 0; }
+
+@media (max-width: 760px) {
+  .profile-preview-columns { grid-template-columns: minmax(0, 1fr); }
+  .profile-preview-hero-body { grid-template-columns: auto minmax(0, 1fr); gap: 12px; }
+  .profile-preview-actions { grid-column: 1 / -1; }
+}

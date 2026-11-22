@@ -109,7 +109,7 @@ function ClientProfile() {
       <main className="dashboard-container">
         <div className="dashboard-welcome">
           <span className="dashboard-tag">CLIENT PROFILE</span>
-          <h1>My Public Profile</h1>
+          <h1>My professional profile</h1>
           <p>Keep your identity up to date for freelancers you work with.</p>
         </div>
         <form className="application-form" onSubmit={saveProfile}>
@@ -126,7 +126,7 @@ function ClientProfile() {
             {loading ? "Loading profile…" : saving ? "Saving…" : "Save profile"}
           </button>
         </form>
-        <p><Link to={`/profiles/${userId}`}>Preview your public profile ↗</Link></p>
+        <p><Link to={`/profiles/${userId}`}>Preview profile</Link></p>
       </main>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./useAuth.js";
 import { supabase } from "./supabase.js";
 import { toSafeExternalUrl } from "./external-urls.js";
@@ -147,6 +147,7 @@ function FreelancerProfile() {
           <span className="dashboard-tag">FREELANCER PROFILE</span>
           <h1>My Professional Profile</h1>
           <p>Tell clients about your experience and skills.</p>
+          <Link to={`/profiles/${user.id}`}>Preview profile</Link>
         </div>
 
         <form className="application-form" onSubmit={handleSave}>
